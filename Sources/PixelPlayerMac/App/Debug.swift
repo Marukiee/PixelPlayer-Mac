@@ -142,6 +142,10 @@ enum Debug {
                 window.makeKeyAndOrderFront(nil)
                 try? await Task.sleep(for: .seconds(0.8))
             }
+            // No keyboard focus ring in the pictures.
+            window.makeFirstResponder(nil)
+            for popover in NSApp.windows where popover.isVisible && isPopover(popover) { popover.makeFirstResponder(nil) }
+            try? await Task.sleep(for: .seconds(0.2))
             await capture(window.windowNumber, to: url)
             if looksActive(url) { break }
         }

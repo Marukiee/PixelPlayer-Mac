@@ -173,8 +173,24 @@ struct QueueInspector: View {
     var body: some View {
         @Bindable var model = model
         List {
-            Section("Speelt nu") {
+            Section {
                 SongLine(song: model.current, playing: true, cover: 36)
+            } header: {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("Hierna").font(.title3.weight(.semibold)).foregroundStyle(.primary)
+                    Text("\(model.userQueue.count + model.upNext.count) nummers").foregroundStyle(.secondary)
+                    Spacer()
+                    Menu {
+                        Button("Willekeurig", systemImage: "shuffle") {}
+                        Button("Wachtrij wissen", systemImage: "trash") {}
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                    }
+                    .menuStyle(.borderlessButton)
+                    .menuIndicator(.hidden)
+                    .fixedSize()
+                }
+                .padding(.bottom, 4)
             }
             Section("Zelf toegevoegd") {
                 ForEach(model.userQueue) { SongLine(song: $0, queued: true) }
@@ -184,25 +200,6 @@ struct QueueInspector: View {
                 ForEach(model.upNext) { SongLine(song: $0) }
                     .onMove { model.upNext.move(fromOffsets: $0, toOffset: $1) }
             }
-        }
-        .safeAreaInset(edge: .top, spacing: 0) {
-            HStack {
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("Hierna").font(.headline)
-                    Text("\(model.userQueue.count + model.upNext.count) nummers").font(.caption).foregroundStyle(.secondary)
-                }
-                Spacer()
-                Menu {
-                    Button("Willekeurig", systemImage: "shuffle") {}
-                    Button("Wachtrij wissen", systemImage: "trash") {}
-                } label: {
-                    Image(systemName: "ellipsis.circle")
-                }
-                .menuStyle(.borderlessButton)
-                .menuIndicator(.hidden)
-                .fixedSize()
-            }
-            .padding(.horizontal, 16).padding(.vertical, 10)
         }
     }
 }

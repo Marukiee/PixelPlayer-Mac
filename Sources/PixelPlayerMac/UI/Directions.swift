@@ -47,7 +47,8 @@ struct RootView: View {
                     .transition(.opacity)
             }
         }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
+        // safeAreaBar gives the system's soft edge under the floating player, so content fades out beneath it.
+        .safeAreaBar(edge: .bottom, spacing: 0) {
             if model.direction == .floating {
                 FloatingPlayer()
                     .padding(.horizontal, 20)

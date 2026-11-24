@@ -62,7 +62,15 @@ struct YourMix: View {
                     }
                     .controlSize(.large)
                 }
-                Spacer(minLength: 0)
+                Spacer(minLength: 16)
+                Divider()
+                // The first songs of the mix, so the box shows what you would hear.
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(["Blue Hour", "Night Signal", "Orbit", "Lantern Song"], id: \.self) { title in
+                        SongLine(song: Sample.song(title), cover: 24)
+                    }
+                }
+                .frame(minWidth: 170, maxWidth: 220)
             }
             .padding(8)
         }

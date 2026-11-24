@@ -11,20 +11,23 @@ open "dist/PixelPlayer Dev.app"
 ```
 
 Minimaal macOS 26, bouwt met `swift build` en de Command Line Tools. In het menu **Richting** wissel je met
-⌘1, ⌘2 en ⌘3 tussen de drie richtingen. Het menubalkpaneel zit onder het muzieknootje in de menubalk.
+⌘1 en ⌘2 tussen de twee varianten. Instellingen zit onder ⌘, en het menubalkpaneel onder het muzieknootje.
 
-## De drie richtingen
+## Ronde 2: native macOS
 
-- **A, Zijbalk:** een zwevende glazen zijbalk met de bibliotheek, de speler als glazen balk bovenin
-  (hoes, titel en voortgang in één capsule), de wachtrij als kolom rechts, Verbinden groeit uit zijn knop.
-- **B, Speler centraal:** de speler is het venster. Links altijd de grote hoes, rechts tekst-tabbladen
-  (Hierna, Home, Bibliotheek, Zoeken). Verbinden schuift van onderen in, en de speler groeit uit tot het hele venster.
-- **C, Tabbladen:** de Android-opbouw vertaald: tabbladen bovenin, inhoud over de hele breedte, een zwevende
-  minispeler onderin die uitgroeit tot de volledige speler. Wachtrij en Verbinden komen als glazen panelen uit de minispeler.
+Alles met de onderdelen van het systeem: de zijbalk en het zoekveld van `NavigationSplitView`, de werkbalk, een `Table`
+voor nummers, de wachtrij in de inspector rechts, Verbinden als popover, Instellingen als echt Mac-venster met tabbladen.
+De speler staat onderin, op twee manieren:
+
+- **A, Balk onderin:** een balk over de hele breedte van het venster, onder de zijbalk en de inhoud.
+- **B, Zwevende speler:** een glazen capsule die onderin over de inhoud zweeft.
+
+Ronde 1 (drie richtingen in PixelPlayer-stijl) staat in `design/ronde-1` en is afgekeurd: te veel Android nagedaan.
 
 ## Screenshots en beweging
 
-`scripts/capture-all.sh` maakt echte screenshots van alleen het eigen venster (`screencapture -l`, dus echt glas),
-licht en donker, en zet ze per scherm naast elkaar in `design/ronde-1/`. `scripts/motion.sh` vertraagt alle veren,
-legt het venster beeld voor beeld vast en zet dat op echte snelheid in `design/ronde-1/beweging-*.mp4`.
-De debug-variabelen staan bovenaan `Sources/PixelPlayerMac/App/Debug.swift`.
+`scripts/capture-all.sh` maakt echte screenshots van alleen het eigen venster (`screencapture -l`), licht en donker,
+en zet ze per scherm naast elkaar in `design/ronde-2/`. Een popover is een eigen venster; dan wordt de rechthoek van het
+venster vastgelegd en bijgesneden tot de vorm van het venster. `scripts/motion.sh` vertraagt de veren, legt het venster
+beeld voor beeld vast en zet dat op echte snelheid in `design/ronde-2/beweging-*.mp4`. De debug-variabelen staan
+bovenaan `Sources/PixelPlayerMac/App/Debug.swift`.

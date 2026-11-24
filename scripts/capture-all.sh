@@ -22,7 +22,12 @@ scenes() {   # $1 = licht|donker
   echo "$steps"
 }
 [ -n "${COMPOSE_ONLY:-}" ] || ./scripts/run.sh "$RAW" "$(scenes licht),appearance:dark,wait:1,$(scenes donker),quit" PP_APPEARANCE=light
-rm -f "$RAW/x.png"
+rm -f "$RAW/x.png" "$RAW"/*-region.png
+
+# The window pictures have see-through rounded corners; put them on white first, or they turn black when combined.
+FLAT="$(mktemp -d)"
+for f in "$RAW"/*.png; do magick -quiet "$f" -background white -alpha remove -alpha off "$FLAT/$(basename "$f")"; done
+RAW_IN="$RAW"; RAW="$FLAT"
 
 # Per scene: A | B side by side with their names above, light over dark.
 LABELS="$(mktemp -d)"
@@ -48,4 +53,5 @@ ffmpeg -nostdin -loglevel error -y \
 [3]scale=iw/2:-1,pad=iw+40:700:20:20:color=white[d];[4]scale=iw/2:-1,pad=iw+40:700:20:20:color=white[e];[5]scale=iw/2:-1,pad=iw+40:700:20:20:color=white[f];\
 [a][b][c]hstack=3[top];[d][e][f]hstack=3[bottom];[top][bottom]vstack" \
   "$OUT/6-instellingen-en-menubalk.png"
+rm -rf "$FLAT"; RAW="$RAW_IN"
 echo "$OUT"
