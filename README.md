@@ -1,32 +1,48 @@
-# PixelPlayer voor Mac (ontwerpproef)
+# PixelPlayer for Mac
 
-Een SwiftUI-prototype om een richting te kiezen voor PixelPlayer op de Mac (roadmap punt 28 van de Android-mod).
-Alleen ontwerp: verzonnen muziek, getekende hoezen, niets speelt, niets wordt gescand of verbonden.
+[![Release](https://img.shields.io/github/v/release/Marukiee/PixelPlayer-Mac)](https://github.com/Marukiee/PixelPlayer-Mac/releases/latest)
+[![License](https://img.shields.io/github/license/Marukiee/PixelPlayer-Mac)](LICENSE)
+![Platform](https://img.shields.io/badge/platform-macOS%2026-blue)
 
-## Bouwen en draaien
+English | [Nederlands](README.nl.md)
+
+**Your Navidrome library and the music on your Mac in one native player.** PixelPlayer for Mac works the way PixelPlayer does on Android: a song you have on the Mac plays from the Mac, likes and listens stay in step with your server, and the music can move to your Sonos speakers or your phone.
+
+## Screenshots
+
+![Home](design/ronde-4/1-home.png)
+![Connect](design/ronde-4/5-verbinden.png)
+![Lyrics](design/ronde-4/6-songtekst.png)
+
+## What it does
+
+- **One library:** your Navidrome server and a music folder on the Mac together. When a song is in both, the Mac plays its own file.
+- **Likes and listens:** a heart here is a star on the server and the other way round, with the same rules as PixelPlayer on Android. Listens count on the server once you heard half a song or four minutes.
+- **Sonos:** pick rooms in Connect, group them and set the volume per room. The Mac keeps the queue.
+- **Your phone:** play on a phone with PixelPlayer, paired over Bluetooth. The phone plays its own copy of each song and the Mac follows it.
+- **Native:** a floating glass player, a queue column, lyrics across the window, a full screen player, the menu bar and media keys.
+
+## Install
+
+1. Download `PixelPlayer-v<version>-macOS.zip` from the [latest release](https://github.com/Marukiee/PixelPlayer-Mac/releases/latest).
+2. Open the zip and move PixelPlayer to Applications.
+3. The first time, right click the app and choose Open. macOS asks because the app is signed with a certificate of its own, not by Apple.
+4. In Settings › Sources, choose your music folder and log in to Navidrome.
+
+After that the app updates itself: a card at the top of the window shows a new version, and one click installs it.
+
+## Build
+
+Needs macOS 26 and the Command Line Tools.
 
 ```bash
+swift run PixelPlayerChecks
 ./scripts/build-app.sh
 open "dist/PixelPlayer Dev.app"
 ```
 
-Minimaal macOS 26, bouwt met `swift build` en de Command Line Tools. Instellingen zit onder ⌘, en het menubalkpaneel
-onder het muzieknootje. De app is standaard Engels.
+The development build never updates itself. Test tools for the Sonos and phone parts are in `tools/`.
 
-## Ronde 3 (nu)
+## License
 
-Native macOS met een ruimere indeling zoals Spotify: de zijbalk is de bibliotheek (lijsten, albums en artiesten met hoes,
-een keuzemenu om te filteren), Home met een brede Your Mix, snelkeuzetegels en rijen hoezen die altijd precies vol zijn,
-afspeellijsten en albums met een grote kop in de kleur van de hoes en ruime rijen. Geen werkbalk: de bovenkant is vrij en
-de kleur loopt door tot de rand. De speler is de zwevende glazen capsule onderin (Marks keuze uit ronde 2), de wachtrij een
-kolom rechts. Wensen voor later staan in `docs/ROADMAP.md`.
-
-Ronde 1 (PixelPlayer-stijl, te veel Android) en ronde 2 (native, maar te veel dichte lijsten) staan in `design/`.
-
-## Screenshots en beweging
-
-`scripts/capture-all.sh` maakt echte screenshots van alleen het eigen venster (`screencapture -l`), licht en donker,
-en zet licht en donker per scherm naast elkaar in `design/ronde-3/`. Een popover is een eigen venster; dan wordt de rechthoek van het
-venster vastgelegd en bijgesneden tot de vorm van het venster. `scripts/motion.sh` vertraagt de veren, legt het venster
-beeld voor beeld vast en zet dat op echte snelheid in `design/ronde-3/beweging.mp4`. De debug-variabelen staan
-bovenaan `Sources/PixelPlayerMac/App/Debug.swift`.
+AGPL-3.0, see [LICENSE](LICENSE). Made by Mark Maakt Media.

@@ -35,5 +35,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.regular)
         Debug.launch()
         NSApp.activate()
+        // New versions from GitHub: at launch, when the app comes to the front, and every hour. The Dev build never looks.
+        Updater.shared.checkIfDue()
+        Updater.shared.startPeriodicChecks()
+    }
+
+    func applicationDidBecomeActive(_ notification: Notification) {
+        Updater.shared.checkIfDue()
     }
 }

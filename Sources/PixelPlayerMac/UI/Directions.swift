@@ -41,8 +41,12 @@ struct RootView: View {
                     NowPlayingView()
                         .transition(.opacity.combined(with: .scale(scale: 0.98)))
                 } else {
-                    RouteContent()
-                        .transition(.opacity)
+                    // The update card pushes the page down rather than lying over it.
+                    VStack(spacing: 0) {
+                        UpdateCard()
+                        RouteContent().frame(maxHeight: .infinity)
+                    }
+                    .transition(.opacity)
                 }
             }
             .frame(minWidth: 0, maxWidth: .infinity)

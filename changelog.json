@@ -1,0 +1,24 @@
+[
+  {
+    "version": "0.1.0",
+    "date": "2026-11-25",
+    "en": {
+      "title": "First version",
+      "new": [
+        "Your Navidrome library and the music on this Mac in one place; a song you have here plays from here",
+        "Likes and listens sync with Navidrome, the same way as PixelPlayer on Android",
+        "Play on Sonos: rooms, groups and volume per room",
+        "Play on your phone with PixelPlayer, from the Mac"
+      ]
+    },
+    "nl": {
+      "title": "Eerste versie",
+      "new": [
+        "Je Navidrome-bibliotheek en de muziek op deze Mac op een plek; een nummer dat hier staat speelt van hier",
+        "Likes en luisterbeurten gaan gelijk met Navidrome, net als PixelPlayer op Android",
+        "Afspelen op Sonos: kamers, groepen en volume per kamer",
+        "Afspelen op je telefoon met PixelPlayer, vanaf de Mac"
+      ]
+    }
+  }
+]

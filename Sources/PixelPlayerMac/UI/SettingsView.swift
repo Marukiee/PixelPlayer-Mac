@@ -20,7 +20,7 @@ struct SettingsView: View {
 private struct GeneralPane: View {
     @LocalState private var launchAtLogin = false
     @LocalState private var menuBar = true
-    @LocalState private var autoUpdate = true
+    @LocalState private var updater = Updater.shared
 
     var body: some View {
         Form {
@@ -29,12 +29,30 @@ private struct GeneralPane: View {
                 Toggle("Player in the menu bar", isOn: $menuBar)
             }
             Section("Updates") {
-                Toggle("Update automatically", isOn: $autoUpdate)
-                LabeledContent("Version", value: "0.1, design prototype")
+                Toggle("Check for updates automatically", isOn: $updater.autoCheck)
+                    .disabled(Updater.isDevelopmentBuild)
+                LabeledContent("Version") {
+                    HStack(spacing: 8) {
+                        Text(Updater.isDevelopmentBuild ? "\(updater.currentVersion), development build" : updaterStatus)
+                            .foregroundStyle(.secondary)
+                        Button("Check Now") { Task { await updater.check(manual: true) } }
+                            .disabled(Updater.isDevelopmentBuild || updater.state == .checking)
+                    }
+                }
             }
         }
         .formStyle(.grouped)
         .frame(height: 262)
+    }
+
+    private var updaterStatus: String {
+        switch updater.state {
+        case .checking: "\(updater.currentVersion), checking…"
+        case .upToDate: "\(updater.currentVersion), up to date"
+        case .available(let release): "\(release.version) is ready, see the top of the window"
+        case .failed(let message): "\(updater.currentVersion). \(message)"
+        default: updater.currentVersion
+        }
     }
 }
 

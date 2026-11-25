@@ -139,6 +139,17 @@ enum Debug {
             } else {
                 try? line.write(to: url, atomically: true, encoding: .utf8)
             }
+        case "update":
+            // `update:available|downloading|installing|failed` shows the update card with a made-up release.
+            let release = Updater.Release(version: "0.2.0", notes: "Faster start\n\nNew\n\n\u{2022} Lyrics follow the song on Sonos\n\u{2022} Add songs to a playlist from the right-click menu",
+                                          zipURL: URL(string: "https://example.invalid/PixelPlayer-macOS.zip")!, shaURL: nil, sigURL: nil,
+                                          size: 18_400_000, page: URL(string: "https://example.invalid")!)
+            switch value {
+            case "available": Updater.shared.state = .available(release)
+            case "downloading": Updater.shared.state = .available(release); try? await Task.sleep(for: .milliseconds(50)); Updater.shared.state = .downloading(release, Double(parts.count > 2 ? parts[2] : "0.42") ?? 0.42)
+            case "installing": Updater.shared.state = .downloading(release, 1); try? await Task.sleep(for: .milliseconds(50)); Updater.shared.state = .installing
+            default: Updater.shared.state = .idle
+            }
         case "remotestate":
             // What the Mac shows while a phone plays, for the remote checks.
             let remote = RemoteController.shared
