@@ -1,43 +1,59 @@
 import SwiftUI
 
-/// Made-up music for the design prototype: the same invented albums as the Android demo screenshots,
-/// plus a few more so the grids fill. Nothing here belongs to anyone.
+/// The drawn covers of the made-up sample music.
 enum ArtStyle: Hashable {
     case sunset, blueDisc, bubbles, hills, orbit, prism, aurora, tide, copperMoon
 }
 
 struct Album: Identifiable, Hashable {
-    let id: Int
+    let id: String
     let title: String
     let artist: String
     let year: Int
     let genre: String
-    let art: ArtStyle
-    /// The colour the player borrows from the cover, light and dark.
-    let tint: UInt32
+    /// A drawn cover (sample music) or a cover from the server or the file.
+    var art: ArtStyle? = nil
+    var coverArtID: String? = nil
+    var localCover: URL? = nil
+    /// The colour the player borrows from the cover.
+    var tint: UInt32 = 0x23408F
+}
+
+/// Where a song can be played from. A song that is both on this Mac and on the server keeps both,
+/// and the local file always wins for playing on the Mac.
+struct SongSource: Hashable {
+    var localURL: URL? = nil
+    var serverID: String? = nil
+    /// The path as the server knows it, for matching against local files.
+    var serverPath: String? = nil
+    var suffix: String? = nil
+    var bitRate: Int? = nil
 }
 
 struct Song: Identifiable, Hashable {
-    let id: Int
+    let id: String
     let title: String
     let album: Album
     let seconds: Int
-    var artist: String { album.artist }
+    var artistName: String? = nil
+    var track: Int? = nil
+    var source = SongSource()
+    var addedText = ""
+
+    var artist: String { artistName ?? album.artist }
     var duration: String { String(format: "%d:%02d", seconds / 60, seconds % 60) }
-    /// When it was added, as the library shows it.
-    var added: String {
-        ["today", "yesterday", "3 days ago", "5 days ago", "1 week ago", "2 weeks ago", "3 weeks ago", "12 Oct 2026", "28 Sep 2026"][id % 9]
-    }
+    var added: String { addedText }
+    var isLocal: Bool { source.localURL != nil }
 }
 
 struct Playlist: Identifiable, Hashable {
-    let id: Int
+    let id: String
     let title: String
-    let songs: [Song]
+    var songs: [Song]
 }
 
 struct Mix: Identifiable, Hashable {
-    let id: Int
+    let id: String
     let title: String
     let subtitle: String
     let symbol: String
@@ -60,20 +76,22 @@ struct Device: Identifiable, Hashable {
     }
 }
 
+/// Made-up music for the design shots: the same invented albums as the Android demo screenshots.
+/// Used whenever the app runs a capture script, so no real music or speaker ever ends up in a picture.
 enum Sample {
     static let albums: [Album] = [
-        Album(id: 1, title: "Midnight Arcade", artist: "Kestrel Bay", year: 2024, genre: "Synthwave", art: .sunset, tint: 0x5B2A86),
-        Album(id: 2, title: "Blue Hour Sessions", artist: "Odile Brandt Trio", year: 2023, genre: "Jazz", art: .blueDisc, tint: 0x1D3A8A),
-        Album(id: 3, title: "Sunday Static", artist: "The Paper Comets", year: 2025, genre: "Indie Pop", art: .bubbles, tint: 0xE8708F),
-        Album(id: 4, title: "Juniper Road", artist: "Juniper Vale", year: 2022, genre: "Folk", art: .hills, tint: 0x3F7A63),
-        Album(id: 5, title: "Satellite Hearts", artist: "Nova Lind", year: 2025, genre: "Indie Pop", art: .orbit, tint: 0x4A2C7A),
-        Album(id: 6, title: "Glasshouse", artist: "Ferro & June", year: 2024, genre: "Electronic", art: .prism, tint: 0x0F7C80),
-        Album(id: 7, title: "Northern Lines", artist: "Halden", year: 2021, genre: "Ambient", art: .aurora, tint: 0x14594F),
-        Album(id: 8, title: "Tidal Hours", artist: "Sea of Maple", year: 2023, genre: "Indie Rock", art: .tide, tint: 0x2B5C8F),
-        Album(id: 9, title: "Copper Moon", artist: "Ruby Ash", year: 2022, genre: "Soul", art: .copperMoon, tint: 0x8C3A1E),
+        Album(id: "a1", title: "Midnight Arcade", artist: "Kestrel Bay", year: 2024, genre: "Synthwave", art: .sunset, tint: 0x5B2A86),
+        Album(id: "a2", title: "Blue Hour Sessions", artist: "Odile Brandt Trio", year: 2023, genre: "Jazz", art: .blueDisc, tint: 0x1D3A8A),
+        Album(id: "a3", title: "Sunday Static", artist: "The Paper Comets", year: 2025, genre: "Indie Pop", art: .bubbles, tint: 0xE8708F),
+        Album(id: "a4", title: "Juniper Road", artist: "Juniper Vale", year: 2022, genre: "Folk", art: .hills, tint: 0x3F7A63),
+        Album(id: "a5", title: "Satellite Hearts", artist: "Nova Lind", year: 2025, genre: "Indie Pop", art: .orbit, tint: 0x4A2C7A),
+        Album(id: "a6", title: "Glasshouse", artist: "Ferro & June", year: 2024, genre: "Electronic", art: .prism, tint: 0x0F7C80),
+        Album(id: "a7", title: "Northern Lines", artist: "Halden", year: 2021, genre: "Ambient", art: .aurora, tint: 0x14594F),
+        Album(id: "a8", title: "Tidal Hours", artist: "Sea of Maple", year: 2023, genre: "Indie Rock", art: .tide, tint: 0x2B5C8F),
+        Album(id: "a9", title: "Copper Moon", artist: "Ruby Ash", year: 2022, genre: "Soul", art: .copperMoon, tint: 0x8C3A1E),
     ]
 
-    private static func album(_ id: Int) -> Album { albums.first { $0.id == id }! }
+    private static func album(_ number: Int) -> Album { albums[number - 1] }
 
     static let songs: [Song] = {
         let list: [(Int, String, Int)] = [
@@ -87,7 +105,10 @@ enum Sample {
             (8, "Tidal Hours", 219), (8, "Harbour Lights", 244),
             (9, "Copper Moon", 236), (9, "Slow Burn", 251),
         ]
-        return list.enumerated().map { Song(id: $0.offset + 1, title: $0.element.1, album: album($0.element.0), seconds: $0.element.2) }
+        let added = ["today", "yesterday", "3 days ago", "5 days ago", "1 week ago", "2 weeks ago", "3 weeks ago", "12 Oct 2026", "28 Sep 2026"]
+        return list.enumerated().map { index, item in
+            Song(id: "s\(index + 1)", title: item.1, album: album(item.0), seconds: item.2, addedText: added[(index + 1) % 9])
+        }
     }()
 
     static func song(_ title: String) -> Song { songs.first { $0.title == title }! }
@@ -104,20 +125,20 @@ enum Sample {
                                 "Copper Moon", "Harbour Lights", "Pixel Rain", "Quiet Corner"].map(song)
 
     static let playlists: [Playlist] = [
-        Playlist(id: 1, title: "Night Drive", songs: ["Night Signal", "Afterglow Drive", "Coastline 1987", "Glasshouse", "Low Sun", "Harbour Lights"].map(song)),
-        Playlist(id: 2, title: "Sunday Morning", songs: ["Wildflower Morning", "Bicycle Summer", "Quiet Corner", "Home by Autumn", "Soft Landing"].map(song)),
-        Playlist(id: 3, title: "Focus", songs: ["Northern Lines", "Snowfield", "Smoke and Velvet", "Mirror Steps", "Orbit"].map(song)),
-        Playlist(id: 4, title: "Kitchen Dance", songs: ["Golden Static", "Copper Moon", "Slow Burn", "Lemonade Sky", "Pixel Rain"].map(song)),
-        Playlist(id: 5, title: "Rainy Days", songs: ["Blue Hour", "Tidal Hours", "River Stones", "Late Train to Lisbon"].map(song)),
+        Playlist(id: "p1", title: "Night Drive", songs: ["Night Signal", "Afterglow Drive", "Coastline 1987", "Glasshouse", "Low Sun", "Harbour Lights"].map(song)),
+        Playlist(id: "p2", title: "Sunday Morning", songs: ["Wildflower Morning", "Bicycle Summer", "Quiet Corner", "Home by Autumn", "Soft Landing"].map(song)),
+        Playlist(id: "p3", title: "Focus", songs: ["Northern Lines", "Snowfield", "Smoke and Velvet", "Mirror Steps", "Orbit"].map(song)),
+        Playlist(id: "p4", title: "Kitchen Dance", songs: ["Golden Static", "Copper Moon", "Slow Burn", "Lemonade Sky", "Pixel Rain"].map(song)),
+        Playlist(id: "p5", title: "Rainy Days", songs: ["Blue Hour", "Tidal Hours", "River Stones", "Late Train to Lisbon"].map(song)),
     ]
 
     static let mixes: [Mix] = [
-        Mix(id: 1, title: "Daily Mix", subtitle: "Based on your listening", symbol: "sparkles", tone: .lilac, covers: [album(2), album(3), album(4)]),
-        Mix(id: 2, title: "Synthwave", subtitle: "Genre mix", symbol: "pianokeys", tone: .pink, covers: [album(1), album(6)]),
-        Mix(id: 3, title: "Jazz", subtitle: "Genre mix", symbol: "music.quarternote.3", tone: .blue, covers: [album(2), album(9)]),
-        Mix(id: 4, title: "Folk", subtitle: "Genre mix", symbol: "guitars.fill", tone: .green, covers: [album(4), album(7)]),
-        Mix(id: 5, title: "Indie Pop", subtitle: "Genre mix", symbol: "music.mic", tone: .amber, covers: [album(3), album(5)]),
-        Mix(id: 6, title: "Rediscover", subtitle: "Not heard in a while", symbol: "clock.arrow.circlepath", tone: .teal, covers: [album(8), album(7), album(9)]),
+        Mix(id: "m1", title: "Daily Mix", subtitle: "Based on your listening", symbol: "sparkles", tone: .lilac, covers: [album(2), album(3), album(4)]),
+        Mix(id: "m2", title: "Synthwave", subtitle: "Genre mix", symbol: "pianokeys", tone: .pink, covers: [album(1), album(6)]),
+        Mix(id: "m3", title: "Jazz", subtitle: "Genre mix", symbol: "music.quarternote.3", tone: .blue, covers: [album(2), album(9)]),
+        Mix(id: "m4", title: "Folk", subtitle: "Genre mix", symbol: "guitars.fill", tone: .green, covers: [album(4), album(7)]),
+        Mix(id: "m5", title: "Indie Pop", subtitle: "Genre mix", symbol: "music.mic", tone: .amber, covers: [album(3), album(5)]),
+        Mix(id: "m6", title: "Rediscover", subtitle: "Not heard in a while", symbol: "clock.arrow.circlepath", tone: .teal, covers: [album(8), album(7), album(9)]),
     ]
 
     /// Minutes listened per day this week, Monday first.

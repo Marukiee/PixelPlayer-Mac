@@ -7,9 +7,15 @@ struct CoverArt: View {
     var radius: CGFloat = Metrics.cover
 
     var body: some View {
-        Canvas { context, size in
-            context.scaleBy(x: size.width / 1000, y: size.height / 1000)
-            CoverArt.draw(album.art, in: &context)
+        Group {
+            if let art = album.art {
+                Canvas { context, size in
+                    context.scaleBy(x: size.width / 1000, y: size.height / 1000)
+                    CoverArt.draw(art, in: &context)
+                }
+            } else {
+                RemoteCover(album: album)
+            }
         }
         .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
         .overlay {
@@ -157,5 +163,47 @@ extension Album {
         return dark
             ? LinearGradient(colors: [base.opacity(0.75), Color(hex: 0x0B0D14)], startPoint: .top, endPoint: .bottom)
             : LinearGradient(colors: [Color(hex: 0xD9E2FF), Color(hex: 0xEEF1FF)], startPoint: .top, endPoint: .bottom)
+    }
+}
+
+/// A cover from the music file or the server, kept in a cache on disk so it is fetched once.
+struct RemoteCover: View {
+    let album: Album
+    @LocalState private var image: NSImage?
+
+    var body: some View {
+        ZStack {
+            LinearGradient(colors: [Color(hex: album.tint), Color(hex: album.tint).opacity(0.6)], startPoint: .topLeading, endPoint: .bottomTrailing)
+            if let image {
+                Image(nsImage: image).resizable().scaledToFill()
+            } else {
+                Image(systemName: "music.note").font(.system(size: 28, weight: .semibold)).foregroundStyle(.white.opacity(0.6))
+            }
+        }
+        .task(id: album.id) { image = await CoverCache.shared.image(for: album) }
+    }
+}
+
+/// Covers in memory and in ~/Library/Caches/PixelPlayer/covers, keyed by the server's cover id or the file path.
+actor CoverCache {
+    static let shared = CoverCache()
+    private var memory: [String: NSImage] = [:]
+    private let folder: URL = {
+        let url = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0].appendingPathComponent("PixelPlayer/covers", isDirectory: true)
+        try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        return url
+    }()
+
+    func image(for album: Album) async -> NSImage? {
+        let key = album.coverArtID ?? album.localCover?.path ?? album.id
+        if let image = memory[key] { return image }
+        let file = folder.appendingPathComponent(key.replacingOccurrences(of: "/", with: "_") + ".img")
+        if let image = NSImage(contentsOf: file) { memory[key] = image; return image }
+        if let local = album.localCover, let image = NSImage(contentsOf: local) { memory[key] = image; return image }
+        guard let url = await MainActor.run(body: { Library.shared.coverURL(for: album) }),
+              let (data, _) = try? await URLSession.shared.data(from: url), let image = NSImage(data: data) else { return nil }
+        try? data.write(to: file)
+        memory[key] = image
+        return image
     }
 }

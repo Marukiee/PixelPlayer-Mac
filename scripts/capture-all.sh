@@ -12,7 +12,7 @@ mkdir -p "$RAW"
 
 scenes() {   # $1 = licht|donker
   local s="$1"
-  echo "page:home,wait:1.4,shot:1-home-$s,page:liked,wait:1.2,shot:2-vind-ik-leuk-$s,page:album:2,wait:1.2,shot:3-album-$s,\
+  echo "page:home,wait:1.4,shot:1-home-$s,page:liked,wait:1.2,shot:2-vind-ik-leuk-$s,page:album:a2,wait:1.2,shot:3-album-$s,\
 page:home,queue:1,wait:1.4,shot:4-wachtrij-$s,queue:0,wait:0.8,devices:1,wait:1.4,shot:5-verbinden-$s,devices:0,wait:0.8,\
 full:1,wait:1.6,shot:6-songtekst-$s,full:0,wait:0.8,fullscreen:1,wait:1.6,shot:10-volledig-scherm-$s,fullscreen:0,wait:0.8,info:1,wait:1.4,shot:11-song-info-$s,info:0,wait:0.8,search:blue,wait:1.2,shot:7-zoeken-$s,search:,page:search,wait:1,shot:8-bladeren-$s,page:home,\
 settings:general,settingsshot:x-instellingen-algemeen-$s,settings:sources,wait:0.8,settingsshot:x-instellingen-bronnen-$s,closesettings,\

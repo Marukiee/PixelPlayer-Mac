@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Not sandboxed: the app reads a music folder anywhere on the Mac, talks to Sonos speakers on the local network
+         and to a phone over Bluetooth. The hardened runtime needs no exceptions for any of that. -->
+</dict>
+</plist>

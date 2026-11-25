@@ -6,12 +6,13 @@ import Observation
 /// is a place of its own, with Home and search above them.
 enum Route: Hashable {
     case home, search, songs, liked
-    case playlist(Int), album(Int), artist(Int)
+    /// Playlists and albums by id; an artist by name, which is what both the server and local files share.
+    case playlist(String), album(String), artist(String)
 
     /// From a script step such as `page:album:2`.
     init?(script: String) {
         let parts = script.split(separator: ":").map(String.init)
-        let id = parts.count > 1 ? Int(parts[1]) : nil
+        let id = parts.count > 1 ? parts[1] : nil
         switch parts.first ?? "" {
         case "home": self = .home
         case "search": self = .search
@@ -51,11 +52,14 @@ final class PlayerModel {
 
     var route: Route = .home
     var filter: LibraryFilter = .all
-    var current: Song = Sample.nowPlaying
-    var isPlaying = true
+    var current: Song = Library.shared.isSample ? Sample.nowPlaying : (Library.shared.songs.first ?? Song.nothing)
+    var isPlaying = Library.shared.isSample
     var position: Double = 104
     /// The songs in Liked Songs. The heart in the player follows the song that plays.
-    var likedIDs: Set<Int> = Set(Sample.liked.map(\.id))
+    var likedIDs: Set<String> {
+        get { Library.shared.likedIDs }
+        set { Library.shared.likedIDs = newValue }
+    }
     var liked: Bool {
         get { likedIDs.contains(current.id) }
         set { if newValue { likedIDs.insert(current.id) } else { likedIDs.remove(current.id) } }
@@ -65,7 +69,9 @@ final class PlayerModel {
     var infoSong: Song?
     var shuffle = false
     var repeatAll = true
-    var volume: Double = 60
+    var volume: Double = 60 {
+        didSet { Playback.shared.setVolume(volume) }
+    }
     var showQueue = false
     var showDevices = false
     var fullPlayer = false
@@ -80,8 +86,8 @@ final class PlayerModel {
     var volumes: [String: Double] = ["living": 42, "kitchen": 28, "bedroom": 30, "study": 20]
     var individualVolume = false
 
-    var userQueue: [Song] = Sample.userQueue
-    var upNext: [Song] = Sample.upNext
+    var userQueue: [Song] = Library.shared.isSample ? Sample.userQueue : []
+    var upNext: [Song] = Library.shared.isSample ? Sample.upNext : []
 
     var duration: Double { Double(current.seconds) }
 
@@ -111,10 +117,26 @@ final class PlayerModel {
         if window.styleMask.contains(.fullScreen) != on { window.toggleFullScreen(nil) }
     }
 
-    func play(_ song: Song) {
-        current = song
-        position = 0
-        isPlaying = true
+    /// Plays a song, with the list it was picked from as what follows it.
+    func play(_ song: Song, in context: [Song] = []) {
+        if Library.shared.isSample {
+            current = song
+            position = 0
+            isPlaying = true
+        } else {
+            Playback.shared.play(song, in: context)
+        }
+    }
+
+    func setPlaying(_ playing: Bool) {
+        withAnimation(Motion.bouncy) { isPlaying = playing }
+        Playback.shared.setPlaying(playing)
+    }
+
+    /// Moves to a point in the song, from the slider or the media keys.
+    func seek(to seconds: Double) {
+        position = seconds
+        Playback.shared.seek(to: seconds)
     }
 
     func go(_ route: Route) {
@@ -130,7 +152,8 @@ final class PlayerModel {
         clock = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
             Task { @MainActor in
                 let model = PlayerModel.shared
-                guard model.isPlaying, !Debug.freezeClock else { return }
+                // Only the sample music needs a pretend clock; real playback moves the position itself.
+                guard Library.shared.isSample, model.isPlaying, !Debug.freezeClock else { return }
                 model.position = model.position >= model.duration ? 0 : model.position + 1
             }
         }
@@ -140,4 +163,10 @@ final class PlayerModel {
 func timeString(_ seconds: Double) -> String {
     let s = max(0, Int(seconds.rounded()))
     return String(format: "%d:%02d", s / 60, s % 60)
+}
+
+extension Song {
+    /// What the player shows before anything has played.
+    static let nothing = Song(id: "", title: "Not playing", album: Album(id: "", title: "", artist: "", year: 0, genre: ""), seconds: 1,
+                              artistName: "Pick something to play")
 }

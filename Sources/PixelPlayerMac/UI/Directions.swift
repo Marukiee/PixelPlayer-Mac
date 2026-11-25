@@ -112,27 +112,32 @@ struct LibraryItem: Identifiable {
     let kind: LibraryFilter
     var id: Route { route }
 
-    static var all: [LibraryItem] {
-        let albums = Sample.albums
-        func playlist(_ index: Int) -> LibraryItem {
-            let list = Sample.playlists[index]
-            return LibraryItem(route: .playlist(list.id), title: list.title, subtitle: "Playlist · \(list.songs.count) songs",
-                               art: .collage(list.songs.map(\.album)), kind: .playlists)
-        }
-        func album(_ index: Int) -> LibraryItem {
-            LibraryItem(route: .album(albums[index].id), title: albums[index].title, subtitle: "Album · \(albums[index].artist)",
-                        art: .album(albums[index]), kind: .albums)
-        }
-        func artist(_ index: Int) -> LibraryItem {
-            LibraryItem(route: .artist(albums[index].id), title: albums[index].artist, subtitle: "Artist",
-                        art: .artist(albums[index]), kind: .artists)
-        }
-        return [
-            LibraryItem(route: .liked, title: "Liked Songs", subtitle: "Playlist · 141 songs", art: .liked, kind: .playlists),
-            LibraryItem(route: .songs, title: "All Songs", subtitle: "Library · 1,284 songs", art: .songs, kind: .playlists),
-            album(1), playlist(0), artist(0), playlist(1), album(2), artist(4), playlist(2), album(5),
-            artist(3), playlist(3), album(8), artist(6), playlist(4), album(3),
+    /// Liked Songs and all songs first, then the playlists, then recent albums and their artists.
+    @MainActor static var all: [LibraryItem] {
+        let library = Library.shared
+        var items: [LibraryItem] = [
+            LibraryItem(route: .liked, title: "Liked Songs", subtitle: "Playlist · \(library.likedIDs.count) songs", art: .liked, kind: .playlists),
+            LibraryItem(route: .songs, title: "All Songs", subtitle: "Library · \(library.songs.count.formatted()) songs", art: .songs, kind: .playlists),
         ]
+        let playlists = library.playlists.map { list in
+            LibraryItem(route: .playlist(list.id), title: list.title, subtitle: "Playlist · \(list.songs.count) songs",
+                        art: .collage(list.songs.isEmpty ? [library.album(at: 0)] : list.songs.map(\.album)), kind: .playlists)
+        }
+        let albums = library.recentAlbums.prefix(12).map { album in
+            LibraryItem(route: .album(album.id), title: album.title, subtitle: "Album · \(album.artist)", art: .album(album), kind: .albums)
+        }
+        var seen = Set<String>()
+        let artists = library.recentAlbums.filter { seen.insert($0.artist).inserted }.prefix(8).map { album in
+            LibraryItem(route: .artist(album.artist), title: album.artist, subtitle: "Artist", art: .artist(album), kind: .artists)
+        }
+        // Mixed, the way a library of recent things reads.
+        let longest = max(playlists.count, albums.count, artists.count)
+        for index in 0..<longest {
+            if index < albums.count { items.append(albums[index]) }
+            if index < playlists.count { items.append(playlists[index]) }
+            if index < artists.count { items.append(artists[index]) }
+        }
+        return items
     }
 }
 
@@ -214,7 +219,9 @@ struct LibraryRow: View {
             Button("Add to Queue", systemImage: "text.line.last.and.arrowtriangle.forward") {}
             Divider()
             if case .album(let id) = item.route {
-                Button("Go to Artist", systemImage: "music.microphone") { model.go(.artist(id)) }
+                Button("Go to Artist", systemImage: "music.microphone") {
+                    model.go(.artist(Library.shared.albums.first { $0.id == id }?.artist ?? ""))
+                }
             }
             Button("Remove from Library", systemImage: "minus.circle") {}
         }

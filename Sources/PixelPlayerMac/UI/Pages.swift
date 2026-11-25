@@ -8,7 +8,9 @@ struct RouteContent: View {
     @Environment(PlayerModel.self) private var model
 
     var body: some View {
-        if !model.searchText.isEmpty {
+        if !Library.shared.hasMusic {
+            ConnectPage()
+        } else if !model.searchText.isEmpty {
             SearchPage(term: model.searchText)
         } else {
             switch model.route {
@@ -17,31 +19,31 @@ struct RouteContent: View {
             case .search:
                 SearchPage(term: "")
             case .songs:
-                TrackListPage(header: TrackHeader(kind: "Library", title: "All Songs", meta: "1,284 songs · 81 h 12 m",
+                TrackListPage(header: TrackHeader(kind: "Library", title: "All Songs", meta: Library.shared.isSample ? "1,284 songs · 81 h 12 m" : Library.summary(Library.shared.songs),
                                                   art: .songs, tint: Color(hex: 0x0058CA)),
-                              songs: Sample.songs.sorted { $0.title < $1.title })
+                              songs: Library.shared.songs.sorted { $0.title < $1.title })
             case .liked:
-                TrackListPage(header: TrackHeader(kind: "Playlist", title: "Liked Songs", meta: "141 songs · 9 h 12 m",
+                TrackListPage(header: TrackHeader(kind: "Playlist", title: "Liked Songs", meta: Library.shared.isSample ? "141 songs · 9 h 12 m" : Library.summary(Library.shared.liked),
                                                   art: .liked, tint: Color(hex: 0x4B37D8)),
-                              songs: Sample.liked)
+                              songs: Library.shared.liked)
             case .playlist(let id):
-                let list = Sample.playlists.first { $0.id == id } ?? Sample.playlists[0]
+                let list = Library.shared.playlists.first { $0.id == id } ?? Playlist(id: id, title: "Playlist", songs: [])
                 TrackListPage(header: TrackHeader(kind: "Playlist", title: list.title, meta: "\(list.songs.count) songs",
                                                   art: .collage(list.songs.map(\.album)), tint: Color(hex: list.songs[0].album.tint)),
                               songs: list.songs)
             case .album(let id):
-                let album = Sample.albums.first { $0.id == id } ?? Sample.albums[0]
-                let songs = Sample.songs.filter { $0.album == album }
+                let album = Library.shared.albums.first { $0.id == id } ?? Library.shared.album(at: 0)
+                let songs = Library.shared.songs.filter { $0.album.id == album.id }.sorted { ($0.track ?? 0) < ($1.track ?? 0) }
                 TrackListPage(header: TrackHeader(kind: "Album", title: album.title, meta: "\(album.artist) · \(album.year) · \(songs.count) songs",
                                                   art: .album(album), tint: Color(hex: album.tint)),
                               songs: songs, showAlbum: false, showAdded: false, showCover: false, showSort: false,
-                              more: Sample.albums.filter { $0 != album })
-            case .artist(let id):
-                let album = Sample.albums.first { $0.id == id } ?? Sample.albums[0]
+                              more: Array(Library.shared.albums.filter { $0.id != album.id }.prefix(8)))
+            case .artist(let name):
+                let album = Library.shared.albums.first { $0.artist == name } ?? Library.shared.album(at: 0)
                 TrackListPage(header: TrackHeader(kind: "Artist", title: album.artist, meta: "\(album.genre) · 1 album",
                                                   art: .artist(album), tint: Color(hex: album.tint)),
-                              songs: Sample.songs.filter { $0.artist == album.artist }, showAdded: false,
-                              more: Sample.albums.filter { $0 != album })
+                              songs: Library.shared.songs.filter { $0.artist == name }, showAdded: false,
+                              more: Array(Library.shared.albums.filter { $0.artist == name || $0.genre == album.genre }.filter { $0.id != album.id }.prefix(8)))
             }
         }
     }
@@ -53,8 +55,8 @@ struct HomePage: View {
     @LocalState private var width: CGFloat = 900
 
     private var quick: [LibraryItem] {
-        let all = LibraryItem.all
-        return [all[0], all[3], all[1], all[2], all[5], all[4], all[8], all[6]]
+        // Always a full grid: the first eight things of the library, never a fixed position that may not exist.
+        Array(LibraryItem.all.prefix(8))
     }
 
     var body: some View {
@@ -66,12 +68,12 @@ struct HomePage: View {
                 }
                 .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
                 Shelf(title: "Mixes for you") {
-                    FittingRow(items: Sample.mixes, minWidth: 160) { mix in
+                    FittingRow(items: Library.shared.mixes, minWidth: 160) { mix in
                         CoverCell(art: .collage(mix.covers + mix.covers.reversed()), title: mix.title, subtitle: mix.subtitle)
                     }
                 }
                 Shelf(title: "Recently played") {
-                    FittingRow(items: Array(Sample.albums.enumerated()), minWidth: 160) { pair in
+                    FittingRow(items: Array(Library.shared.recentAlbums.enumerated()), minWidth: 160) { pair in
                         if pair.offset % 3 == 2 {
                             CoverCell(art: .artist(pair.element), title: pair.element.artist, subtitle: "Artist", round: true)
                         } else {
@@ -94,16 +96,16 @@ struct HomePage: View {
 struct MixHero: View {
     var body: some View {
         HStack(alignment: .center, spacing: 28) {
-            Collage(albums: [Sample.albums[0], Sample.albums[2], Sample.albums[4], Sample.albums[1]], radius: 8)
+            Collage(albums: [Library.shared.album(at: 0), Library.shared.album(at: 2), Library.shared.album(at: 4), Library.shared.album(at: 1)], radius: 8)
                 .frame(width: 184, height: 184)
                 .shadow(color: .black.opacity(0.3), radius: 16, y: 8)
             VStack(alignment: .leading, spacing: 4) {
                 Text("Made for you").font(.subheadline.weight(.semibold)).foregroundStyle(.white.opacity(0.8))
                 Text("Your Mix").font(.system(size: 52, weight: .heavy)).foregroundStyle(.white)
-                Text("Blue Hour, Night Signal, Orbit and 18 more").foregroundStyle(.white.opacity(0.8))
+                Text(Library.shared.yourMixSummary).foregroundStyle(.white.opacity(0.8)).lineLimit(1)
                 Spacer(minLength: 8)
                 HStack(spacing: 12) {
-                    PlayCircle()
+                    PlayCircle { let mix = Library.shared.yourMix; if let first = mix.first { PlayerModel.shared.play(first, in: mix) } }
                     RoundButton(symbol: "shuffle", label: "Shuffle")
                     RoundMenu()
                 }
@@ -119,7 +121,8 @@ struct MixHero: View {
 
 /// The big round play button: the system's prominent glass button.
 struct PlayCircle: View {
-    var body: some View { RoundButton(symbol: "play.fill", label: "Play", prominent: true) }
+    var action: () -> Void = {}
+    var body: some View { RoundButton(symbol: "play.fill", label: "Play", prominent: true, action: action) }
 }
 
 /// Round glass buttons that stand together are one size (56): play in the accent, shuffle and more neutral,
@@ -284,8 +287,8 @@ struct WeekCard: View {
             }
             .frame(width: 210, alignment: .leading)
             Chart {
-                ForEach(Sample.week.indices, id: \.self) { i in
-                    BarMark(x: .value("Day", days[i]), y: .value("Minutes", Sample.week[i]), width: .ratio(0.5))
+                ForEach(Library.shared.week.indices, id: \.self) { i in
+                    BarMark(x: .value("Day", days[i]), y: .value("Minutes", Library.shared.week[i]), width: .ratio(0.5))
                         .foregroundStyle(i == 5 ? AnyShapeStyle(.tint) : AnyShapeStyle(.tint.opacity(0.35)))
                         .clipShape(RoundedRectangle(cornerRadius: 3))
                 }
@@ -294,7 +297,7 @@ struct WeekCard: View {
             .frame(minWidth: 60)
             .frame(height: 96)
             VStack(spacing: 6) {
-                ArtworkView(art: .artist(Sample.albums[0])).frame(width: 64, height: 64)
+                ArtworkView(art: .artist(Library.shared.album(at: 0))).frame(width: 64, height: 64)
                 Text("Kestrel Bay").fontWeight(.semibold)
                 Text("Most played").font(.callout).foregroundStyle(.secondary)
             }
@@ -344,7 +347,7 @@ struct TrackListPage: View {
                 .padding(.horizontal, margin)
                 .padding(.top, margin)
                 HStack(spacing: 12) {
-                    PlayCircle()
+                    PlayCircle { if let first = songs.first { PlayerModel.shared.play(first, in: songs) } }
                     RoundButton(symbol: "shuffle", label: "Shuffle")
                     RoundMenu()
                     Spacer()
@@ -368,7 +371,7 @@ struct TrackListPage: View {
                     .padding(.bottom, 8)
                 LazyVStack(spacing: 0) {
                     ForEach(Array(songs.enumerated()), id: \.element.id) { index, song in
-                        TrackRow(index: index + 1, song: song, showAlbum: showAlbum, showAdded: showAdded && wide, showCover: showCover)
+                        TrackRow(index: index + 1, song: song, context: songs, showAlbum: showAlbum, showAdded: showAdded && wide, showCover: showCover)
                     }
                 }
                 .padding(.horizontal, margin - 12)
@@ -417,6 +420,8 @@ struct TrackColumns: View {
 struct TrackRow: View {
     let index: Int
     let song: Song
+    /// The list the row is in: what plays after it when it is started.
+    var context: [Song] = []
     var showAlbum = true
     var showAdded = true
     var showCover = true
@@ -460,6 +465,7 @@ struct TrackRow: View {
         .frame(height: 56)
         .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Color.primary.opacity(hovering ? 0.07 : 0)))
         .contentShape(Rectangle())
+        .onTapGesture(count: 2) { model.play(song, in: context) }
         .onHover { hovering = $0 && !Debug.active }
         .animation(Motion.fade, value: hovering)
         .contextMenu { SongMenu(song: song) }
@@ -472,10 +478,10 @@ struct SearchPage: View {
     let term: String
 
     private var songs: [Song] {
-        Sample.songs.filter { [$0.title, $0.artist, $0.album.title].contains { $0.localizedCaseInsensitiveContains(term) } }
+        Library.shared.songs.filter { [$0.title, $0.artist, $0.album.title].contains { $0.localizedCaseInsensitiveContains(term) } }
     }
     private var albums: [Album] {
-        Sample.albums.filter { [$0.title, $0.artist].contains { $0.localizedCaseInsensitiveContains(term) } }
+        Library.shared.albums.filter { [$0.title, $0.artist].contains { $0.localizedCaseInsensitiveContains(term) } }
     }
 
     var body: some View {
@@ -493,7 +499,7 @@ struct SearchPage: View {
 
     private var genres: [Album] {
         var seen = Set<String>()
-        return Sample.albums.filter { seen.insert($0.genre).inserted }
+        return Array(Library.shared.albums.filter { !$0.genre.isEmpty && seen.insert($0.genre).inserted }.prefix(8))
     }
 
     private let moods: [(String, Int)] = [("Focus", 6), ("Late Night", 0), ("Sunday Morning", 3), ("Rainy Days", 7)]
@@ -509,7 +515,7 @@ struct SearchPage: View {
             VStack(alignment: .leading, spacing: 14) {
                 Text("Moods").font(.title2.weight(.bold))
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: 4), spacing: 16) {
-                    ForEach(moods, id: \.0) { mood in BrowseTile(title: mood.0, album: Sample.albums[mood.1]) }
+                    ForEach(moods, id: \.0) { mood in BrowseTile(title: mood.0, album: Library.shared.album(at: mood.1)) }
                 }
             }
         }
@@ -548,7 +554,7 @@ struct SearchPage: View {
                 Text("Songs").font(.title2.weight(.bold))
                 VStack(spacing: 0) {
                     ForEach(Array(songs.prefix(4).enumerated()), id: \.element.id) { index, song in
-                        TrackRow(index: index + 1, song: song, showAlbum: false, showAdded: false)
+                        TrackRow(index: index + 1, song: song, context: songs, showAlbum: false, showAdded: false)
                     }
                 }
                 .frame(height: 224, alignment: .top)
@@ -581,5 +587,48 @@ struct BrowseTile: View {
         .frame(height: 112)
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .hoverLift()
+    }
+}
+
+/// Before there is any music: what PixelPlayer needs, and the one step to get there.
+struct ConnectPage: View {
+    @Environment(PlayerModel.self) private var model
+    @Environment(\.openSettings) private var openSettings
+
+    var body: some View {
+        let library = Library.shared
+        VStack(spacing: 20) {
+            Image(systemName: "music.note.house")
+                .font(.system(size: 44, weight: .semibold))
+                .foregroundStyle(.tint)
+                .frame(width: 96, height: 96)
+                .background(Circle().fill(Color.primary.opacity(0.06)))
+            VStack(spacing: 6) {
+                Text("Connect your music").font(.title.weight(.bold))
+                Text("PixelPlayer plays your Navidrome library, with the music on this Mac first.")
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+            switch library.status {
+            case .loading(let what):
+                HStack(spacing: 8) { ProgressView().controlSize(.small); Text(what).foregroundStyle(.secondary) }
+            case .failed(let message):
+                Text(message).foregroundStyle(.red).multilineTextAlignment(.center)
+            default:
+                EmptyView()
+            }
+            HStack(spacing: 12) {
+                Button("Connect to Navidrome…") {
+                    model.settingsTab = .sources
+                    openSettings()
+                }
+                .buttonStyle(.borderedProminent)
+                Button("Choose Music Folder…") { _ = MusicFolder.choose() }
+                    .buttonStyle(.bordered)
+            }
+            .controlSize(.large)
+        }
+        .frame(maxWidth: 440)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }

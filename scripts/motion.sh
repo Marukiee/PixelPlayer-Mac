@@ -16,7 +16,7 @@ mkdir -p "$FRAMES" "$OUT"
 
 for d in $DIRS; do
   # Pages, the queue in the inspector, Speelt nu in and out, play and pause.
-  steps="page:liked,$W,page:album:2,$W,page:home,$W,queue:1,$W,queue:0,$W,full:1,$W,full:0,$W,fullscreen:1,$W,fullscreen:0,$W,play:0,$W,play:1,$W"
+  steps="page:liked,$W,page:album:a2,$W,page:home,$W,queue:1,$W,queue:0,$W,full:1,$W,full:0,$W,fullscreen:1,$W,fullscreen:0,$W,play:0,$W,play:1,$W"
   n=$(echo "$steps" | tr ',' '\n' | grep -c wait)
   secs=$(echo "$n * 0.75 * $SLOW + 2" | bc)
   ./scripts/run.sh "$FRAMES" "page:home,wait:1,shot:probe-$d,slow:$SLOW,frames:$d:$secs,wait:0.8,$steps,wait:3,quit" PP_APPEARANCE="${APPEARANCE:-light}"

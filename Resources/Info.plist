@@ -13,5 +13,12 @@
     <key>LSMinimumSystemVersion</key><string>26.0</string>
     <key>NSHighResolutionCapable</key><true/>
     <key>NSPrincipalClass</key><string>NSApplication</string>
+    <key>NSLocalNetworkUsageDescription</key><string>PixelPlayer finds your Sonos speakers and your music server on this network.</string>
+    <key>NSBluetoothAlwaysUsageDescription</key><string>PixelPlayer connects to your phone to play music on it.</string>
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <!-- A home music server and Sonos speakers usually speak plain http on the local network or over a VPN. -->
+        <key>NSAllowsArbitraryLoads</key><true/>
+    </dict>
 </dict>
 </plist>

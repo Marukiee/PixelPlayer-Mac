@@ -87,7 +87,7 @@ struct FloatingPlayer: View {
                 if withTitle {
                     NowPlayingInfo(cover: 40, round: true)
                 } else {
-                    CoverArt(album: Sample.nowPlaying.album, radius: 20).frame(width: 40, height: 40)
+                    CoverArt(album: PlayerModel.shared.current.album, radius: 20).frame(width: 40, height: 40)
                 }
                 LikeButton().font(.title3)
             }
@@ -352,7 +352,7 @@ struct SongMenu: View {
         Button("Add to Queue", systemImage: "text.line.last.and.arrowtriangle.forward") { model.userQueue.append(song) }
         Divider()
         Menu("Add to Playlist", systemImage: "text.badge.plus") {
-            ForEach(Sample.playlists) { list in Button(list.title) {} }
+            ForEach(Library.shared.playlists) { list in Button(list.title) {} }
             Divider()
             Button("New Playlist…") {}
         }
@@ -360,7 +360,7 @@ struct SongMenu: View {
             if liked { model.likedIDs.remove(song.id) } else { model.likedIDs.insert(song.id) }
         }
         Divider()
-        Button("Go to Artist", systemImage: "music.microphone") { model.go(.artist(song.album.id)) }
+        Button("Go to Artist", systemImage: "music.microphone") { model.go(.artist(song.artist)) }
         Button("Go to Album", systemImage: "square.stack") { model.go(.album(song.album.id)) }
         Divider()
         Button("Song Info", systemImage: "info.circle") { model.infoSong = song }
@@ -374,7 +374,7 @@ struct SongInfoSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     private var trackNumber: String {
-        let songs = Sample.songs.filter { $0.album == song.album }
+        let songs = Library.shared.songs.filter { $0.album.id == song.album.id }
         let index = (songs.firstIndex(of: song) ?? 0) + 1
         return "\(index) of \(songs.count)"
     }

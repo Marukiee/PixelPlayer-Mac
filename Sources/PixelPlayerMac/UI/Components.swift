@@ -51,7 +51,7 @@ struct PositionSlider: View {
 
     var body: some View {
         VStack(spacing: 2) {
-            Slider(value: Binding(get: { model.position }, set: { model.position = $0 }), in: 0...model.duration)
+            Slider(value: Binding(get: { model.position }, set: { model.seek(to: $0) }), in: 0...max(1, model.duration))
                 .controlSize(small ? .mini : .small)
             HStack {
                 Text(timeString(model.position))
@@ -73,7 +73,7 @@ struct InlinePosition: View {
     var body: some View {
         HStack(spacing: 8) {
             Text(timeString(model.position)).frame(width: 36, alignment: .trailing)
-            Slider(value: Binding(get: { model.position }, set: { model.position = $0 }), in: 0...model.duration)
+            Slider(value: Binding(get: { model.position }, set: { model.seek(to: $0) }), in: 0...max(1, model.duration))
                 .controlSize(.mini)
             Text("-" + timeString(model.duration - model.position)).frame(width: 40, alignment: .leading)
         }
@@ -92,15 +92,15 @@ struct TransportButtons: View {
     var body: some View {
         HStack(spacing: large ? 28 : 20) {
             if modes { toggle("shuffle", "Shuffle", on: model.shuffle) { model.shuffle.toggle() } }
-            Button {} label: { Image(systemName: "backward.fill") }.help("Previous")
-            Button { withAnimation(Motion.bouncy) { model.isPlaying.toggle() } } label: {
+            Button { Playback.shared.previous() } label: { Image(systemName: "backward.fill") }.help("Previous")
+            Button { model.setPlaying(!model.isPlaying) } label: {
                 Image(systemName: model.isPlaying ? "pause.fill" : "play.fill")
                     .font(.system(size: large ? 34 : 24))
                     .contentTransition(.symbolEffect(.replace))
                     .frame(width: large ? 40 : 28)
             }
             .help(model.isPlaying ? "Pause" : "Play")
-            Button {} label: { Image(systemName: "forward.fill") }.help("Next")
+            Button { Playback.shared.next() } label: { Image(systemName: "forward.fill") }.help("Next")
             if modes { toggle("repeat", "Repeat", on: model.repeatAll) { model.repeatAll.toggle() } }
         }
         .font(large ? .title2 : .title3)

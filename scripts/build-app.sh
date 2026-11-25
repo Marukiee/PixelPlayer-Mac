@@ -20,5 +20,6 @@ for size in 16 32 128 256 512; do
 done
 rm "$ICONSET/base.png"
 iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/AppIcon.icns"
-codesign --force --sign - "$APP" >/dev/null 2>&1 || true
+# One lasting identity, so Local Network and Bluetooth permissions survive every new build.
+./scripts/mac-signing.sh sign "$APP" >/dev/null
 echo "built $APP"
