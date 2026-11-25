@@ -29,6 +29,8 @@ struct SongSource: Hashable {
     var serverPath: String? = nil
     var suffix: String? = nil
     var bitRate: Int? = nil
+    /// Sample rate in Hz, from Navidrome; above 48 kHz a Sonos speaker gets an MP3 of it.
+    var sampleRate: Int? = nil
 }
 
 struct Song: Identifiable, Hashable {
@@ -42,6 +44,10 @@ struct Song: Identifiable, Hashable {
     var addedText = ""
     /// When the song came into the library, in seconds since 1970, for sorting by recently added.
     var addedAt: Double? = nil
+    /// How often it was played, as Navidrome counts it (all devices together), for an artist's popular songs.
+    var playCount = 0
+    /// When it was last played on any device, in seconds since 1970, from Navidrome.
+    var lastPlayed: Double? = nil
 
     var artist: String { artistName ?? album.artist }
     var orderFields: TrackOrder.Fields { TrackOrder.Fields(title: title, artist: artist, album: album.title, track: track, added: addedAt) }

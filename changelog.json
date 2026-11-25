@@ -1,27 +1,45 @@
 [
   {
-    "version": "0.2.3",
+    "version": "0.2.4",
     "date": "2026-11-25",
     "en": {
-      "title": "Small fixes",
+      "title": "Artist pages and a smarter mix",
+      "new": [
+        "Artist pages like Spotify",
+        "Save songs and add to playlists",
+        "Your Mix shared through Navidrome",
+        "Pin items in Your Library"
+      ],
       "better": [
-        "The update popup sits higher, with the same room above as on the right",
-        "A log of what happens with the speakers, to find out what goes wrong"
+        "Smarter Your Mix from your plays",
+        "All albums and artists in Your Library",
+        "Hi-res songs play on Sonos",
+        "Lyrics keep time on Sonos"
       ],
       "fixed": [
-        "The song title in the player opens the right album",
-        "Only one row in the sidebar lights up under the pointer"
+        "Genres in Browse open",
+        "Settings switches work",
+        "Titles open the right album"
       ]
     },
     "nl": {
-      "title": "Kleine verbeteringen",
+      "title": "Artiestpagina's en een slimmere mix",
+      "new": [
+        "Artiestpagina's zoals Spotify",
+        "Nummers bewaren en in lijsten zetten",
+        "Your Mix gedeeld via Navidrome",
+        "Items vastzetten in Your Library"
+      ],
       "better": [
-        "De updatemelding staat hoger, met evenveel ruimte boven als rechts",
-        "Een logboek van wat er met de speakers gebeurt, om te vinden wat misgaat"
+        "Slimmere Your Mix op je luistergedrag",
+        "Alle albums en artiesten in Your Library",
+        "Hi-res nummers spelen op Sonos",
+        "Songtekst loopt gelijk op Sonos"
       ],
       "fixed": [
-        "De titel in de speler opent het juiste album",
-        "Maar een rij in de zijbalk licht op onder de muis"
+        "Genres in Browse openen",
+        "Schakelaars in Instellingen werken",
+        "Titels openen het juiste album"
       ]
     }
   },

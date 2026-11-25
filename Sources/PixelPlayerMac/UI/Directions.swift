@@ -127,30 +127,54 @@ struct LibraryItem: Identifiable {
     var id: Route { route }
 
     /// Liked Songs and all songs first, then the playlists, then recent albums and their artists.
+    /// Your Library: pinned items first, then Liked Songs and All Songs, then everything else. Cheap: the collections are
+    /// made once per rebuild of the library.
     @MainActor static var all: [LibraryItem] {
         let library = Library.shared
-        var items: [LibraryItem] = [
-            LibraryItem(route: .liked, title: "Liked Songs", subtitle: "Playlist · \(library.likedIDs.count) songs", art: .liked, kind: .playlists),
-            LibraryItem(route: .songs, title: "All Songs", subtitle: "Library · \(library.songs.count.formatted()) songs", art: .songs, kind: .playlists),
+        let fixed = [
+            LibraryItem(route: .liked, title: "Liked Songs", subtitle: "Playlist · \(songCount(library.likedIDs.count))", art: .liked, kind: .playlists),
+            LibraryItem(route: .songs, title: "All Songs", subtitle: "Library · \(songCount(library.songs.count))", art: .songs, kind: .playlists),
         ]
+        let everything = fixed + library.collectionItems
+        guard !library.pinned.isEmpty else { return everything }
+        let byKey = Dictionary(everything.map { ($0.route.key, $0) }, uniquingKeysWith: { first, _ in first })
+        let pins = library.pinned.compactMap { byKey[$0] }
+        let pinnedKeys = Set(library.pinned)
+        return pins + everything.filter { !pinnedKeys.contains($0.route.key) }
+    }
+
+    /// Playlists, then the albums and artists played lately mixed as a library of recent things reads, then every other
+    /// album and artist by name, so all the music is there to scroll to.
+    @MainActor static func collections(of library: Library) -> [LibraryItem] {
         let playlists = library.playlists.map { list in
-            LibraryItem(route: .playlist(list.id), title: list.title, subtitle: "Playlist · \(list.songs.count) songs",
+            LibraryItem(route: .playlist(list.id), title: list.title, subtitle: "Playlist · \(songCount(list.songs.count))",
                         art: .collage(list.songs.isEmpty ? [library.album(at: 0)] : list.songs.map(\.album)), kind: .playlists)
         }
-        let albums = library.recentAlbums.prefix(12).map { album in
+        func albumItem(_ album: Album) -> LibraryItem {
             LibraryItem(route: .album(album.id), title: album.title, subtitle: "Album · \(album.artist)", art: .album(album), kind: .albums)
         }
-        var seen = Set<String>()
-        let artists = library.recentAlbums.filter { seen.insert($0.artist).inserted }.prefix(8).map { album in
+        func artistItem(_ album: Album) -> LibraryItem {
             LibraryItem(route: .artist(album.artist), title: album.artist, subtitle: "Artist", art: .artist(album), kind: .artists)
         }
-        // Mixed, the way a library of recent things reads.
-        let longest = max(playlists.count, albums.count, artists.count)
+        let recent = Array(library.recentAlbums.prefix(12))
+        var seenArtists = Set<String>()
+        let recentArtists = Array(library.recentAlbums.filter { seenArtists.insert($0.artist).inserted }.prefix(8))
+        var items: [LibraryItem] = []
+        let longest = max(playlists.count, recent.count, recentArtists.count)
         for index in 0..<longest {
-            if index < albums.count { items.append(albums[index]) }
+            if index < recent.count { items.append(albumItem(recent[index])) }
             if index < playlists.count { items.append(playlists[index]) }
-            if index < artists.count { items.append(artists[index]) }
+            if index < recentArtists.count { items.append(artistItem(recentArtists[index])) }
         }
+        let recentIDs = Set(recent.map(\.id))
+        let shownArtists = Set(recentArtists.map(\.artist))
+        let otherAlbums = library.albums.filter { !recentIDs.contains($0.id) }
+            .sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+        var artistSeen = shownArtists
+        let otherArtists = library.albums.filter { !$0.artist.isEmpty && artistSeen.insert($0.artist).inserted }
+            .sorted { $0.artist.localizedCaseInsensitiveCompare($1.artist) == .orderedAscending }
+        items += otherAlbums.map(albumItem)
+        items += otherArtists.map(artistItem)
         return items
     }
 }
@@ -168,7 +192,7 @@ struct Sidebar: View {
                                     model.route = route
                                     if model.fullPlayer { model.setFullPlayer(false) }
                                 })) {
-            NavRow(symbol: "house.fill", title: "Home", route: .home).tag(Route.home)
+            NavRow(symbol: "house", title: "Home", route: .home).tag(Route.home)
             NavRow(symbol: "square.grid.2x2.fill", title: "Browse", route: .search).tag(Route.search)
             Section {
                 ForEach(items) { item in
@@ -237,7 +261,14 @@ struct LibraryRow: View {
                 }
             VStack(alignment: .leading, spacing: 1) {
                 Text(item.title).foregroundStyle(playing ? AnyShapeStyle(.tint) : AnyShapeStyle(.primary))
-                Text(item.subtitle).font(.callout).foregroundStyle(.secondary)
+                HStack(spacing: 4) {
+                    // A pinned item carries a small green pin, as in Spotify.
+                    if Library.shared.isPinned(item.route) {
+                        Image(systemName: "pin.fill").font(.caption2).foregroundStyle(Color.green).rotationEffect(.degrees(45))
+                    }
+                    Text(item.subtitle)
+                }
+                .font(.callout).foregroundStyle(.secondary)
             }
             .lineLimit(1)
             Spacer(minLength: 4)
@@ -248,6 +279,8 @@ struct LibraryRow: View {
         // The hover box is the system's selection box, same size and corners, so moving over the open item shows one box.
         .listRowBackground(SidebarHover(on: hovering && !selected))
         .contentShape(Rectangle())
+        // A double click plays it from the top; one click still opens it.
+        .simultaneousGesture(TapGesture(count: 2).onEnded { model.play(Library.shared.songs(for: item.route)) })
         .onHover { inside in SidebarHoverState.shared.set(item.route, inside) }
         .onAppear { if Debug.hovered(item.title) { SidebarHoverState.shared.route = item.route } }
         .animation(Motion.fade, value: hovering)
@@ -256,6 +289,11 @@ struct LibraryRow: View {
             Button("Shuffle", systemImage: "shuffle") { model.play(Library.shared.songs(for: item.route), shuffled: true) }
             Button("Add to Queue", systemImage: "text.line.last.and.arrowtriangle.forward") {
                 model.userQueue.append(contentsOf: Library.shared.songs(for: item.route))
+            }
+            Divider()
+            let pinned = Library.shared.isPinned(item.route)
+            Button(pinned ? "Unpin" : "Pin to Your Library", systemImage: pinned ? "pin.slash" : "pin") {
+                withAnimation(Motion.panel) { Library.shared.togglePin(item.route) }
             }
             if case .album(let id) = item.route {
                 Divider()

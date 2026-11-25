@@ -264,7 +264,7 @@ final class SonosOutput {
     // MARK: What the listener does here
 
     func userChangedTrack() {
-        SonosLog.write("user picked \(model.current.title) server=\(model.current.source.serverID ?? "none")")
+        SonosLog.write("user picked \(model.current.title) server=\(model.current.source.serverID ?? "none") rate=\(model.current.source.sampleRate.map(String.init) ?? "?")")
         model.isPlaying = true
         anchor = (0, .now)
         guard let controller else { return }
@@ -303,7 +303,8 @@ final class SonosOutput {
 
     private func startClock() {
         clock?.invalidate()
-        clock = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { _ in
+        // Ten times a second, so lyrics change on the beat rather than up to half a second late.
+        clock = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
             MainActor.assumeIsolated {
                 let output = SonosOutput.shared
                 guard output.controlsPlayback else { return }
@@ -320,11 +321,21 @@ final class SonosOutput {
         // Built once per song: the stream URL has a fresh salt each time, and the speaker compares it.
         let client = Library.shared.client
         let input = SonosTrackInput(id: song.id, title: song.title, artist: song.artist, album: song.album.title, durationMs: song.seconds * 1000,
-                                    streamURL: song.source.serverID.flatMap { id in client?.streamURL(id: id) },
+                                    streamURL: song.source.serverID.flatMap { id in Self.stream(id: id, song: song, client: client) },
                                     coverURL: Library.shared.coverURL(for: song.album, size: 500),
                                     mimeType: song.source.suffix.map { SonosTracks.mimeType(suffix: $0) })
         tracks[song.id] = input
         return input
+    }
+
+    /// The stream for the speaker. Sonos plays FLAC only up to 48 kHz (and no Opus or DSD): those come as MP3 320 from
+    /// Navidrome, as on Android, or the speaker skips them.
+    private static func stream(id: String, song: Song, client: SubsonicClient?) -> URL? {
+        guard let url = client?.streamURL(id: id) else { return nil }
+        guard SonosTracks.needsTranscode(suffix: song.source.suffix, sampleRate: song.source.sampleRate),
+              var parts = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return url }
+        parts.queryItems = (parts.queryItems ?? []) + [URLQueryItem(name: "maxBitRate", value: "320"), URLQueryItem(name: "format", value: "mp3")]
+        return parts.url ?? url
     }
 
     fileprivate func snapshot() -> SonosLocalSnapshot? {

@@ -53,6 +53,56 @@ final class Library {
     var week: [Int] = []
     var recentSearches: [String] = []
     var recentAlbums: [Album] = []
+    /// Playlists, albums and artists for Your Library, made once per rebuild rather than on every draw of the sidebar.
+    var collectionItems: [LibraryItem] = []
+    /// Pinned items of Your Library, by route key, in the order they were pinned.
+    var pinned: [String] = Store.defaults.stringArray(forKey: "library.pinned") ?? [] {
+        didSet { Store.defaults.set(pinned, forKey: "library.pinned") }
+    }
+
+    func isPinned(_ route: Route) -> Bool { pinned.contains(route.key) }
+
+    /// Songs in any playlist, for the green check in song rows.
+    private(set) var playlistSongIDs: Set<String> = []
+
+    func inPlaylist(_ song: Song) -> Bool { playlistSongIDs.contains(song.id) }
+
+    /// Puts a song in a playlist on Navidrome or takes it out, then reads that playlist back. The listener's own action.
+    func setInPlaylist(_ song: Song, playlistID: String, on: Bool) async {
+        guard let client, let serverID = song.source.serverID,
+              let index = serverPlaylists.firstIndex(where: { $0.id == playlistID }) else { return }
+        do {
+            if on {
+                try await client.updatePlaylist(id: playlistID, adding: [serverID])
+            } else {
+                let positions = (serverPlaylists[index].entry ?? []).enumerated().filter { $0.element.id == serverID }.map(\.offset)
+                guard !positions.isEmpty else { return }
+                try await client.updatePlaylist(id: playlistID, removingIndexes: positions)
+            }
+            if let fresh = try? await client.playlist(id: playlistID) { serverPlaylists[index] = fresh }
+            rebuild()
+        } catch {
+            status = .failed(error.localizedDescription)
+        }
+    }
+
+    /// A new playlist on Navidrome with this song in it.
+    func createPlaylist(named name: String, with song: Song) async {
+        guard let client, let serverID = song.source.serverID else { return }
+        do {
+            try await client.createPlaylist(name: name, songIDs: [serverID])
+            var lists: [SubsonicPlaylist] = []
+            for list in try await client.playlists() { lists.append((try? await client.playlist(id: list.id)) ?? list) }
+            serverPlaylists = lists
+            rebuild()
+        } catch {
+            status = .failed(error.localizedDescription)
+        }
+    }
+
+    func togglePin(_ route: Route) {
+        if let index = pinned.firstIndex(of: route.key) { pinned.remove(at: index) } else { pinned.append(route.key) }
+    }
     private(set) var client: SubsonicClient?
     /// What the server and the music folder gave, kept so the merged library can be rebuilt when either changes.
     private var serverAlbums: [SubsonicAlbum] = []
@@ -75,13 +125,78 @@ final class Library {
 
     var liked: [Song] { songs.filter { likedIDs.contains($0.id) } }
 
-    /// Your Mix: liked songs first, topped up from the rest of the library, 21 in all, fresh every day.
+    /// Your Mix of today: the one on Navidrome when another device made it today already, else our own (DailyMix).
     var yourMix: [Song] {
         if isSample { return Sample.songs }
-        var generator = SeededGenerator(seed: UInt64(Calendar.current.ordinality(of: .day, in: .era, for: .now) ?? 1))
-        let likedPart = liked.shuffled(using: &generator)
-        let rest = songs.filter { !likedIDs.contains($0.id) }.shuffled(using: &generator)
-        return Array((likedPart + rest).prefix(21))
+        return (sharedMixIDs ?? mixIDs).compactMap(song(id:))
+    }
+
+    /// Today's mix made here, by song id.
+    private(set) var mixIDs: [String] = []
+    private var mixDay = 0
+    /// Today's mix as it is on Navidrome, when it was made today (by this Mac or another device).
+    private(set) var sharedMixIDs: [String]?
+    /// A server song's local copy, for playlists that should play from this Mac.
+    private var localByServerID: [String: String] = [:]
+
+    private static var today: Int { Calendar.current.ordinality(of: .day, in: .era, for: .now) ?? 1 }
+    static let mixName = "Your Mix"
+    private static var mixTag: String {
+        let format = DateFormatter()
+        format.dateFormat = "yyyy-MM-dd"
+        format.locale = Locale(identifier: "en_US_POSIX")
+        return "PixelPlayer daily mix \(format.string(from: .now))"
+    }
+
+    /// Makes today's mix from the library: likes, plays and dates. Again only on a new day or a new library.
+    func refreshDailyMix() {
+        let candidates = songs.map { song in
+            MixCandidate(id: song.id, artist: song.artist, liked: likedIDs.contains(song.id), playCount: song.playCount,
+                         lastPlayed: song.lastPlayed, added: song.addedAt)
+        }
+        mixIDs = DailyMix.pick(candidates, day: Self.today, now: Date.now.timeIntervalSince1970)
+        mixDay = Self.today
+    }
+
+    /// A new day while the app was open: a new mix, and the shared one of today.
+    func checkNewDay() async {
+        guard !isSample, !songs.isEmpty, mixDay != Self.today else { return }
+        refreshDailyMix()
+        sharedMixIDs = nil
+        await syncYourMix()
+    }
+
+    /// The same mix on every device: the first one of the day puts it on Navidrome as the playlist Your Mix, the others
+    /// take that one. A playlist called Your Mix that PixelPlayer did not make is never touched.
+    func syncYourMix() async {
+        guard let client, !isSample else { return }
+        let tag = Self.mixTag
+        let existing = serverPlaylists.first { $0.name == Self.mixName }
+        if let existing, existing.comment == tag, let entries = existing.entry, !entries.isEmpty {
+            sharedMixIDs = entries.map { localByServerID[$0.id] ?? $0.id }
+            return
+        }
+        if let existing, !(existing.comment ?? "").hasPrefix("PixelPlayer daily mix") { return }
+        let ids = yourMix.compactMap(\.source.serverID)
+        guard ids.count >= 5 else { return }
+        do {
+            if let existing {
+                try await client.replacePlaylist(id: existing.id, songIDs: ids)
+                try await client.setPlaylistComment(id: existing.id, comment: tag)
+            } else {
+                try await client.createPlaylist(name: Self.mixName, songIDs: ids)
+                if let made = try await client.playlists().first(where: { $0.name == Self.mixName }) {
+                    try await client.setPlaylistComment(id: made.id, comment: tag)
+                }
+            }
+            var lists: [SubsonicPlaylist] = []
+            for list in try await client.playlists() { lists.append((try? await client.playlist(id: list.id)) ?? list) }
+            serverPlaylists = lists
+            sharedMixIDs = nil
+            rebuild()
+        } catch {
+            SonosLog.write("your mix sync failed: \(error.localizedDescription)")
+        }
     }
 
     var yourMixSummary: String {
@@ -97,7 +212,7 @@ final class Library {
         let seconds = songs.reduce(0) { $0 + $1.seconds }
         let hours = seconds / 3600, minutes = (seconds % 3600) / 60
         let time = hours > 0 ? "\(hours) h \(minutes) m" : "\(minutes) m"
-        return "\(songs.count.formatted()) songs · \(time)"
+        return "\(songCount(songs.count)) · \(time)"
     }
     var isSample: Bool { status == .sample }
     /// True once there is music to show.
@@ -154,6 +269,7 @@ final class Library {
         mixes = Sample.mixes
         week = Sample.week
         recentSearches = Sample.recentSearches
+        collectionItems = LibraryItem.collections(of: self)
         recentAlbums = Sample.albums
         status = .sample
     }
@@ -231,6 +347,8 @@ final class Library {
             rebuild()
             status = .ready
             await FavoritesSync.shared.sync()
+            refreshDailyMix()
+            await syncYourMix()
             await ScrobbleQueue.shared.send()
         } catch {
             status = .failed(error.localizedDescription)
@@ -255,8 +373,11 @@ final class Library {
                          genre: song.genre ?? "", coverArtID: song.coverArt)
             let created = song.created.flatMap { iso.date(from: $0) ?? ISO8601DateFormatter().date(from: $0) }
             return Song(id: song.id, title: song.title, album: album, seconds: song.duration ?? 0, artistName: song.artist, track: song.track,
-                        source: SongSource(serverID: song.id, serverPath: song.path, suffix: song.suffix, bitRate: song.bitRate),
-                        addedText: created.map { relative.localizedString(for: $0, relativeTo: .now) } ?? "", addedAt: created?.timeIntervalSince1970)
+                        source: SongSource(serverID: song.id, serverPath: song.path, suffix: song.suffix, bitRate: song.bitRate,
+                                           sampleRate: song.samplingRate),
+                        addedText: created.map { relative.localizedString(for: $0, relativeTo: .now) } ?? "", addedAt: created?.timeIntervalSince1970,
+                        playCount: song.playCount ?? 0,
+                        lastPlayed: song.played.flatMap { iso.date(from: $0) ?? ISO8601DateFormatter().date(from: $0) }?.timeIntervalSince1970)
         }
         let server = serverSongs.map(makeSong)
         serverKeys = serverSongs.map(Library.key(for:))
@@ -279,10 +400,13 @@ final class Library {
             locals.append(Song(id: key.id, title: track.title, album: album, seconds: track.durationMs / 1000,
                                artistName: track.artist.isEmpty ? nil : track.artist, track: track.track,
                                source: SongSource(localURL: URL(fileURLWithPath: track.path), serverID: twin,
-                                                  serverPath: twin.flatMap { serverByID[$0]?.source.serverPath }, suffix: track.suffix),
+                                                  serverPath: twin.flatMap { serverByID[$0]?.source.serverPath }, suffix: track.suffix,
+                                                  sampleRate: twin.flatMap { serverByID[$0]?.source.sampleRate }),
                                // When the file came onto this Mac, as far as the file tells.
                                addedText: track.modified > 0 ? relative.localizedString(for: Date(timeIntervalSince1970: track.modified), relativeTo: .now) : "",
-                               addedAt: track.modified > 0 ? track.modified : nil))
+                               addedAt: track.modified > 0 ? track.modified : nil,
+                               playCount: twin.flatMap { serverByID[$0]?.playCount } ?? 0,
+                               lastPlayed: twin.flatMap { serverByID[$0]?.lastPlayed }))
         }
         let localKeys = locals.map { TrackKey(id: $0.id, title: $0.title, artist: $0.artist, album: $0.album.title, durationMs: $0.seconds * 1000) }
         let hidden = LocalFirst.hiddenServerIDs(locals: localKeys, server: serverKeys)
@@ -293,6 +417,7 @@ final class Library {
                                                             durationMs: $0.seconds * 1000, serverID: $0.id) }
         // A server song with a local copy plays from the copy, also inside a playlist.
         let localForServer = Dictionary(locals.compactMap { song in song.source.serverID.map { ($0, song) } }, uniquingKeysWith: { first, _ in first })
+        localByServerID = localForServer.mapValues(\.id)
         func preferLocal(_ song: Song) -> Song { localForServer[song.id] ?? song }
         // The server's albums and the local ones, plus any album a song points at that neither list has, so an album page
         // always finds its album instead of falling back to another one.
@@ -316,6 +441,9 @@ final class Library {
                        covers: Array(covers))
         }
         week = []
+        if mixIDs.isEmpty || mixDay != Self.today { refreshDailyMix() }
+        playlistSongIDs = Set(playlists.flatMap { $0.songs.map(\.id) })
+        collectionItems = LibraryItem.collections(of: self)
         PlayerModel.shared.restoreIfEmpty()
     }
 
@@ -327,6 +455,7 @@ final class Library {
         case .playlist(let id): return playlists.first { $0.id == id }?.songs ?? []
         case .album(let id): return songs.filter { $0.album.id == id }.sorted { ($0.track ?? 0) < ($1.track ?? 0) }
         case .artist(let name): return TrackOrder.album.sorted(songs.filter { $0.artist == name || $0.album.artist == name }, fields: \.orderFields)
+        case .genre(let name): return TrackOrder.artist.sorted(songs.filter { $0.album.genre == name }, fields: \.orderFields)
         case .home, .search, .shelf: return []
         }
     }

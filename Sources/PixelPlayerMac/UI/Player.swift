@@ -156,7 +156,7 @@ struct NowPlayingView: View {
         .padding(.top, 28)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .ignoresSafeArea(.container, edges: .top)
-        .background { CoverBackdrop(album: model.current.album) }
+        .background { CoverBackdrop(album: model.current.album).ignoresSafeArea(.all, edges: [.top, .bottom]) }
     }
 }
 
@@ -173,8 +173,9 @@ struct CoverBackdrop: View {
             Rectangle().fill(.regularMaterial)
         }
         .clipped()
-        // Up to the top and bottom of the window, but not under the sidebar: the sidebar keeps its own colour.
-        .ignoresSafeArea(.container, edges: [.top, .bottom])
+        // Up to the top and bottom of the window, behind the floating player too, but not under the sidebar: the sidebar
+        // keeps its own colour.
+        .ignoresSafeArea(.all, edges: [.top, .bottom])
     }
 }
 
@@ -272,28 +273,17 @@ struct QueueInspector: View {
             HStack(spacing: 4) {
                 Text("Queue").font(.title2.weight(.bold))
                 Spacer()
-                Menu {
+                BarMenu(symbol: "ellipsis", label: "More") {
                     Button("Shuffle Up Next", systemImage: "shuffle") { withAnimation(Motion.panel) { model.upNext.shuffle() } }
                         .disabled(model.upNext.count < 2)
                     Button("Clear Queue", systemImage: "xmark.circle") {
                         withAnimation(Motion.panel) { model.userQueue = []; model.upNext = [] }
                     }
                     .disabled(model.userQueue.isEmpty && model.upNext.isEmpty)
-                } label: {
-                    Image(systemName: "ellipsis").font(.system(size: 15, weight: .medium)).frame(width: 32, height: 32).contentShape(Circle())
                 }
-                .menuStyle(.button)
-                .buttonStyle(.plain)
-                .menuIndicator(.hidden)
-                .fixedSize()
-                .help("More")
                 BarIcon(symbol: "xmark", label: "Close") { withAnimation(Motion.panel) { model.showQueue = false } }
             }
-            Picker("Show", selection: $tab) {
-                ForEach(Tab.allCases) { Text($0.rawValue).tag($0) }
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
+            QueueTabs(tab: $tab)
         }
         .padding(.leading, 20).padding(.trailing, 12)
         .padding(.top, 24)
@@ -303,35 +293,57 @@ struct QueueInspector: View {
     // MARK: Up Next
 
     private var upNext: some View {
-        List {
-            QueueHeading(text: "Now playing")
-            NowPlayingCard()
-            if !model.userQueue.isEmpty {
-                QueueHeading(text: "Next in queue") {
-                    Button("Clear") { withAnimation(Motion.panel) { model.userQueue = [] } }
-                        .buttonStyle(.link)
-                        .help("Remove the songs you added")
+        // A list of our own rather than the system's: no blue frame around a row on a right click, and the rows move
+        // with the same animation as everything else. Drag a song onto another to put it there.
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 2) {
+                QueueHeading(text: "Now playing")
+                NowPlayingCard()
+                if !model.userQueue.isEmpty {
+                    QueueHeading(text: "Next in queue") {
+                        Button("Clear") { withAnimation(Motion.panel) { model.userQueue = [] } }
+                            .buttonStyle(.link)
+                            .help("Remove the songs you added")
+                    }
+                    ForEach(model.userQueue) { song in
+                        QueueRow(song: song) { remove(song, from: \.userQueue) }
+                            .draggable("user:" + song.id)
+                            .dropDestination(for: String.self) { items, _ in move(items.first, before: song, in: \.userQueue) }
+                    }
                 }
-                ForEach(model.userQueue) { song in
-                    QueueRow(song: song) { remove(song, from: \.userQueue) }
+                if !model.upNext.isEmpty {
+                    QueueHeading(text: model.playingFrom.isEmpty ? "Next up" : "Next from \(model.playingFrom)")
+                    ForEach(model.upNext) { song in
+                        QueueRow(song: song) { remove(song, from: \.upNext) }
+                            .draggable("next:" + song.id)
+                            .dropDestination(for: String.self) { items, _ in move(items.first, before: song, in: \.upNext) }
+                    }
                 }
-                .onMove { from, to in withAnimation(Motion.panel) { model.userQueue.move(fromOffsets: from, toOffset: to) } }
-            }
-            if !model.upNext.isEmpty {
-                QueueHeading(text: model.playingFrom.isEmpty ? "Next up" : "Next from \(model.playingFrom)")
-                ForEach(model.upNext) { song in
-                    QueueRow(song: song) { remove(song, from: \.upNext) }
+                if model.userQueue.isEmpty && model.upNext.isEmpty {
+                    QueueEmpty(symbol: "text.line.last.and.arrowtriangle.forward", title: "Nothing up next",
+                               text: "Songs you add with Add to Queue or Play Next show up here.")
                 }
-                .onMove { from, to in withAnimation(Motion.panel) { model.upNext.move(fromOffsets: from, toOffset: to) } }
             }
-            if model.userQueue.isEmpty && model.upNext.isEmpty {
-                QueueEmpty(symbol: "text.line.last.and.arrowtriangle.forward", title: "Nothing up next",
-                           text: "Songs you add with Add to Queue or Play Next show up here.")
-            }
+            .padding(.horizontal, 12)
+            .padding(.bottom, 90)
         }
-        .queueListStyle()
+        .scrollIndicators(.automatic)
         .animation(Motion.panel, value: model.userQueue)
         .animation(Motion.panel, value: model.upNext)
+    }
+
+    /// A dragged song lands before the song it was dropped on, in that part of the queue.
+    private func move(_ payload: String?, before target: Song, in list: ReferenceWritableKeyPath<PlayerModel, [Song]>) -> Bool {
+        guard let payload, let colon = payload.firstIndex(of: ":") else { return false }
+        let from: ReferenceWritableKeyPath<PlayerModel, [Song]> = payload.hasPrefix("user:") ? \.userQueue : \.upNext
+        let id = String(payload[payload.index(after: colon)...])
+        guard id != target.id, let song = model[keyPath: from].first(where: { $0.id == id }) else { return false }
+        withAnimation(Motion.panel) {
+            model[keyPath: from].removeAll { $0.id == id }
+            let index = model[keyPath: list].firstIndex { $0.id == target.id } ?? model[keyPath: list].count
+            model[keyPath: list].insert(song, at: index)
+        }
+        return true
     }
 
     private func remove(_ song: Song, from list: ReferenceWritableKeyPath<PlayerModel, [Song]>) {
@@ -342,17 +354,20 @@ struct QueueInspector: View {
 
     private var history: some View {
         let played = Array(Playback.shared.history.reversed().prefix(50))
-        return List {
-            if played.isEmpty {
-                QueueEmpty(symbol: "clock.arrow.circlepath", title: "Nothing played yet", text: "Songs you played show up here.")
-            } else {
-                QueueHeading(text: "Played before")
-                ForEach(Array(played.enumerated()), id: \.offset) { _, song in
-                    QueueRow(song: song, play: { model.play(song) })
+        return ScrollView {
+            LazyVStack(alignment: .leading, spacing: 2) {
+                if played.isEmpty {
+                    QueueEmpty(symbol: "clock.arrow.circlepath", title: "Nothing played yet", text: "Songs you played show up here.")
+                } else {
+                    QueueHeading(text: "Played before")
+                    ForEach(Array(played.enumerated()), id: \.offset) { _, song in
+                        QueueRow(song: song, play: { model.play(song) })
+                    }
                 }
             }
+            .padding(.horizontal, 12)
+            .padding(.bottom, 90)
         }
-        .queueListStyle()
     }
 }
 
@@ -531,11 +546,15 @@ struct SongMenu: View {
         Divider()
         // Shown, but greyed: adding would change the playlists on the server.
         Menu("Add to Playlist", systemImage: "text.badge.plus") {
-            ForEach(Library.shared.playlists) { list in Button(list.title) {}.disabled(true).help(playlistEditingNote) }
+            ForEach(Library.shared.playlists) { list in
+                Button(list.title) { Task { await Library.shared.setInPlaylist(song, playlistID: list.id, on: true) } }
+                    .disabled(list.songs.contains { $0.id == song.id })
+            }
             Divider()
-            Button("New Playlist…") {}.disabled(true).help(playlistEditingNote)
+            Button("New Playlist…") { NewPlaylistPrompt.ask(for: song) }
         }
-        .help(playlistEditingNote)
+        .disabled(song.source.serverID == nil || Library.shared.client == nil)
+        .help(song.source.serverID == nil ? "This song is only on this Mac, so it can't go into a Navidrome playlist." : "")
         Button(liked ? "Remove from Liked Songs" : "Save to Liked Songs", systemImage: liked ? "heart.slash" : "heart") {
             model.setLiked(song, !liked)
         }
@@ -548,7 +567,25 @@ struct SongMenu: View {
     }
 }
 
-let playlistEditingNote = "Playlists come from Navidrome; editing them here comes later"
+/// Asks for a name, then makes a playlist on Navidrome with the song in it.
+@MainActor
+enum NewPlaylistPrompt {
+    static func ask(for song: Song) {
+        let alert = NSAlert()
+        alert.messageText = "New playlist"
+        alert.informativeText = "With \(song.title) in it."
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 240, height: 24))
+        field.placeholderString = "Playlist name"
+        alert.accessoryView = field
+        alert.addButton(withTitle: "Create")
+        alert.addButton(withTitle: "Cancel")
+        alert.window.initialFirstResponder = field
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        let name = field.stringValue.trimmingCharacters(in: .whitespaces)
+        guard !name.isEmpty else { return }
+        Task { await Library.shared.createPlaylist(named: name, with: song) }
+    }
+}
 
 /// The details of one song, in a sheet with the system's own form rows.
 struct SongInfoSheet: View {
@@ -738,5 +775,64 @@ struct DevicesPopover: View {
         .frame(width: 280, height: 600)
         .onAppear { remote.refreshPhones(); sonos.connectShown(true) }
         .onDisappear { sonos.connectShown(false) }
+    }
+}
+
+/// Up Next and History: two tabs with a soft round under the pointer and a blue pill that slides to the chosen one,
+/// instead of the system's segmented control, which only lit up on a click and flashed grey before it turned blue.
+struct QueueTabs: View {
+    @Binding var tab: QueueInspector.Tab
+    @Namespace private var pill
+    @LocalState private var hovered: QueueInspector.Tab?
+
+    var body: some View {
+        HStack(spacing: 4) {
+            ForEach(QueueInspector.Tab.allCases) { item in
+                let chosen = item == tab
+                Text(item.rawValue)
+                    .font(.callout.weight(.semibold))
+                    .foregroundStyle(chosen ? AnyShapeStyle(PP.onPrimary) : AnyShapeStyle(.primary))
+                    .padding(.horizontal, 14)
+                    .frame(height: 28)
+                    .background {
+                        if chosen {
+                            Capsule().fill(PP.primary).matchedGeometryEffect(id: "pill", in: pill)
+                        } else if hovered == item {
+                            Capsule().fill(Color.primary.opacity(0.08))
+                        }
+                    }
+                    .contentShape(Capsule())
+                    .onHover { inside in if inside { hovered = item } else if hovered == item { hovered = nil } }
+                    .onTapGesture { withAnimation(Motion.panel) { tab = item } }
+            }
+        }
+        .padding(3)
+        .background(Capsule().fill(Color.primary.opacity(0.06)))
+        .animation(Motion.fade, value: hovered)
+    }
+}
+
+/// A menu in the player's icon style: the same soft round under the pointer as the icon buttons beside it.
+struct BarMenu<Items: View>: View {
+    let symbol: String
+    let label: String
+    @ViewBuilder var items: Items
+    @LocalState private var hovering = false
+
+    var body: some View {
+        Menu { items } label: {
+            Image(systemName: symbol)
+                .font(.system(size: 15, weight: .medium))
+                .frame(width: 32, height: 32)
+                .background(Circle().fill(Color.primary.opacity(hovering ? 0.1 : 0)))
+                .contentShape(Circle())
+        }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .onHover { hovering = $0 && !Debug.active }
+        .animation(Motion.fade, value: hovering)
+        .help(label)
     }
 }

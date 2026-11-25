@@ -9,8 +9,25 @@ enum Route: Hashable {
     case home, search, songs, liked
     /// Playlists and albums by id; an artist by name, which is what both the server and local files share.
     case playlist(String), album(String), artist(String)
+    /// All songs of one genre, from Browse.
+    case genre(String)
     /// Everything on one shelf, from its Show all: `mixes`, `recent`, `more-album:<id>`, `more-artist:<name>`, `albums:<search>`.
     case shelf(String)
+
+    /// A stable text form, the same one `init?(script:)` reads: for pins and anything else that is stored.
+    var key: String {
+        switch self {
+        case .home: "home"
+        case .search: "search"
+        case .songs: "songs"
+        case .liked: "liked"
+        case .playlist(let id): "playlist:\(id)"
+        case .album(let id): "album:\(id)"
+        case .artist(let name): "artist:\(name)"
+        case .genre(let name): "genre:\(name)"
+        case .shelf(let key): "shelf:\(key)"
+        }
+    }
 
     /// From a script step such as `page:album:2`.
     init?(script: String) {
@@ -24,6 +41,7 @@ enum Route: Hashable {
         case "playlist": guard let id else { return nil }; self = .playlist(id)
         case "album": guard let id else { return nil }; self = .album(id)
         case "artist": guard let id else { return nil }; self = .artist(id)
+        case "genre": guard let id else { return nil }; self = .genre(id)
         case "shelf": guard id != nil else { return nil }; self = .shelf(parts.dropFirst().joined(separator: ":"))
         default: return nil
         }
@@ -202,7 +220,14 @@ final class PlayerModel {
         let ids = Set(context.map(\.id))
         let library = Library.shared
         if Set(library.yourMix.map(\.id)) == ids { return "Your Mix" }
-        for item in LibraryItem.all where Set(library.songs(for: item.route).map(\.id)) == ids { return item.title }
+        // One album or one artist: known from the songs themselves, without going through the whole library.
+        if let album = context.first?.album, context.allSatisfy({ $0.album.id == album.id }),
+           Set(library.songs(for: .album(album.id)).map(\.id)) == ids { return album.title }
+        if let artist = context.first?.artist, context.allSatisfy({ $0.artist == artist }),
+           Set(library.songs(for: .artist(artist)).map(\.id)) == ids { return artist }
+        if ids.count == library.songs.count { return "All Songs" }
+        if Set(library.liked.map(\.id)) == ids { return "Liked Songs" }
+        for list in library.playlists where Set(list.songs.map(\.id)) == ids { return list.title }
         for mix in library.mixes where Set(library.songs(for: mix).map(\.id)) == ids { return mix.title }
         return ""
     }

@@ -5,7 +5,9 @@ Alles wat Mark vroeg, met wat klaar is en wat nog moet. Bijgewerkt bij elke rond
 
 ## Nog te doen
 
-- **Sonos wisselt snel door veel nummers bij verbinden.** Serverbibliotheek laadt nu goed (970 nummers); oorzaak nog niet gevonden, logboek in 0.2.3.
+- **Sonos wisselt snel door veel nummers bij verbinden.** Serverbibliotheek laadt goed (970 nummers); hi-res nu omgezet naar MP3 voor Sonos (waarschijnlijke oorzaak); logboek in 0.2.3 om het zeker te weten.
+- **Apps laten samenwerken.** Mac en Android zien wat er op een Sonos-speaker speelt en kunnen het pauzeren; overnemen met een vraag; meerdere mensen in huis (eigen Navidrome-account). Voorstel, nog niet gebouwd.
+- **Your Mix op Android** dezelfde laten zijn: Android moet de afspeellijst Your Mix van vandaag overnemen of zelf maken (Android-kant).
 - **Sonos overnemen zonder wachtrij te verliezen.** Speelt de telefoon op een speaker en start je vanaf de Mac, dan eerst
   vragen (achter dit nummer, nu spelen, of vervangen), de wachtrij van de speaker overnemen en de telefoon netjes laten
   loslaten. Andersom laat de Mac los. Voorstel staat klaar, nog niet gebouwd.
@@ -13,12 +15,21 @@ Alles wat Mark vroeg, met wat klaar is en wat nog moet. Bijgewerkt bij elke rond
 - **Spotify.** Grijs in de welkom en in Instellingen tot het er is.
 - **Nederlandse vertaling** (zie ROADMAP).
 
-## In 0.2.3
+## In 0.2.4 (0.2.3 werd door GitHub afgebroken en kwam nooit uit)
 
-- Updatemelding hoger, met evenveel ruimte boven als rechts.
-- Titel in de speler opent het juiste album (viel terug op het eerste album).
-- Maar een rij in de zijbalk licht op onder de muis (bij wisselen naar Albums stonden er twee).
-- Logboek van wat er met de speakers gebeurt (~/Library/Logs/PixelPlayer/sonos.log), om het overslaan bij Sonos te vinden.
+- Genres in Browse openen een genrepagina; albums in zoekresultaten en het topresultaat openen.
+- Dubbelklik in de zijbalk speelt af. Vastzetten met de rechtermuisknop, met groen speldje.
+- Your Library toont alle albums en artiesten (recente eerst), zonder dat de zijbalk traag wordt.
+- Artiestpagina zoals Spotify: banner, Popular (meest gespeeld via Navidrome), Albums.
+- Albumkop: artiest aanklikbaar; "1 song" in plaats van "1 songs".
+- Nummerrij zoals Spotify: groen vinkje als bewaard, plus en drie puntjes bij hover, menu om in afspeellijsten te zetten; afspeellijsten gaan naar Navidrome.
+- Play rond, shuffle en meer als losse iconen; Home als simpel huisje.
+- Wachtrij: eigen schakelaar Up Next/History met hover, drie puntjes met hover, geen blauw kader bij rechtermuisklik.
+- Instellingen: Open at login, Player in the menu bar, Add new songs automatically en licht/donker werken; crossfade, equalizer en accentkleur grijs met reden.
+- Your Mix slimmer (likes, vaak gespeeld, ontdekkingen, herontdekken, nieuw) en elke dag gedeeld als afspeellijst Your Mix op Navidrome.
+- Sonos: hi-res (boven 48 kHz) komt als MP3 320 van Navidrome; songtekst loopt preciezer gelijk.
+- Songtekstachtergrond loopt door tot onder de speler; klokje gecentreerd boven de tijden.
+- Updatemelding met gelijke ruimte boven en rechts; titel opent juiste album; een gehoverde rij in de zijbalk.
 
 ## In 0.2.2
 

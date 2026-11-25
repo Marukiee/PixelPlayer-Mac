@@ -248,7 +248,8 @@ final class RemoteController {
     private func startTimer() {
         timer?.invalidate()
         ticks = 0
-        timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { _ in
+        // Ten times a second for the position (lyrics); the keepalive still goes every two seconds.
+        timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
             MainActor.assumeIsolated { RemoteController.shared.tick() }
         }
     }
@@ -259,7 +260,7 @@ final class RemoteController {
         let now = Date.now
         switch phase {
         case .connected:
-            if ticks % 4 == 0 { link?.send(RemoteMessage.simple("ping")) }
+            if ticks % 20 == 0 { link?.send(RemoteMessage.simple("ping")) }
             if now.timeIntervalSince(lastReceived) > RemoteProtocol.silenceLimit { linkLost(); return }
             if model.isPlaying, let anchor, now.timeIntervalSince(lastSeek) > 1.5 {
                 model.position = min(model.duration, Double(anchor.ms) / 1000 + now.timeIntervalSince(anchor.at))

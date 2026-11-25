@@ -55,6 +55,11 @@ public struct SubsonicSong: Codable, Sendable, Hashable, Identifiable {
     public var created: String?
     public var starred: String?
     public var playCount: Int?
+    /// OpenSubsonic: when it was last played, on any device.
+    public var played: String?
+    /// OpenSubsonic: sample rate in Hz and bits per sample, for what a Sonos speaker can play.
+    public var samplingRate: Int?
+    public var bitDepth: Int?
 
     public init(id: String, title: String, album: String? = nil, artist: String? = nil, albumId: String? = nil, artistId: String? = nil,
                 track: Int? = nil, discNumber: Int? = nil, year: Int? = nil, genre: String? = nil, duration: Int? = nil, path: String? = nil,
@@ -98,6 +103,7 @@ public struct SubsonicPlaylist: Codable, Sendable, Hashable, Identifiable {
     public var coverArt: String?
     public var owner: String?
     public var changed: String?
+    public var comment: String?
     public var entry: [SubsonicSong]?
 }
 
@@ -248,6 +254,17 @@ public struct SubsonicClient: Sendable {
 
     public func createPlaylist(name: String, songIDs: [String]) async throws {
         _ = try await get("createPlaylist", [.init(name: "name", value: name)] + songIDs.map { .init(name: "songId", value: $0) },
+                          key: nil, as: Empty.self)
+    }
+
+    /// Replaces all songs of an existing playlist.
+    public func replacePlaylist(id: String, songIDs: [String]) async throws {
+        _ = try await get("createPlaylist", [.init(name: "playlistId", value: id)] + songIDs.map { .init(name: "songId", value: $0) },
+                          key: nil, as: Empty.self)
+    }
+
+    public func setPlaylistComment(id: String, comment: String) async throws {
+        _ = try await get("updatePlaylist", [.init(name: "playlistId", value: id), .init(name: "comment", value: comment)],
                           key: nil, as: Empty.self)
     }
 

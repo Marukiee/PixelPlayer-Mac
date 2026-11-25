@@ -29,7 +29,7 @@ struct RouteContent: View {
                               songs: Library.shared.liked, share: "Liked Songs")
             case .playlist(let id):
                 let list = Library.shared.playlists.first { $0.id == id } ?? Playlist(id: id, title: "Playlist", songs: [])
-                TrackListPage(header: TrackHeader(kind: "Playlist", title: list.title, meta: "\(list.songs.count) songs",
+                TrackListPage(header: TrackHeader(kind: "Playlist", title: list.title, meta: songCount(list.songs.count),
                                                   art: .collage(list.songs.map(\.album)), tint: Color(hex: list.songs.first?.album.tint ?? 0x23408F)),
                               songs: list.songs, orders: TrackOrder.allCases, firstOrder: .custom, share: list.title)
             case .album(let id):
@@ -37,18 +37,28 @@ struct RouteContent: View {
                     ?? Library.shared.album(at: 0)
                 let songs = Library.shared.songs(for: .album(album.id))
                 TrackListPage(header: TrackHeader(kind: "Album", title: album.title,
-                                                  meta: [album.artist, album.year > 0 ? String(album.year) : "", "\(songs.count) songs"].filter { !$0.isEmpty }.joined(separator: " · "),
-                                                  art: .album(album), tint: Color(hex: album.tint)),
+                                                  meta: [album.year > 0 ? String(album.year) : "", songCount(songs.count)].filter { !$0.isEmpty }.joined(separator: " · "),
+                                                  art: .album(album), tint: Color(hex: album.tint), artist: album.artist),
                               songs: songs, showAlbum: false, showAdded: false, showCover: false, showSort: false, share: "\(album.title) by \(album.artist)",
                               more: Shelves.items("more-album:\(album.id)"), moreRoute: .shelf("more-album:\(album.id)"))
+            case .artist(let name) where !Library.shared.isSample:
+                ArtistPage(name: name)
             case .artist(let name):
-                let album = Library.shared.albums.first { $0.artist == name } ?? Library.shared.album(at: 0)
-                let albumCount = Library.shared.albums.filter { $0.artist == name }.count
-                TrackListPage(header: TrackHeader(kind: "Artist", title: album.artist,
+                // The name is the artist's own, also when no album has it as album artist; the cover comes from their songs.
+                let album = Library.shared.albums.first { $0.artist == name } ?? Library.shared.songs.first { $0.artist == name }?.album
+                    ?? Library.shared.album(at: 0)
+                let albumCount = Set(Library.shared.songs(for: .artist(name)).map(\.album.id)).count
+                TrackListPage(header: TrackHeader(kind: "Artist", title: name,
                                                   meta: [album.genre, albumCount == 1 ? "1 album" : "\(albumCount) albums"].filter { !$0.isEmpty }.joined(separator: " · "),
                                                   art: .artist(album), tint: Color(hex: album.tint)),
                               songs: Library.shared.songs(for: .artist(name)), showAdded: false, firstOrder: .album, share: album.artist,
                               more: Shelves.items("more-artist:\(name)"), moreRoute: .shelf("more-artist:\(name)"))
+            case .genre(let name):
+                let songs = Library.shared.songs(for: .genre(name))
+                let album = songs.first?.album ?? Library.shared.album(at: 0)
+                TrackListPage(header: TrackHeader(kind: "Genre", title: name, meta: Library.summary(songs),
+                                                  art: .collage(Array(Set(songs.map(\.album))).prefix(4).map { $0 }), tint: Color(hex: album.tint)),
+                              songs: songs, share: name)
             case .shelf(let key):
                 ShelfPage(key: key)
             }
@@ -109,10 +119,10 @@ struct MixHero: View {
                 Text("Your Mix").font(.system(size: 52, weight: .heavy)).foregroundStyle(.white)
                 Text(Library.shared.yourMixSummary).foregroundStyle(.white.opacity(0.8)).lineLimit(1)
                 Spacer(minLength: 8)
-                HStack(spacing: 12) {
+                HStack(spacing: 18) {
                     PlayCircle { PlayerModel.shared.play(Library.shared.yourMix) }
-                    RoundButton(symbol: "shuffle", label: "Shuffle") { PlayerModel.shared.play(Library.shared.yourMix, shuffled: true) }
-                    RoundMenu(songs: Library.shared.yourMix, share: "Your Mix: \(Library.shared.yourMixSummary)")
+                    PlainIconButton(symbol: "shuffle", label: "Shuffle", onColour: true) { PlayerModel.shared.play(Library.shared.yourMix, shuffled: true) }
+                    RoundMenu(songs: Library.shared.yourMix, share: "Your Mix: \(Library.shared.yourMixSummary)", onColour: true)
                 }
             }
             .frame(height: 184)
@@ -167,6 +177,9 @@ struct RoundMenu: View {
     /// The songs the menu acts on, and the line that is shared.
     var songs: [Song] = []
     var share: String? = nil
+    /// On a coloured header (Your Mix): white instead of the text colour.
+    var onColour = false
+    @LocalState private var hovering = false
 
     var body: some View {
         Menu {
@@ -176,15 +189,46 @@ struct RoundMenu: View {
                 Button("Share", systemImage: "square.and.arrow.up") { Share.text(share) }
             }
         } label: {
-            RoundIcon(symbol: "ellipsis")
+            PlainIcon(symbol: "ellipsis", hovering: hovering, onColour: onColour)
         }
         .menuStyle(.button)
         .menuIndicator(.hidden)
         .buttonStyle(.plain)
         .fixedSize()
-        .glassEffect(.regular.interactive(), in: Circle())
-        .hoverLift(scale: 1.06)
+        .onHover { hovering = $0 && !Debug.active }
         .help("More")
+    }
+}
+
+/// Shuffle and more beside the big play button, as in Spotify: just the symbol, no circle, lighter under the pointer.
+struct PlainIconButton: View {
+    let symbol: String
+    let label: String
+    var onColour = false
+    let action: () -> Void
+    @LocalState private var hovering = false
+
+    var body: some View {
+        Button(action: action) { PlainIcon(symbol: symbol, hovering: hovering, onColour: onColour) }
+            .buttonStyle(PressStyle())
+            .onHover { hovering = $0 && !Debug.active }
+            .help(label)
+    }
+}
+
+struct PlainIcon: View {
+    let symbol: String
+    let hovering: Bool
+    var onColour = false
+
+    var body: some View {
+        Image(systemName: symbol)
+            .font(.system(size: 26, weight: .semibold))
+            .foregroundStyle(onColour ? AnyShapeStyle(.white.opacity(hovering ? 1 : 0.75))
+                             : (hovering ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary)))
+            .frame(width: 44, height: 56)
+            .contentShape(Rectangle())
+            .animation(Motion.fade, value: hovering)
     }
 }
 
@@ -350,7 +394,12 @@ struct TrackHeader {
     let meta: String
     let art: Artwork
     let tint: Color
+    /// A name at the start of the meta line that opens its artist, as on an album page.
+    var artist: String? = nil
 }
+
+/// "1 song", "12 songs".
+func songCount(_ count: Int) -> String { count == 1 ? "1 song" : "\(count.formatted()) songs" }
 
 /// A playlist, album or artist: a large header in the colour of its cover, then roomy rows.
 struct TrackListPage: View {
@@ -384,14 +433,21 @@ struct TrackListPage: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text(header.kind).font(.subheadline.weight(.semibold))
                         Text(header.title).font(.system(size: 60, weight: .heavy)).lineLimit(1).minimumScaleFactor(0.5)
-                        Text(header.meta).foregroundStyle(.secondary)
+                        HStack(spacing: 0) {
+                            if let artist = header.artist {
+                                LinkText(artist) { PlayerModel.shared.go(.artist(artist)) }.fontWeight(.semibold).foregroundStyle(.primary)
+                                if !header.meta.isEmpty { Text(" · ") }
+                            }
+                            Text(header.meta)
+                        }
+                        .foregroundStyle(.secondary)
                     }
                 }
                 .padding(.horizontal, margin)
                 .padding(.top, margin)
-                HStack(spacing: 12) {
+                HStack(spacing: 18) {
                     PlayCircle { PlayerModel.shared.play(songs) }
-                    RoundButton(symbol: "shuffle", label: "Shuffle") { PlayerModel.shared.play(songs, shuffled: true) }
+                    PlainIconButton(symbol: "shuffle", label: "Shuffle") { PlayerModel.shared.play(songs, shuffled: true) }
                     RoundMenu(songs: songs, share: share)
                     Spacer()
                     if showSort {
@@ -451,7 +507,10 @@ struct TrackColumns: View {
             Text("Title").frame(maxWidth: .infinity, alignment: .leading)
             if showAlbum { Text("Album").frame(maxWidth: .infinity, alignment: .leading) }
             if showAdded { Text("Date added").frame(width: 130, alignment: .leading) }
-            Image(systemName: "clock").frame(width: 44, alignment: .trailing)
+            // Room for the saved check, then the clock centred over the times, then room for the more button.
+            Color.clear.frame(width: 24)
+            Image(systemName: "clock").frame(width: 44, alignment: .center)
+            Color.clear.frame(width: 24)
         }
         .font(.callout)
         .foregroundStyle(.secondary)
@@ -470,9 +529,11 @@ struct TrackRow: View {
     var showCover = true
     @Environment(PlayerModel.self) private var model
     @LocalState private var hovering = false
+    @LocalState private var showPlaylists = false
 
     var body: some View {
         let playing = song == model.current
+        let saved = model.likedIDs.contains(song.id) || Library.shared.inPlaylist(song)
         HStack(spacing: 16) {
             ZStack {
                 if hovering {
@@ -509,8 +570,43 @@ struct TrackRow: View {
                 Text(song.added).foregroundStyle(.secondary).lineLimit(1)
                     .frame(width: 130, alignment: .leading)
             }
-            Text(song.duration).monospacedDigit().foregroundStyle(.secondary)
-                .frame(width: 44, alignment: .trailing)
+            // As in Spotify: a green check when the song is saved (liked or in a playlist), a plus under the pointer to
+            // save it. The plus saves it to Liked Songs and opens the list of playlists; the check opens that list too.
+            ZStack {
+                if saved {
+                    Button { showPlaylists = true } label: {
+                        Image(systemName: "checkmark.circle.fill").font(.system(size: 17)).foregroundStyle(Color.green)
+                    }
+                    .buttonStyle(PressStyle())
+                    .help("Saved. Change where")
+                } else if hovering {
+                    Button {
+                        model.setLiked(song, true)
+                        showPlaylists = true
+                    } label: {
+                        Image(systemName: "plus.circle").font(.system(size: 17)).foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(PressStyle())
+                    .help("Save to Liked Songs")
+                }
+            }
+            .frame(width: 24)
+            .popover(isPresented: $showPlaylists, arrowEdge: .bottom) { AddToPlaylistView(song: song) }
+            Text(song.duration).monospacedDigit().foregroundStyle(.secondary).frame(width: 44, alignment: .center)
+            ZStack {
+                if hovering {
+                    Menu { SongMenu(song: song) } label: {
+                        Image(systemName: "ellipsis").font(.system(size: 15, weight: .semibold)).foregroundStyle(.secondary)
+                            .frame(width: 24, height: 24).contentShape(Rectangle())
+                    }
+                    .menuStyle(.button)
+                    .buttonStyle(.plain)
+                    .menuIndicator(.hidden)
+                    .fixedSize()
+                    .help("More for \(song.title)")
+                }
+            }
+            .frame(width: 24)
         }
         .padding(.horizontal, 12)
         .frame(height: 56)
@@ -518,6 +614,10 @@ struct TrackRow: View {
         .contentShape(Rectangle())
         .onTapGesture(count: 2) { model.play(song, in: context) }
         .onHover { hovering = $0 && !Debug.active }
+        .onAppear {
+            if Debug.hovered(song.title) { hovering = true }
+            if Debug.active, ProcessInfo.processInfo.environment["PP_SHOW_PLAYLISTS"] == song.title { showPlaylists = true }
+        }
         .animation(Motion.fade, value: hovering)
         .contextMenu { SongMenu(song: song) }
     }
@@ -603,6 +703,8 @@ struct SearchPage: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .frame(height: 224)
                     .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .onTapGesture { PlayerModel.shared.go(.album(album.id)) }
                 }
             }
             .frame(width: 320)
@@ -619,7 +721,7 @@ struct SearchPage: View {
         if !albums.isEmpty {
             Shelf(title: "Albums", showAll: .shelf("albums:\(term)")) {
                 FittingRow(items: albums, minWidth: 160) { album in
-                    CoverCell(art: .album(album), title: album.title, subtitle: "\(album.year) · \(album.artist)")
+                    ShelfCell(item: .album(album))
                 }
             }
         }
@@ -645,6 +747,8 @@ struct BrowseTile: View {
         .frame(height: 112)
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .hoverLift()
+        .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .onTapGesture { PlayerModel.shared.go(.genre(title)) }
     }
 }
 
@@ -793,5 +897,201 @@ extension TrackOrder {
         case .artist: "Artist"
         case .album: "Album"
         }
+    }
+}
+
+/// An artist, the way Spotify shows one: a wide picture with the name large over it, play and shuffle, the songs played
+/// most, and the albums.
+struct ArtistPage: View {
+    let name: String
+    @Environment(PlayerModel.self) private var model
+    @LocalState private var showMore = false
+
+    private var songs: [Song] { Library.shared.songs(for: .artist(name)) }
+
+    /// Most played first (Navidrome counts the plays of every device); without counts, liked songs and then album order.
+    private var popular: [Song] {
+        let liked = model.likedIDs
+        return songs.enumerated().sorted { a, b in
+            if a.element.playCount != b.element.playCount { return a.element.playCount > b.element.playCount }
+            let la = liked.contains(a.element.id), lb = liked.contains(b.element.id)
+            if la != lb { return la }
+            return a.offset < b.offset
+        }.map(\.element)
+    }
+
+    private var albums: [Album] {
+        var seen = Set<String>()
+        return songs.map(\.album).filter { seen.insert($0.id).inserted }.sorted { $0.year > $1.year }
+    }
+
+    var body: some View {
+        let songs = songs
+        let albums = albums
+        let cover = albums.first ?? Library.shared.album(at: 0)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                banner(cover: cover, songs: songs, albums: albums)
+                HStack(spacing: 18) {
+                    PlayCircle { model.play(popular) }
+                    PlainIconButton(symbol: "shuffle", label: "Shuffle") { model.play(songs, shuffled: true) }
+                    RoundMenu(songs: songs, share: name)
+                }
+                .padding(.horizontal, margin)
+                .padding(.vertical, 22)
+                VStack(alignment: .leading, spacing: 36) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Popular").font(.title2.weight(.bold))
+                        VStack(spacing: 0) {
+                            let shown = Array(popular.prefix(showMore ? 10 : 5))
+                            ForEach(Array(shown.enumerated()), id: \.element.id) { index, song in
+                                TrackRow(index: index + 1, song: song, context: popular, showAlbum: false, showAdded: false)
+                                    .transition(.opacity)
+                            }
+                        }
+                        if songs.count > 5 {
+                            Button(showMore ? "Show less" : "Show more") { withAnimation(Motion.panel) { showMore.toggle() } }
+                                .buttonStyle(.plain)
+                                .font(.callout.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                                .padding(.top, 6)
+                                .padding(.leading, 12)
+                        }
+                    }
+                    if !albums.isEmpty {
+                        Shelf(title: "Albums") {
+                            FittingRow(items: albums, minWidth: 160) { album in ShelfCell(item: .album(album)) }
+                        }
+                    }
+                }
+                .padding(.horizontal, margin)
+                .padding(.bottom, 100)
+            }
+        }
+        .ignoresSafeArea(.container, edges: .top)
+    }
+
+    /// The cover across the whole width, darkened towards the bottom so the name reads on it.
+    private func banner(cover: Album, songs: [Song], albums: [Album]) -> some View {
+        ZStack(alignment: .bottomLeading) {
+            GeometryReader { geo in
+                CoverArt(album: cover, radius: 0)
+                    .scaledToFill()
+                    .frame(width: geo.size.width, height: geo.size.height)
+                    .clipped()
+            }
+            LinearGradient(colors: [.black.opacity(0.05), .black.opacity(0.65)], startPoint: .top, endPoint: .bottom)
+            VStack(alignment: .leading, spacing: 6) {
+                Text(name)
+                    .font(.system(size: 76, weight: .heavy))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.4)
+                Text([songCount(songs.count), albums.count == 1 ? "1 album" : "\(albums.count) albums", cover.genre]
+                        .filter { !$0.isEmpty }.joined(separator: " · "))
+                    .font(.title3.weight(.medium))
+                    .foregroundStyle(.white.opacity(0.85))
+            }
+            .padding(.horizontal, margin)
+            .padding(.bottom, 24)
+        }
+        .frame(height: 340)
+        .clipped()
+    }
+}
+
+/// Where a song is saved, as Spotify asks it: Liked Songs and every playlist, each with a circle to tick. Changes go to
+/// Navidrome at once. A playlist can be found by name and a new one made here.
+struct AddToPlaylistView: View {
+    let song: Song
+    @Environment(PlayerModel.self) private var model
+    @LocalState private var search = ""
+    @LocalState private var newName = ""
+    @LocalState private var naming = false
+    @LocalState private var busy: String?
+
+    private var library: Library { .shared }
+    private var onServer: Bool { song.source.serverID != nil && library.client != nil }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Add to playlist").font(.headline)
+            TextField("Find a playlist", text: $search)
+                .textFieldStyle(.roundedBorder)
+            if naming {
+                HStack {
+                    TextField("Playlist name", text: $newName).textFieldStyle(.roundedBorder)
+                        .onSubmit(create)
+                    Button("Create", action: create).disabled(newName.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+            } else {
+                Button { naming = true } label: { Label("New playlist", systemImage: "plus") }
+                    .buttonStyle(.plain)
+                    .disabled(!onServer)
+                    .help(onServer ? "" : noServerNote)
+            }
+            Divider()
+            ScrollView {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Saved in").font(.subheadline.weight(.semibold)).foregroundStyle(.secondary).padding(.top, 2)
+                    row(title: "Liked Songs", subtitle: songCount(model.likedIDs.count), art: .liked,
+                        on: model.likedIDs.contains(song.id), busy: false) { model.setLiked(song, !model.likedIDs.contains(song.id)) }
+                    let lists = library.playlists.filter { search.isEmpty || $0.title.localizedCaseInsensitiveContains(search) }
+                    if !lists.isEmpty {
+                        Text("Playlists").font(.subheadline.weight(.semibold)).foregroundStyle(.secondary).padding(.top, 8)
+                    }
+                    ForEach(lists) { list in
+                        let inList = list.songs.contains { $0.id == song.id }
+                        row(title: list.title, subtitle: songCount(list.songs.count),
+                            art: .collage(list.songs.isEmpty ? [library.album(at: 0)] : list.songs.map(\.album)),
+                            on: inList, busy: busy == list.id) {
+                            busy = list.id
+                            Task {
+                                await library.setInPlaylist(song, playlistID: list.id, on: !inList)
+                                busy = nil
+                            }
+                        }
+                        .disabled(!onServer)
+                        .help(onServer ? "" : noServerNote)
+                    }
+                }
+            }
+            .frame(maxHeight: 300)
+        }
+        .padding(16)
+        .frame(width: 320)
+    }
+
+    private var noServerNote: String { "This song is only on this Mac, so it can't go into a Navidrome playlist." }
+
+    private func create() {
+        let name = newName.trimmingCharacters(in: .whitespaces)
+        guard !name.isEmpty else { return }
+        naming = false
+        newName = ""
+        Task { await library.createPlaylist(named: name, with: song) }
+    }
+
+    private func row(title: String, subtitle: String, art: Artwork, on: Bool, busy: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                ArtworkView(art: art, radius: 4).frame(width: 36, height: 36)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(title).lineLimit(1)
+                    Text(subtitle).font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 8)
+                if busy {
+                    ProgressView().controlSize(.small)
+                } else {
+                    Image(systemName: on ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 18))
+                        .foregroundStyle(on ? AnyShapeStyle(Color.green) : AnyShapeStyle(.secondary))
+                }
+            }
+            .padding(.vertical, 4).padding(.horizontal, 6)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 }

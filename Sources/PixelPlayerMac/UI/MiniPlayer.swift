@@ -50,8 +50,14 @@ struct MenuBarPanel: View {
                     Spacer()
                     Text("\(model.userQueue.count + model.upNext.count) songs").font(.caption).foregroundStyle(.secondary)
                 }
-                ForEach(model.userQueue.prefix(2)) { SongLine(song: $0, queued: true, cover: 28) }
-                if let next = model.upNext.first { SongLine(song: next, cover: 28) }
+                ForEach(model.userQueue.prefix(2)) { song in
+                    Button { Playback.shared.jump(to: song.id) } label: { SongLine(song: song, queued: true, cover: 28).contentShape(Rectangle()) }
+                        .buttonStyle(.plain).help("Play \(song.title)")
+                }
+                if let next = model.upNext.first {
+                    Button { Playback.shared.jump(to: next.id) } label: { SongLine(song: next, cover: 28).contentShape(Rectangle()) }
+                        .buttonStyle(.plain).help("Play \(next.title)")
+                }
             }
             Divider()
             HStack {

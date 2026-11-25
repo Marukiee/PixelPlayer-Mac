@@ -5,6 +5,7 @@ import AppKit
 struct PixelPlayerApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     private let model = PlayerModel.shared
+    @AppStorage("menubar.show") private var showMenuBar = true
 
     var body: some Scene {
         WindowGroup("PixelPlayer", id: "main") {
@@ -22,7 +23,7 @@ struct PixelPlayerApp: App {
                 .tint(PP.primary)
         }
         // Not in the menu bar during scripted captures, so a run leaves nothing behind on the screen.
-        MenuBarExtra("PixelPlayer", systemImage: "music.note", isInserted: .constant(!Debug.active)) {
+        MenuBarExtra("PixelPlayer", systemImage: "music.note", isInserted: Debug.active ? .constant(false) : $showMenuBar) {
             MenuBarPanel()
                 .environment(model)
                 .tint(PP.primary)
@@ -48,6 +49,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.regular)
         Debug.launch()
         NSApp.activate()
+        Appearance.apply(UserDefaults.standard.string(forKey: "appearance.mode") ?? "System")
         // The spacebar plays and pauses, as in Spotify, unless you are typing. Without this it pressed whatever button had
         // keyboard focus, such as Lyrics.
         NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
@@ -71,6 +73,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Updater.shared.startPeriodicChecks()
     }
 
+    nonisolated(unsafe) static var lastScan = Date.now
+
     static func widenSidebar() {
         func split(in view: NSView?) -> NSSplitView? {
             guard let view else { return nil }
@@ -87,6 +91,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidBecomeActive(_ notification: Notification) {
         Updater.shared.checkIfDue()
+        // New songs in the music folder: looked for when the app comes to the front, at most every five minutes.
+        // Unchanged files come from the cache, so this is quick.
+        Task { @MainActor in await Library.shared.checkNewDay() }
+        let watch = UserDefaults.standard.object(forKey: "music.watch") as? Bool ?? true
+        if watch, !Debug.active, Date.now.timeIntervalSince(Self.lastScan) > 300 {
+            Self.lastScan = .now
+            Task { @MainActor in await Library.shared.scanLocal() }
+        }
     }
 }
 
@@ -94,9 +106,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 struct PlaybackCommands: Commands {
     let model: PlayerModel
 
+    // Fixed titles on purpose: a title that reads the player's state makes SwiftUI rebuild the whole app on every
+    // change, which with a long library froze the window.
     var body: some Commands {
         CommandMenu("Controls") {
-            Button(model.isPlaying ? "Pause" : "Play") { model.setPlaying(!model.isPlaying) }
+            Button("Play or Pause") { model.setPlaying(!model.isPlaying) }
             Button("Next") { Playback.shared.next() }
                 .keyboardShortcut(.rightArrow, modifiers: .command)
             Button("Previous") { Playback.shared.previous() }
@@ -112,19 +126,18 @@ struct PlaybackCommands: Commands {
             Button("Volume Down") { model.groupVolume = max(0, model.groupVolume - 10) }
                 .keyboardShortcut(.downArrow, modifiers: .command)
             Divider()
-            Toggle("Shuffle", isOn: Binding(get: { model.shuffle }, set: { model.shuffle = $0 }))
+            Button("Shuffle On or Off") { model.shuffle.toggle() }
                 .keyboardShortcut("s", modifiers: .command)
-            Toggle("Repeat", isOn: Binding(get: { model.repeatAll }, set: { model.repeatAll = $0 }))
+            Button("Repeat On or Off") { model.repeatAll.toggle() }
                 .keyboardShortcut("r", modifiers: .command)
-            Button(model.liked ? "Remove from Liked Songs" : "Save to Liked Songs") { model.liked.toggle() }
+            Button("Like or Unlike") { if !model.current.id.isEmpty { model.liked.toggle() } }
                 .keyboardShortcut("b", modifiers: [.option, .shift])
-                .disabled(model.current.id.isEmpty)
             Divider()
             Button("Search") { model.go(.search) }
                 .keyboardShortcut("l", modifiers: .command)
-            Button(model.showQueue ? "Hide Queue" : "Show Queue") { withAnimation(Motion.panel) { model.showQueue.toggle() } }
+            Button("Queue") { withAnimation(Motion.panel) { model.showQueue.toggle() } }
                 .keyboardShortcut("q", modifiers: [.option, .shift])
-            Button(model.fullPlayer ? "Hide Lyrics" : "Show Lyrics") { model.setFullPlayer(!model.fullPlayer) }
+            Button("Lyrics") { model.setFullPlayer(!model.fullPlayer) }
                 .keyboardShortcut("l", modifiers: [.option, .shift])
         }
     }

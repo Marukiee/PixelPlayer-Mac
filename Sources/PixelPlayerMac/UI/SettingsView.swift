@@ -1,3 +1,4 @@
+import ServiceManagement
 import SwiftUI
 import PixelPlayerKit
 
@@ -18,14 +19,20 @@ struct SettingsView: View {
 }
 
 private struct GeneralPane: View {
-    @LocalState private var launchAtLogin = false
-    @LocalState private var menuBar = true
+    @LocalState private var launchAtLogin = SMAppService.mainApp.status == .enabled
+    @AppStorage("menubar.show") private var menuBar = true
     @LocalState private var updater = Updater.shared
 
     var body: some View {
         Form {
             Section {
                 Toggle("Open at login", isOn: $launchAtLogin)
+                    .onChange(of: launchAtLogin) {
+                        if launchAtLogin { try? SMAppService.mainApp.register() } else { try? SMAppService.mainApp.unregister() }
+                        launchAtLogin = SMAppService.mainApp.status == .enabled
+                    }
+                    // Only the installed app opens at login, not a development build.
+                    .disabled(Updater.isDevelopmentBuild)
                 Toggle("Player in the menu bar", isOn: $menuBar)
                 LabeledContent("Welcome") {
                     Button("Show Again") {
@@ -64,7 +71,7 @@ private struct GeneralPane: View {
 
 private struct SourcesPane: View {
     @Environment(PlayerModel.self) private var model
-    @LocalState private var watch = true
+    @AppStorage("music.watch") private var watch = true
     @LocalState private var server = ""
     @LocalState private var user = ""
     @LocalState private var password = ""
@@ -168,7 +175,7 @@ private struct SourcesPane: View {
 }
 
 private struct PlaybackPane: View {
-    @LocalState private var crossfade = true
+    @LocalState private var crossfade = false
     @LocalState private var seconds = 4.0
     @LocalState private var normalize = false
     @LocalState private var preset = "Off"
@@ -186,19 +193,25 @@ private struct PlaybackPane: View {
                 .disabled(!crossfade)
                 Toggle("Normalise volume", isOn: $normalize)
             }
-            Section("Equalizer") {
+            Section {
                 Picker("Preset", selection: $preset) {
                     ForEach(["Off", "Acoustic", "Bass Booster", "Electronic", "Spoken Word"], id: \.self) { Text($0) }
                 }
+            } header: {
+                Text("Equalizer")
+            } footer: {
+                Text("Crossfade, normalising and the equalizer come in a later version.").foregroundStyle(.secondary)
             }
         }
+        // Grey until they work, so nothing here pretends to do something.
+        .disabled(true)
         .formStyle(.grouped)
         .frame(height: 300)
     }
 }
 
 private struct AppearancePane: View {
-    @LocalState private var theme = "System"
+    @AppStorage("appearance.mode") private var theme = "System"
     @LocalState private var accent = "Blue"
     @LocalState private var fromCover = false
 
@@ -209,13 +222,33 @@ private struct AppearancePane: View {
                     ForEach(["System", "Light", "Dark"], id: \.self) { Text($0) }
                 }
                 .pickerStyle(.segmented)
+                .onChange(of: theme) { Appearance.apply(theme) }
+            }
+            Section {
                 Picker("Accent colour", selection: $accent) {
                     ForEach(["Blue", "Purple", "Pink", "Green"], id: \.self) { Text($0) }
                 }
                 Toggle("Colour from the cover in Now Playing", isOn: $fromCover)
+            } footer: {
+                Text("Other accent colours come in a later version.").foregroundStyle(.secondary)
             }
+            .disabled(true)
         }
         .formStyle(.grouped)
         .frame(height: 220)
+    }
+}
+
+/// Light, dark or the system's choice, for the whole app.
+@MainActor
+enum Appearance {
+    static func apply(_ mode: String) {
+        // A scripted run sets its own appearance.
+        guard !Debug.active else { return }
+        switch mode {
+        case "Light": NSApp.appearance = NSAppearance(named: .aqua)
+        case "Dark": NSApp.appearance = NSAppearance(named: .darkAqua)
+        default: NSApp.appearance = nil
+        }
     }
 }
