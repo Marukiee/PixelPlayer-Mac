@@ -9,13 +9,22 @@ struct RootView: View {
 
     var body: some View {
         @Bindable var model = model
-        NavigationSplitView(columnVisibility: $columns) {
-            Sidebar()
-        } detail: {
-            detail
+        ZStack {
+            NavigationSplitView(columnVisibility: $columns) {
+                Sidebar()
+            } detail: {
+                detail
+            }
+            .searchable(text: $model.searchText, placement: .sidebar, prompt: "Search")
+            if model.fullScreen {
+                FullScreenPlayer()
+                    .transition(.opacity.combined(with: .scale(scale: 1.02)))
+                    .zIndex(10)
+            }
         }
-        .searchable(text: $model.searchText, placement: .sidebar, prompt: "Search")
-        .frame(minWidth: 900, minHeight: 600)
+        .sheet(item: $model.infoSong) { SongInfoSheet(song: $0) }
+        // Room for the sidebar, the content and the queue side by side, so none of them is ever pushed aside.
+        .frame(minWidth: 1100, minHeight: 640)
         .onAppear {
             model.startClock()
             Debug.windowAppeared()
@@ -176,6 +185,7 @@ struct Sidebar: View {
 struct LibraryRow: View {
     let item: LibraryItem
     @Environment(PlayerModel.self) private var model
+    @LocalState private var hovering = false
 
     private var playing: Bool {
         if case .album(let id) = item.route { return id == model.current.album.id }
@@ -185,6 +195,7 @@ struct LibraryRow: View {
     var body: some View {
         HStack(spacing: 10) {
             ArtworkView(art: item.art, radius: 4).frame(width: 40, height: 40)
+                .scaleEffect(hovering ? 1.05 : 1)
             VStack(alignment: .leading, spacing: 1) {
                 Text(item.title).foregroundStyle(playing ? AnyShapeStyle(.tint) : AnyShapeStyle(.primary))
                 Text(item.subtitle).font(.callout).foregroundStyle(.secondary)
@@ -194,6 +205,19 @@ struct LibraryRow: View {
             if playing { NowPlayingMark() }
         }
         .padding(.vertical, 3)
+        .contentShape(Rectangle())
+        .onHover { hovering = $0 && !Debug.active }
+        .animation(Motion.hover, value: hovering)
+        .contextMenu {
+            Button("Play", systemImage: "play.fill") {}
+            Button("Shuffle", systemImage: "shuffle") {}
+            Button("Add to Queue", systemImage: "text.line.last.and.arrowtriangle.forward") {}
+            Divider()
+            if case .album(let id) = item.route {
+                Button("Go to Artist", systemImage: "music.microphone") { model.go(.artist(id)) }
+            }
+            Button("Remove from Library", systemImage: "minus.circle") {}
+        }
     }
 }
 

@@ -6,7 +6,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 OUT="$1"; SCRIPT="$2"; shift 2
 mkdir -p "$OUT"
-pkill -f "PixelPlayer Dev.app/Contents/MacOS" 2>/dev/null || true
+pkill -f "dist/PixelPlayer Dev.app/Contents/MacOS" 2>/dev/null || true
 env PP_DEBUG_DIR="$OUT" PP_WINDOW="${PP_WINDOW:-1180x760}" PP_FREEZE=1 PP_SCRIPT="$SCRIPT" "$@" \
   "dist/PixelPlayer Dev.app/Contents/MacOS/PixelPlayerMac" >"$OUT/run.log" 2>&1 &
 PID=$!

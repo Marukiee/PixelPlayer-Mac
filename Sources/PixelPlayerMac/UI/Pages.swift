@@ -136,6 +136,7 @@ struct RoundButton: View {
         }
         .buttonStyle(.plain)
         .glassEffect(prominent ? .regular.tint(PP.primary).interactive() : .regular.interactive(), in: Circle())
+        .hoverLift(scale: 1.06)
         .help(label)
     }
 }
@@ -167,6 +168,7 @@ struct RoundMenu: View {
         .buttonStyle(.plain)
         .fixedSize()
         .glassEffect(.regular.interactive(), in: Circle())
+        .hoverLift(scale: 1.06)
         .help("More")
     }
 }
@@ -183,6 +185,12 @@ struct QuickTile: View {
                 .clipShape(item.kind == .artists ? AnyShape(Circle().inset(by: 4)) : AnyShape(Rectangle()))
             Text(item.title).fontWeight(.semibold).lineLimit(2)
             Spacer(minLength: 0)
+            Image(systemName: "play.fill").font(.system(size: 13, weight: .bold)).foregroundStyle(PP.onPrimary)
+                .frame(width: 34, height: 34)
+                .glassEffect(.regular.tint(PP.primary).interactive(), in: Circle())
+                .padding(.trailing, 11)
+                .opacity(hovering ? 1 : 0)
+                .scaleEffect(hovering ? 1 : 0.8)
         }
         .frame(minWidth: 0, maxWidth: .infinity)
         .frame(height: 56)
@@ -236,17 +244,30 @@ struct CoverCell: View {
     let title: String
     let subtitle: String
     var round = false
+    @LocalState private var hovering = false
 
     var body: some View {
         VStack(alignment: round ? .center : .leading, spacing: 8) {
             ArtworkView(art: art, radius: 6)
-                .shadow(color: .black.opacity(0.12), radius: 8, y: 4)
+                .shadow(color: .black.opacity(hovering ? 0.22 : 0.12), radius: hovering ? 14 : 8, y: hovering ? 8 : 4)
+                .overlay(alignment: .bottomTrailing) {
+                    Image(systemName: "play.fill").font(.system(size: 16, weight: .bold)).foregroundStyle(PP.onPrimary)
+                        .frame(width: 44, height: 44)
+                        .glassEffect(.regular.tint(PP.primary).interactive(), in: Circle())
+                        .padding(10)
+                        .opacity(hovering ? 1 : 0)
+                        .offset(y: hovering ? 0 : 8)
+                }
+                .scaleEffect(hovering ? 1.03 : 1)
             VStack(alignment: round ? .center : .leading, spacing: 2) {
                 Text(title).fontWeight(.semibold)
                 Text(subtitle).font(.callout).foregroundStyle(.secondary)
             }
             .lineLimit(1)
         }
+        .contentShape(Rectangle())
+        .onHover { hovering = $0 && !Debug.active }
+        .animation(Motion.hover, value: hovering)
     }
 }
 
@@ -441,6 +462,7 @@ struct TrackRow: View {
         .contentShape(Rectangle())
         .onHover { hovering = $0 && !Debug.active }
         .animation(Motion.fade, value: hovering)
+        .contextMenu { SongMenu(song: song) }
     }
 }
 
@@ -558,5 +580,6 @@ struct BrowseTile: View {
         }
         .frame(height: 112)
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .hoverLift()
     }
 }

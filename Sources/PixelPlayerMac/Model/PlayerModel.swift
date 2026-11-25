@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 import Observation
 
 /// Where the window is. The sidebar is the library, as in Spotify: every playlist, album and artist
@@ -53,7 +54,15 @@ final class PlayerModel {
     var current: Song = Sample.nowPlaying
     var isPlaying = true
     var position: Double = 104
-    var liked = true
+    /// The songs in Liked Songs. The heart in the player follows the song that plays.
+    var likedIDs: Set<Int> = Set(Sample.liked.map(\.id))
+    var liked: Bool {
+        get { likedIDs.contains(current.id) }
+        set { if newValue { likedIDs.insert(current.id) } else { likedIDs.remove(current.id) } }
+    }
+    var fullScreen = false
+    /// The song whose details are shown in a sheet.
+    var infoSong: Song?
     var shuffle = false
     var repeatAll = true
     var volume: Double = 60
@@ -93,6 +102,25 @@ final class PlayerModel {
 
     func setFullPlayer(_ on: Bool) {
         withAnimation(Motion.morph) { fullPlayer = on }
+    }
+
+    /// The full screen player, and the window in macOS full screen with it (not during scripted captures).
+    func setFullScreen(_ on: Bool) {
+        withAnimation(Motion.morph) { fullScreen = on }
+        guard !Debug.active, let window = NSApp.windows.first(where: { $0.isVisible && $0.frame.width > 800 }) else { return }
+        if window.styleMask.contains(.fullScreen) != on { window.toggleFullScreen(nil) }
+    }
+
+    func play(_ song: Song) {
+        current = song
+        position = 0
+        isPlaying = true
+    }
+
+    func go(_ route: Route) {
+        searchText = ""
+        fullPlayer = false
+        self.route = route
     }
 
     private var clock: Timer?

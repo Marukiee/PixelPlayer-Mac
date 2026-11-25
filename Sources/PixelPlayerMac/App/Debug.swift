@@ -91,6 +91,10 @@ enum Debug {
             model.showDevices = value == "1"
         case "full":
             model.setFullPlayer(value == "1")
+        case "fullscreen":
+            model.setFullScreen(value == "1")
+        case "info":
+            model.infoSong = value == "1" ? model.current : nil
         case "indiv":
             withAnimation(Motion.panel) { model.individualVolume = value == "1" }
         case "play":

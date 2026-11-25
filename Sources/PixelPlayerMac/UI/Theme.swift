@@ -124,6 +124,9 @@ extension View {
 
     func pressable() -> some View { buttonStyle(PressStyle()) }
 
+    /// Grows a little under the pointer, on a spring. Still in scripted captures, where the pointer is not part of the design.
+    func hoverLift(scale: CGFloat = 1.03) -> some View { modifier(HoverLift(scale: scale)) }
+
     /// A floating panel that holds content (the queue, the devices): glass at the rim, with a quiet plane
     /// under the rows so busy covers behind it never fight the text.
     func panelGlass(radius: CGFloat = Metrics.panel) -> some View {
@@ -157,5 +160,17 @@ struct PressStyle: ButtonStyle {
         configuration.label
             .scaleEffect(configuration.isPressed ? pressedScale : 1)
             .animation(Motion.bouncy, value: configuration.isPressed)
+    }
+}
+
+struct HoverLift: ViewModifier {
+    var scale: CGFloat
+    @LocalState private var hovering = false
+
+    func body(content: Content) -> some View {
+        content
+            .scaleEffect(hovering ? scale : 1)
+            .onHover { hovering = $0 && !Debug.active }
+            .animation(Motion.hover, value: hovering)
     }
 }
