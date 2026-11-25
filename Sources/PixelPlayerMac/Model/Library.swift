@@ -311,6 +311,7 @@ final class Library {
                        covers: Array(covers))
         }
         week = []
+        PlayerModel.shared.restoreIfEmpty()
     }
 
     /// The songs behind a place in the library, in the order its page shows them first.

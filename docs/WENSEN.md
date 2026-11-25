@@ -12,7 +12,14 @@ Alles wat Mark vroeg, met wat klaar is en wat nog moet. Bijgewerkt bij elke rond
 - **Spotify.** Grijs in de welkom en in Instellingen tot het er is.
 - **Nederlandse vertaling** (zie ROADMAP).
 
-## In de volgende versie (0.2.1), klaar op main
+## In 0.2.2
+
+- Bij het openen staat het laatst gespeelde nummer klaar, op de plek waar je was, met de wachtrij; de eerste keer Your Mix.
+- Individual volume klapt weer uit.
+- Meer ruimte rond Your Library.
+- Speakerknop blauw zolang Connect open is.
+
+## In 0.2.1
 
 - Wachtrij helemaal opnieuw: Up Next en History, Now playing als kaart, Next in queue met Clear, Next from de lijst,
   afspelen, weghalen en slepen met animaties, zelfde kleur als de zijbalk.

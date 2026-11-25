@@ -173,9 +173,10 @@ struct Sidebar: View {
                 }
             } header: {
                 // A small menu instead of a segmented bar: four words never fit a sidebar without being cut.
-                HStack {
+                HStack(alignment: .firstTextBaseline) {
                     Text("Your Library")
-                        .padding(.leading, 2)
+                        .font(.headline)
+                        .foregroundStyle(.primary)
                     Spacer()
                     Menu {
                         Picker("Show", selection: $model.filter) {
@@ -188,9 +189,11 @@ struct Sidebar: View {
                     .menuStyle(.borderlessButton)
                     .fixedSize()
                 }
-                // The same inset as the rows below, so the words line up with the covers.
+                // The same inset as the rows below, so the words line up with the covers, with air above and below.
                 .padding(.leading, 6)
                 .padding(.trailing, 16)
+                .padding(.top, 14)
+                .padding(.bottom, 8)
             }
         }
         .scrollContentBackground(.hidden)

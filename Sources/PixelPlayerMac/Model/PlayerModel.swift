@@ -159,6 +159,44 @@ final class PlayerModel {
         }
     }
 
+    // MARK: The song in the player when the app opens
+
+    private struct Saved: Codable {
+        var id: String
+        var position: Double
+        var userQueue: [String]
+        var upNext: [String]
+        var playingFrom: String
+    }
+
+    /// Remembers the song, the place in it and the queue, so the player is never empty when the app opens again.
+    func saveNowPlaying() {
+        guard !Library.shared.isSample, !current.id.isEmpty else { return }
+        let saved = Saved(id: current.id, position: position, userQueue: userQueue.map(\.id), upNext: upNext.prefix(300).map(\.id),
+                          playingFrom: playingFrom)
+        if let data = try? JSONEncoder().encode(saved) { Store.defaults.set(data, forKey: "player.last") }
+    }
+
+    /// Once the library is there: the last song where it was, paused, with its queue; the first time, Your Mix.
+    func restoreIfEmpty() {
+        guard current.id.isEmpty, !Library.shared.isSample, Library.shared.hasMusic else { return }
+        let library = Library.shared
+        if let data = Store.defaults.data(forKey: "player.last"), let saved = try? JSONDecoder().decode(Saved.self, from: data),
+           let song = library.song(id: saved.id) {
+            current = song
+            position = min(saved.position, Double(song.seconds))
+            userQueue = saved.userQueue.compactMap(library.song(id:))
+            upNext = saved.upNext.compactMap(library.song(id:))
+            playingFrom = saved.playingFrom
+        } else if !Debug.active, let first = library.yourMix.first {
+            // Scripted runs start empty, so their checks do not depend on what a mix picks.
+            current = first
+            upNext = Array(library.yourMix.dropFirst())
+            playingFrom = "Your Mix"
+            position = 0
+        }
+    }
+
     /// Which list of the library a set of songs is, in any order (sorted or shuffled).
     static func source(of context: [Song]) -> String {
         let ids = Set(context.map(\.id))

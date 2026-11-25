@@ -66,7 +66,7 @@ struct PlayerSideButtons: View {
         @Bindable var model = model
         HStack(spacing: 4) {
             BarIcon(symbol: lyricsSymbol, label: "Lyrics", active: model.fullPlayer) { model.setFullPlayer(!model.fullPlayer) }
-            BarIcon(symbol: RemoteController.shared.isActive ? "iphone" : "hifispeaker", label: "Connect · \(model.groupName)", active: !model.group.isEmpty || RemoteController.shared.isActive || SonosOutput.shared.controlsPlayback) { model.showDevices.toggle() }
+            BarIcon(symbol: RemoteController.shared.isActive ? "iphone" : "hifispeaker", label: "Connect · \(model.groupName)", active: model.showDevices || !model.group.isEmpty || RemoteController.shared.isActive || SonosOutput.shared.controlsPlayback) { model.showDevices.toggle() }
                 .popover(isPresented: $model.showDevices, arrowEdge: .top) { DevicesPopover() }
             BarIcon(symbol: "list.bullet", label: "Up Next", active: model.showQueue) {
                 withAnimation(Motion.panel) { model.showQueue.toggle() }
@@ -660,13 +660,27 @@ struct DevicesPopover: View {
                     Image(systemName: "speaker.wave.3.fill")
                 }
                 if groupedRooms.count > 1 {
-                    DisclosureGroup("Individual volume", isExpanded: $model.individualVolume) {
+                    // A row of its own instead of a disclosure group, which did not open on a click in this popover.
+                    Button { withAnimation(Motion.panel) { model.individualVolume.toggle() } } label: {
+                        HStack {
+                            Text("Individual volume")
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                                .rotationEffect(.degrees(model.individualVolume ? 90 : 0))
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    if model.individualVolume {
                         ForEach(groupedRooms) { room in
                             Slider(value: Binding(get: { Library.shared.isSample ? model.volumes[room.id] ?? 0 : sonos.volume(of: room) },
                                                   set: { Library.shared.isSample ? (model.volumes[room.id] = $0) : sonos.setVolume(of: room, $0) }),
                                    in: 0...100) {
                                 Text(room.name)
                             }
+                            .transition(.opacity.combined(with: .move(edge: .top)))
                         }
                     }
                 }

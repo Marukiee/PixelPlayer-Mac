@@ -1,4 +1,5 @@
 import AVFoundation
+import AppKit
 import MediaPlayer
 import PixelPlayerKit
 
@@ -18,6 +19,7 @@ final class Playback {
     private var listenedMs = 0
     private var lastTick: Double?
     private var lastReport = Date.distantPast
+    private var lastSave = Date.distantPast
     /// Seeks on their way; the clock's reports are stale until they land.
     private var seeking = 0
     private var model: PlayerModel { PlayerModel.shared }
@@ -34,6 +36,9 @@ final class Playback {
             }
         }
         setUpRemoteCommands()
+        NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { _ in
+            MainActor.assumeIsolated { PlayerModel.shared.saveNowPlaying() }
+        }
     }
 
     /// Where a song plays from on the Mac: the local file wins over the server copy.
@@ -57,6 +62,7 @@ final class Playback {
         model.current = song
         model.position = seconds
         guard !Library.shared.isSample else { return }
+        model.saveNowPlaying()
         // On a phone the phone plays; the Mac only tells it what.
         if RemoteController.shared.controlsPlayback { RemoteController.shared.userChangedTrack(); return }
         if SonosOutput.shared.controlsPlayback { SonosOutput.shared.userChangedTrack(); return }
@@ -84,6 +90,7 @@ final class Playback {
         if SonosOutput.shared.controlsPlayback { SonosOutput.shared.setPlaying(playing); return }
         if player.currentItem == nil, playing, model.current.id != "" { start(model.current, at: model.position); return }
         playing ? player.play() : player.pause()
+        if !playing { model.saveNowPlaying() }
         lastTick = nil
         updateNowPlaying()
         report(playing ? "playing" : "paused")
@@ -187,6 +194,7 @@ final class Playback {
             if let last = lastTick { listenedMs += Int(max(0, min(1, seconds - last)) * 1000) }
             lastTick = seconds
             if Date.now.timeIntervalSince(lastReport) >= 30 { report("playing") }
+            if Date.now.timeIntervalSince(lastSave) >= 10 { lastSave = .now; model.saveNowPlaying() }
         }
     }
 

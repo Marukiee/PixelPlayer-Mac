@@ -1,5 +1,35 @@
 [
   {
+    "version": "0.2.2",
+    "date": "2026-11-25",
+    "en": {
+      "title": "Ready where you left off",
+      "new": [
+        "The player opens with the song you played last, where you were"
+      ],
+      "better": [
+        "More room around Your Library in the sidebar",
+        "The speaker button is blue while Connect is open"
+      ],
+      "fixed": [
+        "Individual volume opens again"
+      ]
+    },
+    "nl": {
+      "title": "Klaar waar je was",
+      "new": [
+        "De speler opent met het nummer dat je het laatst speelde, op de plek waar je was"
+      ],
+      "better": [
+        "Meer ruimte rond Your Library in de zijbalk",
+        "De speakerknop is blauw zolang Connect open is"
+      ],
+      "fixed": [
+        "Individual volume klapt weer uit"
+      ]
+    }
+  },
+  {
     "version": "0.2.1",
     "date": "2026-11-25",
     "en": {
