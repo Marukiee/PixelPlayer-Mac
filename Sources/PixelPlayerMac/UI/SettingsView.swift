@@ -79,6 +79,7 @@ private struct SourcesPane: View {
     @LocalState private var sonos = UserDefaults.standard.object(forKey: "sonos.search") as? Bool ?? true
     @LocalState private var sonosHosts = UserDefaults.standard.string(forKey: "sonos.hosts") ?? ""
     @LocalState private var sonosHome = UserDefaults.standard.string(forKey: "sonos.home") ?? ""
+    @AppStorage("sonos.hires") private var hiRes = "flac"
     @LocalState private var remoteHosts = UserDefaults.standard.string(forKey: "remote.hosts") ?? ""
 
     private var library: Library { Library.shared }
@@ -139,11 +140,17 @@ private struct SourcesPane: View {
                 TextField("Home address", text: $sonosHome, prompt: Text("http://192.168.1.10:4533"))
                     .onChange(of: sonosHome) { UserDefaults.standard.set(sonosHome, forKey: "sonos.home") }
                 LabeledContent("Found", value: SonosOutput.shared.rooms.isEmpty ? "None yet" : "\(SonosOutput.shared.rooms.count) rooms")
+                Picker("Hi-res songs", selection: $hiRes) {
+                    Text("FLAC 48 kHz").tag("flac")
+                    Text("MP3 320").tag("mp3")
+                }
+                .onChange(of: hiRes) { SonosOutput.shared.settingsChanged() }
             } header: {
                 Text("Sonos")
             } footer: {
-                Text("Speakers: addresses of speakers the search misses. Home address: how the speakers reach Navidrome, when this Mac uses another address (such as Tailscale).")
+                Text("Speakers: addresses of speakers the search misses. Home address: how the speakers reach Navidrome, when this Mac uses another address (such as Tailscale). Hi-res: Sonos plays up to 48 kHz; for FLAC 48 kHz add in \(Text("Navidrome › Settings › Transcodings").bold()) one named flac, target format flac, command ffmpeg -i %s -ss %t -map 0:a:0 -v 0 -c:a flac -sample_fmt s16 -ar 48000 -f flac -")
                     .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
             }
             Section("Spotify") {
                 LabeledContent("Account") { Text("Coming later").foregroundStyle(.secondary) }

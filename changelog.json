@@ -1,6 +1,6 @@
 [
   {
-    "version": "0.2.4",
+    "version": "0.2.5",
     "date": "2026-11-25",
     "en": {
       "title": "Artist pages and a smarter mix",
@@ -13,7 +13,7 @@
       "better": [
         "Smarter Your Mix from your plays",
         "All albums and artists in Your Library",
-        "Hi-res songs play on Sonos",
+        "Hi-res on Sonos as FLAC",
         "Lyrics keep time on Sonos"
       ],
       "fixed": [
@@ -33,7 +33,7 @@
       "better": [
         "Slimmere Your Mix op je luistergedrag",
         "Alle albums en artiesten in Your Library",
-        "Hi-res nummers spelen op Sonos",
+        "Hi-res op Sonos als FLAC",
         "Songtekst loopt gelijk op Sonos"
       ],
       "fixed": [

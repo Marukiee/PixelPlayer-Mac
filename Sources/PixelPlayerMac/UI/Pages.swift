@@ -579,7 +579,7 @@ struct TrackRow: View {
                     }
                     .buttonStyle(PressStyle())
                     .help("Saved. Change where")
-                } else if hovering {
+                } else if hovering || showPlaylists {
                     Button {
                         model.setLiked(song, true)
                         showPlaylists = true
@@ -616,7 +616,11 @@ struct TrackRow: View {
         .onHover { hovering = $0 && !Debug.active }
         .onAppear {
             if Debug.hovered(song.title) { hovering = true }
-            if Debug.active, ProcessInfo.processInfo.environment["PP_SHOW_PLAYLISTS"] == song.title { showPlaylists = true }
+            // A scripted run presses the plus: saved to Liked Songs, and the list of playlists open.
+            if Debug.active, ProcessInfo.processInfo.environment["PP_SHOW_PLAYLISTS"] == song.title {
+                model.setLiked(song, true)
+                showPlaylists = true
+            }
         }
         .animation(Motion.fade, value: hovering)
         .contextMenu { SongMenu(song: song) }

@@ -323,18 +323,28 @@ final class SonosOutput {
         let input = SonosTrackInput(id: song.id, title: song.title, artist: song.artist, album: song.album.title, durationMs: song.seconds * 1000,
                                     streamURL: song.source.serverID.flatMap { id in Self.stream(id: id, song: song, client: client) },
                                     coverURL: Library.shared.coverURL(for: song.album, size: 500),
-                                    mimeType: song.source.suffix.map { SonosTracks.mimeType(suffix: $0) })
+                                    mimeType: Self.needsConverting(song) && Self.losslessHiRes ? "audio/flac"
+                                        : song.source.suffix.map { SonosTracks.mimeType(suffix: $0) })
         tracks[song.id] = input
         return input
     }
 
-    /// The stream for the speaker. Sonos plays FLAC only up to 48 kHz (and no Opus or DSD): those come as MP3 320 from
-    /// Navidrome, as on Android, or the speaker skips them.
+    /// Whether a song needs converting before a speaker can play it: FLAC above 48 kHz, Opus, DSD and the like.
+    private static func needsConverting(_ song: Song) -> Bool {
+        SonosTracks.needsTranscode(suffix: song.source.suffix, sampleRate: song.source.sampleRate)
+    }
+
+    /// Lossless FLAC at 48 kHz (needs a transcoding called flac in Navidrome), or MP3 320, which works without one.
+    static var losslessHiRes: Bool { (UserDefaults.standard.string(forKey: "sonos.hires") ?? "flac") == "flac" }
+
+    /// The stream for the speaker. Sonos plays FLAC only up to 48 kHz: those songs come converted from Navidrome, as FLAC
+    /// 16-bit 48 kHz or as MP3 320, or the speaker skips them.
     private static func stream(id: String, song: Song, client: SubsonicClient?) -> URL? {
         guard let url = client?.streamURL(id: id) else { return nil }
-        guard SonosTracks.needsTranscode(suffix: song.source.suffix, sampleRate: song.source.sampleRate),
-              var parts = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return url }
-        parts.queryItems = (parts.queryItems ?? []) + [URLQueryItem(name: "maxBitRate", value: "320"), URLQueryItem(name: "format", value: "mp3")]
+        guard needsConverting(song), var parts = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return url }
+        let extra = losslessHiRes ? [URLQueryItem(name: "format", value: "flac")]
+            : [URLQueryItem(name: "maxBitRate", value: "320"), URLQueryItem(name: "format", value: "mp3")]
+        parts.queryItems = (parts.queryItems ?? []) + extra
         return parts.url ?? url
     }
 

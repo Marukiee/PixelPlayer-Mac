@@ -5,7 +5,7 @@ Alles wat Mark vroeg, met wat klaar is en wat nog moet. Bijgewerkt bij elke rond
 
 ## Nog te doen
 
-- **Sonos wisselt snel door veel nummers bij verbinden.** Serverbibliotheek laadt goed (970 nummers); hi-res nu omgezet naar MP3 voor Sonos (waarschijnlijke oorzaak); logboek in 0.2.3 om het zeker te weten.
+- **Sonos wisselt snel door veel nummers bij verbinden.** Serverbibliotheek laadt goed (970 nummers); hi-res wordt nu omgezet voor Sonos (waarschijnlijke oorzaak); logboek in 0.2.3 om het zeker te weten.
 - **Apps laten samenwerken.** Mac en Android zien wat er op een Sonos-speaker speelt en kunnen het pauzeren; overnemen met een vraag; meerdere mensen in huis (eigen Navidrome-account). Voorstel, nog niet gebouwd.
 - **Your Mix op Android** dezelfde laten zijn: Android moet de afspeellijst Your Mix van vandaag overnemen of zelf maken (Android-kant).
 - **Sonos overnemen zonder wachtrij te verliezen.** Speelt de telefoon op een speaker en start je vanaf de Mac, dan eerst
@@ -15,7 +15,7 @@ Alles wat Mark vroeg, met wat klaar is en wat nog moet. Bijgewerkt bij elke rond
 - **Spotify.** Grijs in de welkom en in Instellingen tot het er is.
 - **Nederlandse vertaling** (zie ROADMAP).
 
-## In 0.2.4 (0.2.3 werd door GitHub afgebroken en kwam nooit uit)
+## In 0.2.5 (0.2.3 en 0.2.4 kwamen nooit uit)
 
 - Genres in Browse openen een genrepagina; albums in zoekresultaten en het topresultaat openen.
 - Dubbelklik in de zijbalk speelt af. Vastzetten met de rechtermuisknop, met groen speldje.
@@ -27,7 +27,8 @@ Alles wat Mark vroeg, met wat klaar is en wat nog moet. Bijgewerkt bij elke rond
 - Wachtrij: eigen schakelaar Up Next/History met hover, drie puntjes met hover, geen blauw kader bij rechtermuisklik.
 - Instellingen: Open at login, Player in the menu bar, Add new songs automatically en licht/donker werken; crossfade, equalizer en accentkleur grijs met reden.
 - Your Mix slimmer (likes, vaak gespeeld, ontdekkingen, herontdekken, nieuw) en elke dag gedeeld als afspeellijst Your Mix op Navidrome.
-- Sonos: hi-res (boven 48 kHz) komt als MP3 320 van Navidrome; songtekst loopt preciezer gelijk.
+- Sonos: hi-res (boven 48 kHz) komt als FLAC 16-bit 48 kHz van Navidrome (eenmalig een transcoding flac toevoegen in Navidrome), of als MP3 320 via Instellingen; songtekst loopt preciezer gelijk.
+- Plusje bij een nummer: meteen in Liked Songs (groen in het menu), vinkje blijft zichtbaar zolang het menu open is.
 - Songtekstachtergrond loopt door tot onder de speler; klokje gecentreerd boven de tijden.
 - Updatemelding met gelijke ruimte boven en rechts; titel opent juiste album; een gehoverde rij in de zijbalk.
 
