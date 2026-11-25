@@ -195,7 +195,7 @@ final class RemoteController {
             finish(note: "Can't reach this phone.")
             return
         }
-        newLink.onLine = { [weak self] line in MainActor.assumeIsolated { self?.receive(line) } }
+        newLink.onLine = { [weak self, weak newLink] line in MainActor.assumeIsolated { self?.receive(line, from: newLink) } }
         newLink.onClose = { [weak self, weak newLink] in MainActor.assumeIsolated { self?.closed(newLink) } }
         let ok = await newLink.open(timeout: first ? 8 : 6)
         guard active == phone else { newLink.close(); return }
@@ -373,7 +373,9 @@ final class RemoteController {
 
     // MARK: What the phone sends
 
-    private func receive(_ line: String) {
+    private func receive(_ line: String, from sender: RemoteLink?) {
+        // A link that was let go may still say something before it closes; only the current one counts.
+        guard let sender, sender === link else { return }
         lastReceived = .now
         guard let message = RemoteMessage.parse(line) else { return }
         switch message {

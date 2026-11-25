@@ -132,8 +132,10 @@ final class SonosOutput {
 
     private func start(groupID: String, controller: SonosController) {
         guard !model.current.id.isEmpty else { note = "Play a song first."; return }
-        // One place at a time: a phone that played lets go first.
+        // One place at a time: a phone that played lets go first, and the music carries on here.
+        let wasPlaying = model.isPlaying
         RemoteController.shared.disconnect()
+        model.isPlaying = wasPlaying
         note = nil
         connecting = true
         anchor = (Int(model.position * 1000), .now)
