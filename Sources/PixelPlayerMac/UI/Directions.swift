@@ -196,6 +196,8 @@ struct Sidebar: View {
                 .padding(.trailing, 16)
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(PP.sidebar.ignoresSafeArea())
         .navigationSplitViewColumnWidth(min: 260, ideal: 280, max: 420)
         .toolbar(removing: .sidebarToggle)
     }

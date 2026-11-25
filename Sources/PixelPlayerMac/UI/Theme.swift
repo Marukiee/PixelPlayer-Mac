@@ -18,6 +18,10 @@ enum PP {
     static let tertiaryContainer = adaptive(0xFFD8EC, 0x5A2F50)
     static let onTertiaryContainer = adaptive(0x7A2E5E, 0xFFD8EC)
     static let window = adaptive(0xFAF8FF, 0x111318)
+    /// The sidebar in dark: nearly black, darker than the pages, as Spotify's frame. In light the system's own sidebar stays.
+    static let sidebar = Color(nsColor: NSColor(name: nil) { appearance in
+        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? NSColor(hex: 0x060606, alpha: 1) : .clear
+    })
     /// Behind the pages: the system's window colour in light, near black in dark, as dark as Spotify feels.
     static let page = Color(nsColor: NSColor(name: nil) { appearance in
         appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? NSColor(hex: 0x121212, alpha: 1) : .windowBackgroundColor
