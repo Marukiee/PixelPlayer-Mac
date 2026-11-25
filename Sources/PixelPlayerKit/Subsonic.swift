@@ -9,6 +9,20 @@ public struct SubsonicConfig: Sendable, Equatable {
     public var password: String
     public var client: String
     public var version: String
+    /// A fixed salt and its token (md5 of password and salt), so the app can keep these instead of the password.
+    public var savedAuth: SavedAuth?
+
+    public struct SavedAuth: Sendable, Equatable {
+        public var salt: String
+        public var token: String
+        public init(salt: String, token: String) { self.salt = salt; self.token = token }
+
+        /// A new random salt with the token for this password.
+        public static func make(password: String) -> SavedAuth {
+            let salt = String(UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(12)).lowercased()
+            return SavedAuth(salt: salt, token: SubsonicClient.token(password: password, salt: salt))
+        }
+    }
 
     public init(server: URL, user: String, password: String, client: String = "PixelPlayerMac", version: String = "1.16.1") {
         self.server = server
@@ -157,9 +171,12 @@ public struct SubsonicClient: Sendable {
     }
 
     func authItems(salt: String = UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(12).lowercased()) -> [URLQueryItem] {
-        [
+        // With a saved token the same salt goes along every time; the server checks md5(password + salt) either way.
+        let salt = config.savedAuth?.salt ?? salt
+        let token = config.savedAuth?.token ?? Self.token(password: config.password, salt: salt)
+        return [
             URLQueryItem(name: "u", value: config.user),
-            URLQueryItem(name: "t", value: Self.token(password: config.password, salt: salt)),
+            URLQueryItem(name: "t", value: token),
             URLQueryItem(name: "s", value: salt),
             URLQueryItem(name: "v", value: config.version),
             URLQueryItem(name: "c", value: config.client),

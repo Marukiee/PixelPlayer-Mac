@@ -32,4 +32,12 @@ func remoteChecks() {
         check(items.first?["p"] as? String == "A/B/c.flac" && items.first?["d"] as? Int == 1000, "queue items carry tail and duration")
     } else { check(false, "queue is JSON") }
     check(RemoteMessage.volume(130).contains(Data("\"v\":100".utf8)), "volume is capped at 100")
+
+    // A saved token logs in without the password: the same salt every time, and no password in the URL.
+    var config = SubsonicConfig(server: URL(string: "http://music.local:4533")!, user: "listener", password: "")
+    config.savedAuth = .make(password: "secret")
+    let url = SubsonicClient(config: config).streamURL(id: "so-1").absoluteString
+    check(url.contains("s=\(config.savedAuth!.salt)") && url.contains("t=\(SubsonicClient.token(password: "secret", salt: config.savedAuth!.salt))"),
+          "a saved token logs in with its own salt")
+    check(SubsonicClient(config: config).streamURL(id: "so-1").absoluteString == url, "a saved token gives the same address each time")
 }

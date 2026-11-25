@@ -91,7 +91,7 @@ struct OnboardingView: View {
                         }
                     }
                 } footer: {
-                    Text("\(Text("Navidrome › Settings › Users").bold()). The password stays in your keychain.").foregroundStyle(.secondary)
+                    Text("\(Text("Navidrome › Settings › Users").bold()). Only a login token is kept, not the password itself.").foregroundStyle(.secondary)
                 }
             }
             .formStyle(.grouped)

@@ -15,6 +15,11 @@ Alles wat Mark vroeg, met wat klaar is en wat nog moet. Bijgewerkt bij elke rond
 - **Spotify.** Grijs in de welkom en in Instellingen tot het er is.
 - **Nederlandse vertaling** (zie ROADMAP).
 
+## In 0.2.6
+
+- De app gebruikte soms de halve processor (het menubalk-item liet de hele app steeds opnieuw opbouwen); nu rustig.
+- Geen vraag om het sleutelhangerwachtwoord meer na elke update: de app bewaart een inlogtoken in plaats van het wachtwoord (na de update nog een laatste keer).
+
 ## In 0.2.5 (0.2.3 en 0.2.4 kwamen nooit uit)
 
 - Genres in Browse openen een genrepagina; albums in zoekresultaten en het topresultaat openen.

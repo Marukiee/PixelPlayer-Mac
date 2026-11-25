@@ -1,5 +1,23 @@
 [
   {
+    "version": "0.2.6",
+    "date": "2026-11-25",
+    "en": {
+      "title": "Quieter and no password prompts",
+      "fixed": [
+        "No more busy processor",
+        "No keychain prompt after updates"
+      ]
+    },
+    "nl": {
+      "title": "Rustiger en geen wachtwoordvraag",
+      "fixed": [
+        "Geen drukke processor meer",
+        "Geen sleutelhangervraag na updates"
+      ]
+    }
+  },
+  {
     "version": "0.2.5",
     "date": "2026-11-25",
     "en": {

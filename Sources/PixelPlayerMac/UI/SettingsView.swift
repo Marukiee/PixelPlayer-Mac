@@ -20,7 +20,7 @@ struct SettingsView: View {
 
 private struct GeneralPane: View {
     @LocalState private var launchAtLogin = SMAppService.mainApp.status == .enabled
-    @AppStorage("menubar.show") private var menuBar = true
+    private var menuBar: Binding<Bool> { Binding(get: { MenuBarSetting.shared.show }, set: { MenuBarSetting.shared.set($0) }) }
     @LocalState private var updater = Updater.shared
 
     var body: some View {
@@ -33,7 +33,7 @@ private struct GeneralPane: View {
                     }
                     // Only the installed app opens at login, not a development build.
                     .disabled(Updater.isDevelopmentBuild)
-                Toggle("Player in the menu bar", isOn: $menuBar)
+                Toggle("Player in the menu bar", isOn: menuBar)
                 LabeledContent("Welcome") {
                     Button("Show Again") {
                         PlayerModel.shared.onboardingStep = 0
@@ -107,20 +107,20 @@ private struct SourcesPane: View {
             Section {
                 TextField("Server", text: $server, prompt: Text("http://server:4533"))
                 TextField("User", text: $user)
-                SecureField("Password", text: $password)
+                SecureField("Password", text: $password, prompt: Text(ServerSettings.savedAuth != nil ? "Saved" : ""))
                 LabeledContent("Status") {
                     HStack(spacing: 8) {
                         statusText
                         Button(library.client == nil ? "Connect" : "Reconnect") {
                             Task { await library.connect(ServerSettings(server: server, user: user), password: password) }
                         }
-                        .disabled(server.isEmpty || user.isEmpty || password.isEmpty || library.isSample)
+                        .disabled(server.isEmpty || user.isEmpty || (password.isEmpty && ServerSettings.savedAuth == nil) || library.isSample)
                     }
                 }
             } header: {
                 Text("Navidrome")
             } footer: {
-                Text("\(Text("Navidrome › Settings › Users").bold()). The password stays in your keychain.")
+                Text("\(Text("Navidrome › Settings › Users").bold()). Only a login token is kept, not the password itself.")
                     .foregroundStyle(.secondary)
             }
             Section {
@@ -162,7 +162,8 @@ private struct SourcesPane: View {
             if library.isSample {
                 server = "http://music.local:4533"; user = "listener"; password = "secret"
             } else if let saved = ServerSettings.saved {
-                server = saved.server; user = saved.user; password = Keychain.password(for: saved.user) ?? ""
+                // The password is not kept, so the field stays empty; Reconnect uses the saved token.
+                server = saved.server; user = saved.user; password = ""
             }
         }
     }

@@ -12,7 +12,9 @@ enum LibraryStatus: Equatable {
     case failed(String)
 }
 
-/// Where the Navidrome server is. The password is kept in the keychain under the user name.
+/// Where the Navidrome server is, and the token that logs in. The password itself is not kept: only a salt and the md5
+/// token Navidrome checks. Earlier versions kept the password in the keychain, which asked for the login password after
+/// every update (the app is signed with a certificate of its own, so each version looks new to the keychain).
 struct ServerSettings: Equatable {
     var server: String
     var user: String
@@ -27,13 +29,34 @@ struct ServerSettings: Equatable {
     func save(password: String?) {
         UserDefaults.standard.set(server, forKey: "navidrome.server")
         UserDefaults.standard.set(user, forKey: "navidrome.user")
-        if let password { Keychain.setPassword(password, for: user) }
+        if let password, !password.isEmpty { Self.store(.make(password: password)) }
+    }
+
+    private static func store(_ auth: SubsonicConfig.SavedAuth) {
+        UserDefaults.standard.set(auth.salt, forKey: "navidrome.salt")
+        UserDefaults.standard.set(auth.token, forKey: "navidrome.token")
+    }
+
+    static var savedAuth: SubsonicConfig.SavedAuth? {
+        guard let salt = UserDefaults.standard.string(forKey: "navidrome.salt"), let token = UserDefaults.standard.string(forKey: "navidrome.token"),
+              !salt.isEmpty, !token.isEmpty else { return nil }
+        return SubsonicConfig.SavedAuth(salt: salt, token: token)
     }
 
     var config: SubsonicConfig? {
-        guard let url = URL(string: server.hasPrefix("http") ? server : "http://\(server)"),
-              let password = Keychain.password(for: user) else { return nil }
-        return SubsonicConfig(server: url, user: user, password: password)
+        guard let url = URL(string: server.hasPrefix("http") ? server : "http://\(server)") else { return nil }
+        if let auth = Self.savedAuth {
+            var config = SubsonicConfig(server: url, user: user, password: "")
+            config.savedAuth = auth
+            return config
+        }
+        // Once, from an earlier version: the password from the keychain becomes a token, and the keychain is not asked again.
+        guard let password = Keychain.password(for: user) else { return nil }
+        let auth = SubsonicConfig.SavedAuth.make(password: password)
+        Self.store(auth)
+        var config = SubsonicConfig(server: url, user: user, password: "")
+        config.savedAuth = auth
+        return config
     }
 }
 
@@ -280,7 +303,10 @@ final class Library {
             status = .failed("That is not a server address.")
             return
         }
-        let candidate = SubsonicClient(config: SubsonicConfig(server: url, user: settings.user, password: password))
+        // An empty password with a saved token reconnects with the token.
+        var config = SubsonicConfig(server: url, user: settings.user, password: password)
+        if password.isEmpty, let auth = ServerSettings.savedAuth { config.savedAuth = auth }
+        let candidate = SubsonicClient(config: config)
         status = .loading("Connecting")
         do {
             try await candidate.ping()

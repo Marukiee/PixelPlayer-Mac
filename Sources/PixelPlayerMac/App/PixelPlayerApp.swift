@@ -5,7 +5,6 @@ import AppKit
 struct PixelPlayerApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     private let model = PlayerModel.shared
-    @AppStorage("menubar.show") private var showMenuBar = true
 
     var body: some Scene {
         WindowGroup("PixelPlayer", id: "main") {
@@ -23,7 +22,7 @@ struct PixelPlayerApp: App {
                 .tint(PP.primary)
         }
         // Not in the menu bar during scripted captures, so a run leaves nothing behind on the screen.
-        MenuBarExtra("PixelPlayer", systemImage: "music.note", isInserted: Debug.active ? .constant(false) : $showMenuBar) {
+        MenuBarExtra("PixelPlayer", systemImage: "music.note", isInserted: MenuBarSetting.shared.binding) {
             MenuBarPanel()
                 .environment(model)
                 .tint(PP.primary)
@@ -140,5 +139,28 @@ struct PlaybackCommands: Commands {
             Button("Lyrics") { model.setFullPlayer(!model.fullPlayer) }
                 .keyboardShortcut("l", modifiers: [.option, .shift])
         }
+    }
+}
+
+/// Whether the player shows in the menu bar. An observable value, not an @AppStorage on the app: the menu bar item writes
+/// its binding back whenever it is set up, and a write to @AppStorage, even of the same value, rebuilt the whole app,
+/// which set the item up again: a loop that kept the processor busy.
+@MainActor @Observable
+final class MenuBarSetting {
+    static let shared = MenuBarSetting()
+    private(set) var show = UserDefaults.standard.object(forKey: "menubar.show") as? Bool ?? true
+
+    func set(_ value: Bool) {
+        guard value != show else { return }
+        show = value
+        UserDefaults.standard.set(value, forKey: "menubar.show")
+    }
+
+    var binding: Binding<Bool> {
+        Binding(get: { !Debug.active && self.show }, set: { value in
+            // Only a real change from the listener counts; the item's own write-back of the same value is ignored.
+            guard !Debug.active else { return }
+            self.set(value)
+        })
     }
 }
