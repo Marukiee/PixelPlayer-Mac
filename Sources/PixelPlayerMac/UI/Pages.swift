@@ -644,10 +644,14 @@ struct ConnectPage: View {
                 .frame(width: 96, height: 96)
                 .background(Circle().fill(Color.primary.opacity(0.06)))
             VStack(spacing: 6) {
-                Text("Connect your music").font(.title.weight(.bold))
-                Text("PixelPlayer plays your Navidrome library, with the music on this Mac first.")
+                Text(library.scanning ? "Reading your music" : "Connect your music").font(.title.weight(.bold))
+                Text(library.scanning ? "The first time takes a moment for a large folder. Your songs appear here by themselves."
+                     : "PixelPlayer plays your Navidrome library, with the music on this Mac first.")
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
+            }
+            if library.scanning {
+                ProgressView().controlSize(.small)
             }
             switch library.status {
             case .loading(let what):

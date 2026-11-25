@@ -43,6 +43,8 @@ final class Library {
     static let shared = Library()
 
     var status: LibraryStatus = .notConnected
+    /// True while the music folder is being read; the first read of a large folder takes a while.
+    var scanning = false
     var albums: [Album] = []
     var songs: [Song] = []
     var playlists: [Playlist] = []
@@ -135,6 +137,8 @@ final class Library {
         // A scripted run keeps its own cache, so it never replaces the one of the real app.
         let cache = Debug.directory?.appendingPathComponent("local-library.json")
             ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("PixelPlayer/local-library.json")
+        scanning = true
+        defer { scanning = false }
         localTracks = await LocalScanner(cacheURL: cache).scan(root: URL(fileURLWithPath: folder))
         rebuild()
         if status == .notConnected, hasMusic { status = .ready }
