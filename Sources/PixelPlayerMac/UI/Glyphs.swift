@@ -21,7 +21,13 @@ enum GlyphKind {
 struct Glyph: View {
     let kind: GlyphKind
 
+    /// The parts only shape a mask, and the style fills it once: with a see-through style (white at 75% on a coloured
+    /// header, or secondary grey) the spots where a line and its arrowhead overlap would otherwise come out lighter.
     var body: some View {
+        Rectangle().mask { parts.foregroundStyle(.black) }
+    }
+
+    private var parts: some View {
         GeometryReader { geo in
             let w = geo.size.width, h = geo.size.height
             let line = w * (kind == .queue ? 0.107 : 0.096)
@@ -46,28 +52,32 @@ struct Glyph: View {
     /// Arrowheads: round ends and a pointed tip.
     private static func arrow(_ line: CGFloat) -> StrokeStyle { StrokeStyle(lineWidth: line, lineCap: .round, lineJoin: .miter) }
 
+    /// Two straight diagonals with rounded bends, one the mirror image of the other. The one from the top left runs under
+    /// the other: it stops short of the crossing with a square cut and goes on at the same angle, as one line.
     private static func shuffle(_ w: CGFloat, _ h: CGFloat, _ line: CGFloat) -> some View {
         func n(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: x * w, y: y * h) }
+        let radius = w * 0.106
+        let left: CGFloat = 0.104, right: CGFloat = 0.609, tip: CGFloat = 0.9275
         return ZStack {
             Path { p in
-                // Top left, broken off before the crossing.
-                p.move(to: n(0, 0.14))
-                p.addLine(to: n(0.12, 0.14))
-                p.addQuadCurve(to: n(0.29, 0.37), control: n(0.21, 0.14))
                 // Bottom left up to the top right, in one piece, over the other.
                 p.move(to: n(0, 0.856))
-                p.addLine(to: n(0.07, 0.856))
-                p.addCurve(to: n(0.63, 0.21), control1: n(0.24, 0.856), control2: n(0.43, 0.21))
-                p.addLine(to: n(0.915, 0.21))
-                // On again after the crossing, down to the bottom right.
-                p.move(to: n(0.48, 0.63))
-                p.addQuadCurve(to: n(0.66, 0.784), control: n(0.56, 0.784))
-                p.addLine(to: n(0.915, 0.784))
+                p.addArc(tangent1End: n(left, 0.856), tangent2End: n(right, 0.2055), radius: radius)
+                p.addArc(tangent1End: n(right, 0.2055), tangent2End: n(tip, 0.2055), radius: radius)
+                p.addLine(to: n(tip, 0.2055))
+                // Top left, down to just before the crossing.
+                p.move(to: n(0, 0.137))
+                p.addArc(tangent1End: n(left, 0.137), tangent2End: n(right, 0.7877), radius: radius)
+                p.addLine(to: n(0.272, 0.349))
+                // On again after the crossing, on the same line, down to the bottom right.
+                p.move(to: n(0.5, 0.6455))
+                p.addArc(tangent1End: n(right, 0.7877), tangent2End: n(tip, 0.7877), radius: radius)
+                p.addLine(to: n(tip, 0.7877))
             }
             .stroke(style: butt(line))
             Path { p in
-                p.move(to: n(0.735, 0.04)); p.addLine(to: n(0.915, 0.21)); p.addLine(to: n(0.735, 0.38))
-                p.move(to: n(0.735, 0.614)); p.addLine(to: n(0.915, 0.784)); p.addLine(to: n(0.735, 0.954))
+                p.move(to: n(0.7875, 0.0514)); p.addLine(to: n(tip, 0.2055)); p.addLine(to: n(0.7875, 0.3596))
+                p.move(to: n(0.7875, 0.6336)); p.addLine(to: n(tip, 0.7877)); p.addLine(to: n(0.7875, 0.9418))
             }
             .stroke(style: arrow(line))
         }
