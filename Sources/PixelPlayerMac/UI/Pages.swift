@@ -63,7 +63,7 @@ struct HomePage: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 36) {
                 MixHero()
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: width > 760 ? 4 : 2), spacing: 12) {
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: width > 940 ? 4 : 2), spacing: 12) {
                     ForEach(quick) { QuickTile(item: $0) }
                 }
                 .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
@@ -187,19 +187,22 @@ struct QuickTile: View {
                 .frame(width: 56, height: 56)
                 .clipShape(item.kind == .artists ? AnyShape(Circle().inset(by: 4)) : AnyShape(Rectangle()))
             Text(item.title).fontWeight(.semibold).lineLimit(2)
-            Spacer(minLength: 0)
+            Spacer(minLength: 12)
+        }
+        // The play button lies over the end of the tile, so the title has the whole width when it is not shown.
+        .overlay(alignment: .trailing) {
             Image(systemName: "play.fill").font(.system(size: 13, weight: .bold)).foregroundStyle(PP.onPrimary)
                 .frame(width: 34, height: 34)
                 .glassEffect(.regular.tint(PP.primary).interactive(), in: Circle())
                 .padding(.trailing, 11)
                 .opacity(hovering ? 1 : 0)
-                .scaleEffect(hovering ? 1 : 0.8)
         }
         .frame(minWidth: 0, maxWidth: .infinity)
         .frame(height: 56)
         .background(Color.primary.opacity(hovering ? 0.1 : 0.06))
         .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
         .onHover { hovering = $0 && !Debug.active }
+        .onAppear { if Debug.hovered(item.title) { hovering = true } }
         .animation(Motion.fade, value: hovering)
     }
 }
@@ -252,7 +255,7 @@ struct CoverCell: View {
     var body: some View {
         VStack(alignment: round ? .center : .leading, spacing: 8) {
             ArtworkView(art: art, radius: 6)
-                .shadow(color: .black.opacity(hovering ? 0.22 : 0.12), radius: hovering ? 14 : 8, y: hovering ? 8 : 4)
+                .shadow(color: .black.opacity(0.12), radius: 8, y: 4)
                 .overlay(alignment: .bottomTrailing) {
                     Image(systemName: "play.fill").font(.system(size: 16, weight: .bold)).foregroundStyle(PP.onPrimary)
                         .frame(width: 44, height: 44)
@@ -261,16 +264,22 @@ struct CoverCell: View {
                         .opacity(hovering ? 1 : 0)
                         .offset(y: hovering ? 0 : 8)
                 }
-                .scaleEffect(hovering ? 1.03 : 1)
             VStack(alignment: round ? .center : .leading, spacing: 2) {
                 Text(title).fontWeight(.semibold)
                 Text(subtitle).font(.callout).foregroundStyle(.secondary)
             }
             .lineLimit(1)
         }
+        // A grey card around cover and text on hover, as in Spotify. It reaches 10 past the edges, so the grid stays put.
+        .padding(10)
+        .background {
+            RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color.primary.opacity(hovering ? 0.06 : 0))
+        }
+        .padding(-10)
         .contentShape(Rectangle())
         .onHover { hovering = $0 && !Debug.active }
-        .animation(Motion.hover, value: hovering)
+        .onAppear { if Debug.hovered(title) { hovering = true } }
+        .animation(Motion.fade, value: hovering)
     }
 }
 

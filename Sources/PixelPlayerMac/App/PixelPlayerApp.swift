@@ -14,7 +14,7 @@ struct PixelPlayerApp: App {
         }
         // No toolbar band at the top: the content runs to the edge and the traffic lights sit in the sidebar.
         .windowStyle(.hiddenTitleBar)
-        .defaultSize(width: 1180, height: 760)
+        .defaultSize(width: 1280, height: 800)
         Settings {
             SettingsView()
                 .environment(model)
@@ -32,13 +32,42 @@ struct PixelPlayerApp: App {
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        // Once: forget the sidebar width macOS saved from earlier versions, so the new, wider default shows.
+        let defaults = UserDefaults.standard
+        if defaults.integer(forKey: "layout.version") < 2 {
+            for key in defaults.dictionaryRepresentation().keys where key.hasPrefix("NSSplitView Subview Frames") {
+                defaults.removeObject(forKey: key)
+            }
+            defaults.set(2, forKey: "layout.version")
+        }
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
         Debug.launch()
         NSApp.activate()
+        // macOS starts a fresh window with a narrow sidebar, whatever its minimum says; give it its intended width once.
+        for delay in [0.2, 0.8] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { Self.widenSidebar() }
+        }
         // New versions from GitHub: at launch, when the app comes to the front, and every hour. The Dev build never looks.
         Updater.shared.checkIfDue()
         Updater.shared.startPeriodicChecks()
+    }
+
+    static func widenSidebar() {
+        func split(in view: NSView?) -> NSSplitView? {
+            guard let view else { return nil }
+            if let found = view as? NSSplitView { return found }
+            for child in view.subviews { if let found = split(in: child) { return found } }
+            return nil
+        }
+        for window in NSApp.windows where window.isVisible && window.frame.width > 800 {
+            guard let split = split(in: window.contentView), let sidebar = split.arrangedSubviews.first,
+                  sidebar.frame.width < 280 else { continue }
+            split.setPosition(320, ofDividerAt: 0)
+        }
     }
 
     func applicationDidBecomeActive(_ notification: Notification) {

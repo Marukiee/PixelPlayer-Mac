@@ -16,6 +16,10 @@ enum Debug {
     private static let env = ProcessInfo.processInfo.environment
     static let directory: URL? = env["PP_DEBUG_DIR"].map { URL(fileURLWithPath: $0, isDirectory: true) }
     static var active: Bool { directory != nil }
+    /// `PP_HOVER=Night Drive,Jazz` draws those rows, tiles and cards as if the pointer were on them, for screenshots of hover.
+    static func hovered(_ title: String) -> Bool {
+        (ProcessInfo.processInfo.environment["PP_HOVER"] ?? "").split(separator: ",").contains { $0 == title }
+    }
     nonisolated(unsafe) static var freezeClock = false
     private static var started = false
     private static var stageWindow: NSWindow?

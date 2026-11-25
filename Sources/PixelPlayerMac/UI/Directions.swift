@@ -14,6 +14,8 @@ struct RootView: View {
                 Sidebar()
             } detail: {
                 detail
+                    // Without its own width the floating player decides how wide the content is, and squeezes the sidebar.
+                    .navigationSplitViewColumnWidth(min: 640, ideal: 860)
             }
             .searchable(text: $model.searchText, placement: .sidebar, prompt: "Search")
             if model.fullScreen {
@@ -186,11 +188,12 @@ struct Sidebar: View {
                     .menuStyle(.borderlessButton)
                     .fixedSize()
                 }
-                // Same distance from the edge as the speaker mark in the rows below.
-                .padding(.trailing, 10)
+                // The same inset as the rows below, so the words line up with the covers.
+                .padding(.leading, 6)
+                .padding(.trailing, 16)
             }
         }
-        .navigationSplitViewColumnWidth(min: 280, ideal: 290, max: 360)
+        .navigationSplitViewColumnWidth(min: 280, ideal: 320, max: 420)
         .toolbar(removing: .sidebarToggle)
     }
 }
@@ -209,7 +212,17 @@ struct LibraryRow: View {
     var body: some View {
         HStack(spacing: 10) {
             ArtworkView(art: item.art, radius: 4).frame(width: 40, height: 40)
-                .scaleEffect(hovering ? 1.05 : 1)
+                .overlay {
+                    // Hovering shows play on the cover, as in Spotify, instead of a zoom.
+                    if hovering {
+                        ZStack {
+                            Color.black.opacity(0.4)
+                            Image(systemName: "play.fill").font(.system(size: 15, weight: .bold)).foregroundStyle(.white)
+                        }
+                        .clipShape(item.kind == .artists ? AnyShape(Circle()) : AnyShape(RoundedRectangle(cornerRadius: 4, style: .continuous)))
+                        .transition(.opacity)
+                    }
+                }
             VStack(alignment: .leading, spacing: 1) {
                 Text(item.title).foregroundStyle(playing ? AnyShapeStyle(.tint) : AnyShapeStyle(.primary))
                 Text(item.subtitle).font(.callout).foregroundStyle(.secondary)
@@ -219,9 +232,14 @@ struct LibraryRow: View {
             if playing { NowPlayingMark() }
         }
         .padding(.vertical, 3)
+        .padding(.horizontal, 6)
+        .background {
+            RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Color.primary.opacity(hovering ? 0.06 : 0))
+        }
         .contentShape(Rectangle())
         .onHover { hovering = $0 && !Debug.active }
-        .animation(Motion.hover, value: hovering)
+        .onAppear { if Debug.hovered(item.title) { hovering = true } }
+        .animation(Motion.fade, value: hovering)
         .contextMenu {
             Button("Play", systemImage: "play.fill") {}
             Button("Shuffle", systemImage: "shuffle") {}
@@ -253,5 +271,7 @@ struct NavRow: View {
             Spacer(minLength: 0)
         }
         .padding(.vertical, 3)
+        .padding(.horizontal, 6)
+        .modifier(HoverHighlight(radius: 6, selected: false, selectedFill: .clear))
     }
 }

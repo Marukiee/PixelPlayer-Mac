@@ -149,7 +149,7 @@ struct HoverHighlight: ViewModifier {
                     .fill(selected ? selectedFill : (hovering ? PP.ink.opacity(0.06) : Color.clear))
             }
             .contentShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
-            .onHover { hovering = $0 }
+            .onHover { hovering = $0 && !Debug.active }
             .animation(Motion.fade, value: hovering)
     }
 }
@@ -166,14 +166,15 @@ struct PressStyle: ButtonStyle {
     }
 }
 
+/// Hover without zooming, as in Spotify: what the pointer is on gets a little lighter.
 struct HoverLift: ViewModifier {
     var scale: CGFloat
     @LocalState private var hovering = false
 
     func body(content: Content) -> some View {
         content
-            .scaleEffect(hovering ? scale : 1)
+            .brightness(hovering ? 0.06 : 0)
             .onHover { hovering = $0 && !Debug.active }
-            .animation(Motion.hover, value: hovering)
+            .animation(Motion.fade, value: hovering)
     }
 }
