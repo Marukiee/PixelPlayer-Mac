@@ -145,7 +145,11 @@ final class SonosOutput {
             await controller.setSettings(addressSettings)
             let ok = await controller.connect(groupID: groupID)
             connecting = false
-            if !ok, session == nil { ended() }
+            // The speakers did not take it: the Mac plays on from the same spot.
+            if !ok, session == nil {
+                ended()
+                if model.isPlaying { Playback.shared.setPlaying(true) }
+            }
         }
     }
 
@@ -175,6 +179,14 @@ final class SonosOutput {
         clock?.invalidate()
         clock = nil
         tracks = [:]
+    }
+
+    /// The search and the speaker list in Settings changed: the next look for rooms uses them.
+    func settingsChanged() {
+        guard !controlsPlayback else { return }
+        if let controller { Task { await controller.watchGroups(false) } }
+        controller = nil
+        discovery = nil
     }
 
     // MARK: Volume

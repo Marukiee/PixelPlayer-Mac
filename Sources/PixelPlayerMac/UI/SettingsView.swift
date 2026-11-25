@@ -99,9 +99,9 @@ private struct SourcesPane: View {
             }
             Section {
                 Toggle("Find speakers on this network", isOn: $sonos)
-                    .onChange(of: sonos) { UserDefaults.standard.set(sonos, forKey: "sonos.search") }
+                    .onChange(of: sonos) { UserDefaults.standard.set(sonos, forKey: "sonos.search"); SonosOutput.shared.settingsChanged() }
                 TextField("Speakers", text: $sonosHosts, prompt: Text("192.168.1.30"))
-                    .onChange(of: sonosHosts) { UserDefaults.standard.set(sonosHosts, forKey: "sonos.hosts") }
+                    .onChange(of: sonosHosts) { UserDefaults.standard.set(sonosHosts, forKey: "sonos.hosts"); SonosOutput.shared.settingsChanged() }
                 TextField("Home address", text: $sonosHome, prompt: Text("http://192.168.1.10:4533"))
                     .onChange(of: sonosHome) { UserDefaults.standard.set(sonosHome, forKey: "sonos.home") }
                 LabeledContent("Found", value: SonosOutput.shared.rooms.isEmpty ? "None yet" : "\(SonosOutput.shared.rooms.count) rooms")

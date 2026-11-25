@@ -46,7 +46,7 @@ struct MenuBarPanel: View {
                     Text("\(model.userQueue.count + model.upNext.count) songs").font(.caption).foregroundStyle(.secondary)
                 }
                 ForEach(model.userQueue.prefix(2)) { SongLine(song: $0, queued: true, cover: 28) }
-                SongLine(song: model.upNext[0], cover: 28)
+                if let next = model.upNext.first { SongLine(song: next, cover: 28) }
             }
             Divider()
             HStack {
