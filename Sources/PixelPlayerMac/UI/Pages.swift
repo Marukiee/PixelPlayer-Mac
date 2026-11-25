@@ -538,6 +538,8 @@ struct TrackListPage: View {
                             .labelsHidden()
                         }
                         .menuStyle(.borderlessButton).fixedSize()
+                        // Grey like Spotify's sort menu, not the green of buttons that play.
+                        .tint(PP.icon)
                         // The menu has its own inset; this puts its edge on the duration column below.
                         .padding(.trailing, -6)
                     }
@@ -1073,18 +1075,20 @@ struct ArtistPage: View {
             // The artist's colour behind the top of the page: the cover far blurred, running on from the banner and
             // fading into the page, so the page is not one flat grey under a picture.
             .background(alignment: .top) {
-                // Darker than the banner and gone soon below it: a glow of colour, then the plain page.
+                // Under the banner only: a dark glow in the colour of the cover that fades into the plain page.
+                // Long and eased, so it never ends in a visible line.
                 CoverArt(album: cover, radius: 0)
                     .scaledToFill()
-                    .frame(height: bannerHeight + 240)
+                    .frame(height: 520)
                     .frame(maxWidth: .infinity)
                     .clipped()
-                    .blur(radius: 70, opaque: true)
+                    .blur(radius: 80, opaque: true)
                     .overlay(PP.page.opacity(0.62))
-                    .mask(LinearGradient(stops: [.init(color: .black, location: 0),
-                                                 .init(color: .black, location: bannerHeight / (bannerHeight + 240)),
+                    .mask(LinearGradient(stops: [.init(color: .black, location: 0), .init(color: .black.opacity(0.75), location: 0.3),
+                                                 .init(color: .black.opacity(0.35), location: 0.6), .init(color: .black.opacity(0.1), location: 0.82),
                                                  .init(color: .clear, location: 1)],
                                          startPoint: .top, endPoint: .bottom))
+                    .padding(.top, bannerHeight)
                     .allowsHitTesting(false)
             }
         }
@@ -1180,9 +1184,10 @@ struct ArtistPage: View {
                     .scaledToFill()
                     .frame(width: geo.size.width, height: geo.size.height)
                     .clipped()
-                    .mask(LinearGradient(stops: [.init(color: .black, location: 0), .init(color: .black, location: 0.55),
-                                                 .init(color: .clear, location: 1)], startPoint: .top, endPoint: .bottom))
             }
+            // A sharp picture to the edge, darker towards the bottom so the name reads; no blurred band.
+            LinearGradient(stops: [.init(color: .black.opacity(0), location: 0.4), .init(color: .black.opacity(0.55), location: 1)],
+                           startPoint: .top, endPoint: .bottom)
             VStack(alignment: .leading, spacing: 4) {
                 Text("Artist")
                     .font(.subheadline.weight(.semibold))

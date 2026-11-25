@@ -214,23 +214,71 @@ struct TransportButtons: View {
 
 enum TransportGlyph { case back, forward, loop, shuffle }
 
-/// Shuffle: two crossing arrows in a square, taller than the system's wide symbol, like Spotify's.
+/// Lyrics: a plain microphone on a slant, a round head and a slim handle drawn as an outline, like Spotify's; the
+/// outlined handle keeps it from reading as a magnifying glass.
+struct MicGlyph: Shape {
+    func path(in rect: CGRect) -> Path {
+        let w = rect.width, h = rect.height
+        let headRadius = w * 0.26
+        let head = CGPoint(x: rect.minX + w * 0.7, y: rect.minY + h * 0.3)
+        var path = Path()
+        path.addEllipse(in: CGRect(x: head.x - headRadius, y: head.y - headRadius, width: headRadius * 2, height: headRadius * 2))
+        // The handle: a slim rounded bar from the head down to the lower left, drawn along the x axis and turned.
+        let handleWidth = w * 0.2
+        let length = w * 0.62
+        let bar = Path(roundedRect: CGRect(x: 0, y: -handleWidth / 2, width: length, height: handleWidth),
+                       cornerSize: CGSize(width: handleWidth / 2, height: handleWidth / 2))
+        let angle = CGFloat.pi * 0.75
+        let start = CGPoint(x: head.x + cos(angle) * (headRadius - handleWidth * 0.3), y: head.y + sin(angle) * (headRadius - handleWidth * 0.3))
+        path.addPath(bar, transform: CGAffineTransform(translationX: start.x, y: start.y).rotated(by: angle))
+        return path
+    }
+}
+
+/// A player icon by name: the drawn ones where the system symbol is too busy, else the symbol.
+struct PlayerIconImage: View {
+    let symbol: String
+    let size: CGFloat
+    var weight: Font.Weight = .medium
+
+    var body: some View {
+        if symbol == "music.mic" {
+            MicGlyph()
+                .stroke(style: StrokeStyle(lineWidth: max(1.4, size * 0.1), lineCap: .round, lineJoin: .round))
+                .frame(width: size * 1.05, height: size * 1.05)
+        } else {
+            Image(systemName: symbol).font(.system(size: size, weight: weight))
+        }
+    }
+}
+
+/// Shuffle: two arrows that cross in a square, with a little gap in the one that runs under, like Spotify's.
 struct ShuffleGlyph: Shape {
     func path(in rect: CGRect) -> Path {
-        let head = rect.height * 0.2
-        let top = rect.minY + head
-        let bottom = rect.maxY - head
+        let head = rect.height * 0.24
+        let top = rect.minY + head * 0.9
+        let bottom = rect.maxY - head * 0.9
         let w = rect.width
+        let bendLeft = rect.minX + w * 0.22, bendRight = rect.minX + w * 0.68
+        func point(_ t: CGFloat, from a: CGPoint, to b: CGPoint) -> CGPoint { CGPoint(x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t) }
         var path = Path()
-        for (from, to) in [(top, bottom), (bottom, top)] {
-            path.move(to: CGPoint(x: rect.minX, y: from))
-            path.addLine(to: CGPoint(x: rect.minX + w * 0.18, y: from))
-            path.addCurve(to: CGPoint(x: rect.minX + w * 0.72, y: to),
-                          control1: CGPoint(x: rect.minX + w * 0.45, y: from), control2: CGPoint(x: rect.minX + w * 0.45, y: to))
-            path.addLine(to: CGPoint(x: rect.maxX, y: to))
-            path.move(to: CGPoint(x: rect.maxX - head, y: to - head))
-            path.addLine(to: CGPoint(x: rect.maxX, y: to))
-            path.addLine(to: CGPoint(x: rect.maxX - head, y: to + head))
+        // Over: from the top left down to the bottom right.
+        path.move(to: CGPoint(x: rect.minX, y: top))
+        path.addLine(to: CGPoint(x: bendLeft, y: top))
+        path.addLine(to: CGPoint(x: bendRight, y: bottom))
+        path.addLine(to: CGPoint(x: rect.maxX, y: bottom))
+        // Under: from the bottom left up to the top right, open where it crosses.
+        let start = CGPoint(x: bendLeft, y: bottom), end = CGPoint(x: bendRight, y: top)
+        path.move(to: CGPoint(x: rect.minX, y: bottom))
+        path.addLine(to: start)
+        path.addLine(to: point(0.36, from: start, to: end))
+        path.move(to: point(0.64, from: start, to: end))
+        path.addLine(to: end)
+        path.addLine(to: CGPoint(x: rect.maxX, y: top))
+        for y in [top, bottom] {
+            path.move(to: CGPoint(x: rect.maxX - head, y: y - head))
+            path.addLine(to: CGPoint(x: rect.maxX, y: y))
+            path.addLine(to: CGPoint(x: rect.maxX - head, y: y + head))
         }
         return path
     }
@@ -255,29 +303,25 @@ struct SkipGlyph: Shape {
     }
 }
 
-/// Repeat: two arrows like the system's, but further apart: the top one runs right to an arrowhead at the right end, the
-/// bottom one runs left to an arrowhead at the left end, each turning down or up at its other end.
+/// Repeat: a rounded, nearly square loop with an opening at the bottom, where an arrowhead points left into it, like
+/// Spotify's.
 struct LoopGlyph: Shape {
     func path(in rect: CGRect) -> Path {
         let head = rect.height * 0.2
-        let top = rect.minY + head
-        let bottom = rect.maxY - head
-        let radius = (bottom - top) * 0.4
+        let box = CGRect(x: rect.minX, y: rect.minY, width: rect.width, height: rect.height - head)
+        let radius = box.height * 0.32
+        let gapLeft = box.minX + box.width * 0.36
+        let tip = box.minX + box.width * 0.5
         var path = Path()
-        // Top: from the left side, up and round, to the right.
-        path.move(to: CGPoint(x: rect.minX, y: rect.midY + head * 0.4))
-        path.addArc(tangent1End: CGPoint(x: rect.minX, y: top), tangent2End: CGPoint(x: rect.maxX, y: top), radius: radius)
-        path.addLine(to: CGPoint(x: rect.maxX, y: top))
-        path.move(to: CGPoint(x: rect.maxX - head, y: top - head))
-        path.addLine(to: CGPoint(x: rect.maxX, y: top))
-        path.addLine(to: CGPoint(x: rect.maxX - head, y: top + head))
-        // Bottom: from the right side, down and round, to the left.
-        path.move(to: CGPoint(x: rect.maxX, y: rect.midY - head * 0.4))
-        path.addArc(tangent1End: CGPoint(x: rect.maxX, y: bottom), tangent2End: CGPoint(x: rect.minX, y: bottom), radius: radius)
-        path.addLine(to: CGPoint(x: rect.minX, y: bottom))
-        path.move(to: CGPoint(x: rect.minX + head, y: bottom - head))
-        path.addLine(to: CGPoint(x: rect.minX, y: bottom))
-        path.addLine(to: CGPoint(x: rect.minX + head, y: bottom + head))
+        path.move(to: CGPoint(x: gapLeft, y: box.maxY))
+        path.addArc(tangent1End: CGPoint(x: box.minX, y: box.maxY), tangent2End: CGPoint(x: box.minX, y: box.minY), radius: radius)
+        path.addArc(tangent1End: CGPoint(x: box.minX, y: box.minY), tangent2End: CGPoint(x: box.maxX, y: box.minY), radius: radius)
+        path.addArc(tangent1End: CGPoint(x: box.maxX, y: box.minY), tangent2End: CGPoint(x: box.maxX, y: box.maxY), radius: radius)
+        path.addArc(tangent1End: CGPoint(x: box.maxX, y: box.maxY), tangent2End: CGPoint(x: box.minX, y: box.maxY), radius: radius)
+        path.addLine(to: CGPoint(x: tip, y: box.maxY))
+        path.move(to: CGPoint(x: tip + head, y: box.maxY - head))
+        path.addLine(to: CGPoint(x: tip, y: box.maxY))
+        path.addLine(to: CGPoint(x: tip + head, y: box.maxY + head))
         return path
     }
 }
@@ -323,7 +367,7 @@ struct TransportIcon: View {
                 case .loop?:
                     LoopGlyph()
                         .stroke(colour, style: StrokeStyle(lineWidth: max(1.4, size * 0.1), lineCap: .round, lineJoin: .round))
-                        .frame(width: size * 1.0, height: size * 1.0)
+                        .frame(width: size * 1.05, height: size * 1.0)
                 case nil:
                     Image(systemName: symbol)
                         .font(.system(size: size, weight: on == nil ? .regular : .medium))

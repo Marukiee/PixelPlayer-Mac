@@ -41,8 +41,7 @@ struct BarIcon: View {
 
     var body: some View {
         Button(action: action) {
-            Image(systemName: symbol)
-                .font(.system(size: 15, weight: .medium))
+            PlayerIconImage(symbol: symbol, size: 15)
                 .foregroundStyle(active ? PP.primary : hovering ? PP.iconHover : PP.icon)
                 .frame(width: 32, height: 32)
                 .background(Circle().fill(Color.primary.opacity(hovering ? 0.1 : 0)))
@@ -199,10 +198,12 @@ struct NowPlayingView: View {
                 .buttonStyle(.plain)
                 .glassEffect(.regular.interactive(), in: Circle())
                 .help("Close lyrics")
+                // The song itself, title over artist, rather than the word Lyrics over both.
                 VStack(alignment: .leading, spacing: 1) {
-                    Text("Lyrics").font(.headline)
-                    Text("\(model.current.title) · \(model.current.artist)").font(.callout).foregroundStyle(.secondary)
+                    Text(model.current.title).font(.headline)
+                    Text(model.current.artist).font(.callout).foregroundStyle(.secondary)
                 }
+                .lineLimit(1)
             }
             .padding(.bottom, 28)
             ScrollView {
@@ -322,7 +323,7 @@ struct FullScreenPlayer: View {
             HStack(spacing: 10) {
                 // Lyrics on or off, in the accent while they show, like the lyrics button in the player.
                 Button { withAnimation(Motion.morph) { self.showLyrics.toggle() } } label: {
-                    Image(systemName: lyricsSymbol).font(.system(size: 15, weight: .semibold))
+                    PlayerIconImage(symbol: lyricsSymbol, size: 15, weight: .semibold)
                         .foregroundStyle(showLyrics ? AnyShapeStyle(.tint) : AnyShapeStyle(.primary))
                         .frame(width: 40, height: 40).contentShape(Circle())
                 }
@@ -340,7 +341,9 @@ struct FullScreenPlayer: View {
                 .keyboardShortcut(.escape, modifiers: [])
                 .help("Exit full screen")
             }
-            .padding(28)
+            // As far from the top of the window as from its side, whatever the title bar takes.
+            .padding(24)
+            .ignoresSafeArea(.container, edges: .top)
         }
     }
 }

@@ -236,6 +236,7 @@ struct Sidebar: View {
                         Text(model.filter.title)
                     }
                     .menuStyle(.borderlessButton)
+                    .tint(PP.icon)
                     .fixedSize()
                 }
                 // The same inset as the rows below, so the words line up with the covers, with air above and below.
