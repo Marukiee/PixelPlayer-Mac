@@ -115,6 +115,9 @@ final class Library {
             client = SubsonicClient(config: SubsonicConfig(server: url, user: env["PP_LIVE_USER"] ?? "test", password: env["PP_LIVE_PASSWORD"] ?? "test"))
             FavoritesSync.shared.use(account: "\(server)|test")
             Task { await scanLocal(); await reload() }
+        } else if Debug.active, env["PP_MUSIC_FOLDER"] != nil {
+            // A scripted run against a music folder and no server: the live app as it is with only local files.
+            Task { await scanLocal() }
         } else if Debug.active {
             loadSample()
         } else if let settings = ServerSettings.saved, let config = settings.config {
@@ -129,8 +132,9 @@ final class Library {
     /// Reads the music folder on this Mac and merges it with the server library.
     func scanLocal() async {
         guard !isSample, let folder = MusicFolder.path else { return }
-        let cache = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("PixelPlayer/local-library.json")
+        // A scripted run keeps its own cache, so it never replaces the one of the real app.
+        let cache = Debug.directory?.appendingPathComponent("local-library.json")
+            ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("PixelPlayer/local-library.json")
         localTracks = await LocalScanner(cacheURL: cache).scan(root: URL(fileURLWithPath: folder))
         rebuild()
         if status == .notConnected, hasMusic { status = .ready }
@@ -225,7 +229,7 @@ final class Library {
             let created = song.created.flatMap { iso.date(from: $0) ?? ISO8601DateFormatter().date(from: $0) }
             return Song(id: song.id, title: song.title, album: album, seconds: song.duration ?? 0, artistName: song.artist, track: song.track,
                         source: SongSource(serverID: song.id, serverPath: song.path, suffix: song.suffix, bitRate: song.bitRate),
-                        addedText: created.map { relative.localizedString(for: $0, relativeTo: .now) } ?? "")
+                        addedText: created.map { relative.localizedString(for: $0, relativeTo: .now) } ?? "", addedAt: created?.timeIntervalSince1970)
         }
         let server = serverSongs.map(makeSong)
         serverKeys = serverSongs.map(Library.key(for:))
@@ -249,7 +253,9 @@ final class Library {
                                artistName: track.artist.isEmpty ? nil : track.artist, track: track.track,
                                source: SongSource(localURL: URL(fileURLWithPath: track.path), serverID: twin,
                                                   serverPath: twin.flatMap { serverByID[$0]?.source.serverPath }, suffix: track.suffix),
-                               addedText: ""))
+                               // When the file came onto this Mac, as far as the file tells.
+                               addedText: track.modified > 0 ? relative.localizedString(for: Date(timeIntervalSince1970: track.modified), relativeTo: .now) : "",
+                               addedAt: track.modified > 0 ? track.modified : nil))
         }
         let localKeys = locals.map { TrackKey(id: $0.id, title: $0.title, artist: $0.artist, album: $0.album.title, durationMs: $0.seconds * 1000) }
         let hidden = LocalFirst.hiddenServerIDs(locals: localKeys, server: serverKeys)
@@ -278,6 +284,25 @@ final class Library {
                        covers: Array(covers))
         }
         week = []
+    }
+
+    /// The songs behind a place in the library, in the order its page shows them first.
+    func songs(for route: Route) -> [Song] {
+        switch route {
+        case .songs: return TrackOrder.title.sorted(songs, fields: \.orderFields)
+        case .liked: return liked
+        case .playlist(let id): return playlists.first { $0.id == id }?.songs ?? []
+        case .album(let id): return songs.filter { $0.album.id == id }.sorted { ($0.track ?? 0) < ($1.track ?? 0) }
+        case .artist(let name): return TrackOrder.album.sorted(songs.filter { $0.artist == name || $0.album.artist == name }, fields: \.orderFields)
+        case .home, .search, .shelf: return []
+        }
+    }
+
+    /// The songs of a mix: a genre mix plays that genre, a sample mix the albums on its cover.
+    func songs(for mix: Mix) -> [Song] {
+        if mix.id.hasPrefix("genre-") { return songs.filter { "genre-" + $0.album.genre == mix.id } }
+        let albums = Set(mix.covers.map(\.id))
+        return songs.filter { albums.contains($0.album.id) }
     }
 
     /// The cover image address for an album from the server.

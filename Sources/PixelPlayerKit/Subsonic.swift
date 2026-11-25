@@ -113,6 +113,27 @@ public struct SubsonicSearch: Codable, Sendable, Hashable {
     public var artist: [SubsonicArtist]?
 }
 
+/// OpenSubsonic getLyricsBySongId: lyrics with a start in milliseconds per line when synced.
+public struct SubsonicStructuredLyrics: Codable, Sendable, Hashable {
+    public struct Line: Codable, Sendable, Hashable {
+        public var start: Int?
+        public var value: String
+    }
+    public var displayArtist: String?
+    public var displayTitle: String?
+    public var lang: String?
+    public var offset: Int?
+    public var synced: Bool
+    public var line: [Line]?
+}
+
+/// The older getLyrics: one block of text found by artist and title.
+public struct SubsonicLyrics: Codable, Sendable, Hashable {
+    public var artist: String?
+    public var title: String?
+    public var value: String?
+}
+
 // MARK: Client
 
 public struct SubsonicClient: Sendable {
@@ -175,6 +196,7 @@ public struct SubsonicClient: Sendable {
         var index: [Index]?
     }
     private struct PlaylistList: Decodable { var playlist: [SubsonicPlaylist]? }
+    struct LyricsList: Decodable { var structuredLyrics: [SubsonicStructuredLyrics]? }
 
     public func ping() async throws {
         _ = try await get("ping", key: nil, as: Empty.self)
@@ -249,6 +271,16 @@ public struct SubsonicClient: Sendable {
                                              .init(name: "positionMs", value: "\(positionMs)"), .init(name: "state", value: state),
                                              .init(name: "playbackRate", value: "1.0"), .init(name: "ignoreScrobble", value: "true")],
                           key: nil, as: Empty.self)
+    }
+
+    /// Lyrics of a song by its id (OpenSubsonic). Only reads.
+    public func lyrics(songID: String) async throws -> [SubsonicStructuredLyrics] {
+        try await get("getLyricsBySongId", [.init(name: "id", value: songID)], key: "lyricsList", as: LyricsList.self).structuredLyrics ?? []
+    }
+
+    /// Lyrics found by artist and title, for servers without the call above. Only reads.
+    public func lyrics(artist: String, title: String) async throws -> SubsonicLyrics {
+        try await get("getLyrics", [.init(name: "artist", value: artist), .init(name: "title", value: title)], key: "lyrics", as: SubsonicLyrics.self)
     }
 
     public func streamURL(id: String) -> URL { url("stream", [.init(name: "id", value: id)]) }

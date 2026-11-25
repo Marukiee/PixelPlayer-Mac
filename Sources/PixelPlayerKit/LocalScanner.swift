@@ -78,28 +78,50 @@ public actor LocalScanner {
             return nil
         }
         let fileTitle = url.deletingPathExtension().lastPathComponent
+        // FLAC and Ogg keep their tags as Vorbis comments, which AVFoundation names vorb/<FIELD>.
+        func vorbis(_ fields: String...) -> [AVMetadataIdentifier] { fields.map { AVMetadataIdentifier(rawValue: "vorb/" + $0) } }
         let title = await string([.commonIdentifierTitle, .id3MetadataTitleDescription, .iTunesMetadataSongName], common: .commonKeyTitle) ?? fileTitle
         let artist = await string([.commonIdentifierArtist, .id3MetadataLeadPerformer, .iTunesMetadataArtist], common: .commonKeyArtist) ?? ""
         let album = await string([.commonIdentifierAlbumName, .id3MetadataAlbumTitle, .iTunesMetadataAlbum], common: .commonKeyAlbumName) ?? ""
-        let albumArtist = await string([.id3MetadataBand, .iTunesMetadataAlbumArtist])
-        let genre = await string([.id3MetadataContentType, .iTunesMetadataUserGenre], common: .commonKeyType)
-        let trackText = await string([.id3MetadataTrackNumber])
-        let yearText = await string([.id3MetadataYear, .id3MetadataRecordingTime, .iTunesMetadataReleaseDate], common: .commonKeyCreationDate)
+        let albumArtist = await string([.id3MetadataBand, .iTunesMetadataAlbumArtist] + vorbis("ALBUMARTIST", "ALBUM ARTIST", "ALBUM_ARTIST"))
+        let genre = await string([.id3MetadataContentType, .iTunesMetadataUserGenre] + vorbis("GENRE"), common: .commonKeyType)
+        let trackText = await string([.id3MetadataTrackNumber] + vorbis("TRACKNUMBER"))
+        let yearText = await string([.id3MetadataYear, .id3MetadataRecordingTime, .iTunesMetadataReleaseDate] + vorbis("DATE", "YEAR", "ORIGINALDATE", "ORIGINALYEAR"),
+                                    common: .commonKeyCreationDate)
+        let trackNumber = trackText.flatMap { Int($0.split(separator: "/").first?.trimmingCharacters(in: .whitespaces) ?? "") }
         var relative = url.path
         if relative.hasPrefix(root.path) { relative = String(relative.dropFirst(root.path.count)).trimmingCharacters(in: CharacterSet(charactersIn: "/")) }
         return LocalTrack(path: url.path, relativePath: relative, title: title, artist: artist, album: album, albumArtist: albumArtist, genre: genre,
-                          year: yearText.flatMap { Int($0.prefix(4)) }, track: trackText.flatMap { Int($0.split(separator: "/").first ?? "") },
+                          year: yearText.flatMap { Int($0.prefix(4)) }, track: trackNumber,
                           durationMs: Int((duration.isFinite ? duration : 0) * 1000), modified: modified, size: size, suffix: url.pathExtension.lowercased())
+    }
+
+    /// Raised whenever the scanner reads more or other tags, so a cache from before is read again in full.
+    /// 2: Vorbis comments (FLAC genre, track number, year and album artist).
+    static let cacheVersion = 2
+    private struct CacheFile: Codable {
+        var version: Int
+        var tracks: [LocalTrack]
+    }
+
+    /// The cached tracks, or nothing when the cache was written by an older scanner.
+    static func decodeCache(_ data: Data) -> [LocalTrack] {
+        guard let file = try? JSONDecoder().decode(CacheFile.self, from: data), file.version == cacheVersion else { return [] }
+        return file.tracks
+    }
+
+    static func encodeCache(_ tracks: [LocalTrack]) -> Data? {
+        try? JSONEncoder().encode(CacheFile(version: cacheVersion, tracks: tracks))
     }
 
     private func loadCache() -> [LocalTrack] {
         guard let data = try? Data(contentsOf: cacheURL) else { return [] }
-        return (try? JSONDecoder().decode([LocalTrack].self, from: data)) ?? []
+        return Self.decodeCache(data)
     }
 
     private func saveCache(_ tracks: [LocalTrack]) {
         try? FileManager.default.createDirectory(at: cacheURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try? JSONEncoder().encode(tracks).write(to: cacheURL)
+        try? Self.encodeCache(tracks)?.write(to: cacheURL)
     }
 
     /// The embedded cover of a file, for local albums without a server cover.
@@ -108,5 +130,59 @@ public actor LocalScanner {
         let metadata = (try? await asset.load(.metadata)) ?? []
         guard let item = AVMetadataItem.metadataItems(from: metadata, filteredByIdentifier: .commonIdentifierArtwork).first else { return nil }
         return try? await item.load(.dataValue)
+    }
+
+    // MARK: Cover pictures next to the music
+
+    static let pictureExtensions: Set<String> = ["jpg", "jpeg", "png", "webp", "gif", "bmp"]
+
+    /// How good a picture file in an album folder is as its cover, lower is better, nil when it is not one:
+    /// cover, folder and front first, then other album art names, then any picture named after the cover or the front.
+    /// Never the back, the disc or a spectrogram.
+    public static func folderArtRank(_ name: String) -> Int? {
+        let url = URL(fileURLWithPath: name)
+        guard pictureExtensions.contains(url.pathExtension.lowercased()) else { return nil }
+        let stem = url.deletingPathExtension().lastPathComponent.lowercased().trimmingCharacters(in: .whitespaces)
+        let exact = ["cover", "folder", "front", "album", "albumart", "albumartlarge", "artwork", "albumartsmall"]
+        if let index = exact.firstIndex(of: stem) { return index }
+        let words = stem.split(whereSeparator: { !$0.isLetter && !$0.isNumber }).map(String.init)
+        let never: Set<String> = ["back", "rear", "inlay", "inside", "tray", "cd", "disc", "disk", "booklet", "spectrogram", "spectrum"]
+        if words.contains(where: never.contains) { return nil }
+        // Windows Media Player: AlbumArt_{id}_Large.jpg and _Small.jpg.
+        if stem.hasPrefix("albumart") { return stem.hasSuffix("small") ? exact.count : 5 }
+        if stem.contains("cover") || words.contains("front") { return exact.count + 1 }
+        return nil
+    }
+
+    /// True for a folder that holds one disc of an album (CD1, Disc 2), whose cover is often in the folder above.
+    public static func isDiscFolder(_ name: String) -> Bool {
+        let folded = name.lowercased().filter { !$0.isWhitespace && $0 != "-" && $0 != "_" && $0 != "." }
+        for prefix in ["cd", "disc", "disk"] where folded.hasPrefix(prefix) {
+            return !folded.dropFirst(prefix.count).isEmpty && folded.dropFirst(prefix.count).allSatisfy(\.isNumber)
+        }
+        return false
+    }
+
+    /// The best cover picture among file names, nil when none of them is one.
+    public static func bestFolderArt(_ names: [String]) -> String? {
+        var best: (name: String, rank: Int)?
+        for name in names {
+            guard let rank = folderArtRank(name) else { continue }
+            if let current = best, current.rank < rank || (current.rank == rank && current.name.localizedStandardCompare(name) != .orderedDescending) { continue }
+            best = (name, rank)
+        }
+        return best?.name
+    }
+
+    /// A cover picture next to a music file, for files without one inside: in its folder, or above a disc folder.
+    public static func folderArtwork(near path: String) -> URL? {
+        var folder = URL(fileURLWithPath: path).deletingLastPathComponent()
+        for _ in 0..<2 {
+            let names = (try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []
+            if let best = bestFolderArt(names) { return folder.appendingPathComponent(best) }
+            guard isDiscFolder(folder.lastPathComponent) else { return nil }
+            folder = folder.deletingLastPathComponent()
+        }
+        return nil
     }
 }

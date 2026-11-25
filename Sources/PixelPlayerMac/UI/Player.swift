@@ -111,39 +111,6 @@ struct FloatingPlayer: View {
 
 // MARK: Lyrics
 
-let sampleLyrics = [
-    "The streetlights hum a quiet tune",
-    "The city folds into the blue",
-    "We wait between the day and night",
-    "Two coffees going cold",
-    "Your coat still on the chair",
-    "The radio is low",
-    "And everything is slow",
-    "Stay a little longer",
-    "Before the lights come on",
-    "Here in the blue hour",
-    "We don't need a song",
-]
-
-/// Lyrics in large type: the line sung now in full colour, the ones before it faded, the ones after it waiting.
-struct LyricsLines: View {
-    var size: CGFloat = 40
-    var current = 3
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: size * 0.55) {
-            ForEach(sampleLyrics.indices, id: \.self) { i in
-                Text(sampleLyrics[i])
-                    .font(.system(size: size, weight: .bold))
-                    .foregroundStyle(i == current ? AnyShapeStyle(.primary)
-                                     : i < current ? AnyShapeStyle(.tertiary) : AnyShapeStyle(.secondary))
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-}
-
 /// The lyrics over the content, across its whole width. The cover and the song are already in the player.
 struct NowPlayingView: View {
     @Environment(PlayerModel.self) private var model
@@ -268,8 +235,10 @@ struct QueueInspector: View {
                 Text("Up Next").font(.title2.weight(.bold))
                 Spacer()
                 Menu {
-                    Button("Shuffle", systemImage: "shuffle") {}
-                    Button("Clear queue", systemImage: "trash") {}
+                    Button("Shuffle", systemImage: "shuffle") { model.upNext.shuffle() }
+                        .disabled(model.upNext.count < 2)
+                    Button("Clear queue", systemImage: "trash") { model.userQueue = []; model.upNext = [] }
+                        .disabled(model.userQueue.isEmpty && model.upNext.isEmpty)
                 } label: {
                     Image(systemName: "ellipsis").font(.system(size: 14, weight: .semibold)).frame(width: 28, height: 28)
                 }
@@ -354,11 +323,13 @@ struct SongMenu: View {
         Button("Play Next", systemImage: "text.line.first.and.arrowtriangle.forward") { model.userQueue.insert(song, at: 0) }
         Button("Add to Queue", systemImage: "text.line.last.and.arrowtriangle.forward") { model.userQueue.append(song) }
         Divider()
+        // Shown, but greyed: adding would change the playlists on the server.
         Menu("Add to Playlist", systemImage: "text.badge.plus") {
-            ForEach(Library.shared.playlists) { list in Button(list.title) {} }
+            ForEach(Library.shared.playlists) { list in Button(list.title) {}.disabled(true).help(playlistEditingNote) }
             Divider()
-            Button("New Playlist…") {}
+            Button("New Playlist…") {}.disabled(true).help(playlistEditingNote)
         }
+        .help(playlistEditingNote)
         Button(liked ? "Remove from Liked Songs" : "Save to Liked Songs", systemImage: liked ? "heart.slash" : "heart") {
             model.setLiked(song, !liked)
         }
@@ -367,9 +338,11 @@ struct SongMenu: View {
         Button("Go to Album", systemImage: "square.stack") { model.go(.album(song.album.id)) }
         Divider()
         Button("Song Info", systemImage: "info.circle") { model.infoSong = song }
-        Button("Share", systemImage: "square.and.arrow.up") {}
+        Button("Share", systemImage: "square.and.arrow.up") { Share.text(Share.text(for: song)) }
     }
 }
+
+let playlistEditingNote = "Playlists come from Navidrome; editing them here comes later"
 
 /// The details of one song, in a sheet with the system's own form rows.
 struct SongInfoSheet: View {
@@ -378,8 +351,25 @@ struct SongInfoSheet: View {
 
     private var trackNumber: String {
         let songs = Library.shared.songs.filter { $0.album.id == song.album.id }
-        let index = (songs.firstIndex(of: song) ?? 0) + 1
+        let index = song.track ?? (songs.firstIndex(of: song) ?? 0) + 1
         return "\(index) of \(songs.count)"
+    }
+
+    // What the file really is. The sample music keeps the made-up values of the design shots.
+    private var sample: Bool { Library.shared.isSample }
+    private var format: String? {
+        if sample { return "MP3 · 192 kbps · 44.1 kHz" }
+        let parts = [song.source.suffix?.uppercased(), song.source.bitRate.map { "\($0) kbps" }].compactMap { $0 }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+    private var source: String {
+        if sample || !song.isLocal { return "Navidrome" }
+        return song.source.serverID == nil ? "This Mac" : "This Mac and Navidrome"
+    }
+    private var location: String? {
+        if sample { return "~/Music/\(song.artist)/\(song.album.title)" }
+        if let file = song.source.localURL { return (file.deletingLastPathComponent().path as NSString).abbreviatingWithTildeInPath }
+        return song.source.serverPath
     }
 
     var body: some View {
@@ -397,19 +387,21 @@ struct SongInfoSheet: View {
                 Section {
                     LabeledContent("Album", value: song.album.title)
                     LabeledContent("Artist", value: song.artist)
-                    LabeledContent("Year", value: String(song.album.year))
-                    LabeledContent("Genre", value: song.album.genre)
+                    if song.album.year > 0 { LabeledContent("Year", value: String(song.album.year)) }
+                    if !song.album.genre.isEmpty { LabeledContent("Genre", value: song.album.genre) }
                     LabeledContent("Track", value: trackNumber)
                     LabeledContent("Duration", value: song.duration)
                 }
                 Section("File") {
-                    LabeledContent("Format", value: "MP3 · 192 kbps · 44.1 kHz")
-                    LabeledContent("Source", value: "Navidrome")
-                    LabeledContent("Location", value: "~/Music/\(song.artist)/\(song.album.title)")
+                    if let format { LabeledContent("Format", value: format) }
+                    LabeledContent("Source", value: source)
+                    if let location { LabeledContent("Location", value: location) }
                 }
-                Section("Listening") {
-                    LabeledContent("Plays", value: "37")
-                    LabeledContent("Added", value: song.added)
+                if sample || !song.added.isEmpty {
+                    Section("Listening") {
+                        if sample { LabeledContent("Plays", value: "37") }
+                        if !song.added.isEmpty { LabeledContent("Added", value: song.added) }
+                    }
                 }
             }
             .formStyle(.grouped)

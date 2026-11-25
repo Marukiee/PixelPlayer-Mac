@@ -1,6 +1,7 @@
 import SwiftUI
 import AppKit
 import Observation
+import PixelPlayerKit
 
 /// Where the window is. The sidebar is the library, as in Spotify: every playlist, album and artist
 /// is a place of its own, with Home and search above them.
@@ -8,6 +9,8 @@ enum Route: Hashable {
     case home, search, songs, liked
     /// Playlists and albums by id; an artist by name, which is what both the server and local files share.
     case playlist(String), album(String), artist(String)
+    /// Everything on one shelf, from its Show all: `mixes`, `recent`, `more-album:<id>`, `more-artist:<name>`, `albums:<search>`.
+    case shelf(String)
 
     /// From a script step such as `page:album:2`.
     init?(script: String) {
@@ -21,6 +24,7 @@ enum Route: Hashable {
         case "playlist": guard let id else { return nil }; self = .playlist(id)
         case "album": guard let id else { return nil }; self = .album(id)
         case "artist": guard let id else { return nil }; self = .artist(id)
+        case "shelf": guard id != nil else { return nil }; self = .shelf(parts.dropFirst().joined(separator: ":"))
         default: return nil
         }
     }
@@ -54,7 +58,8 @@ final class PlayerModel {
     var filter: LibraryFilter = .all
     var current: Song = Library.shared.isSample ? Sample.nowPlaying : (Library.shared.songs.first ?? Song.nothing)
     var isPlaying = Library.shared.isSample
-    var position: Double = 104
+    /// Where the song is, in seconds. The sample music starts in the middle of a song, as in the design shots.
+    var position: Double = Library.shared.isSample ? 104 : 0
     /// The songs in Liked Songs. The heart in the player follows the song that plays.
     var likedIDs: Set<String> {
         get { Library.shared.likedIDs }
@@ -89,8 +94,8 @@ final class PlayerModel {
     /// Raised to open the Settings window from a script.
     var settingsRequest = 0
 
-    /// Devices: where the music plays, and the group around it.
-    var group: Set<String> = ["living", "kitchen"]
+    /// Devices: where the music plays, and the group around it. Only the sample music has made-up rooms in it.
+    var group: Set<String> = Library.shared.isSample ? ["living", "kitchen"] : []
     var volumes: [String: Double] = ["living": 42, "kitchen": 28, "bedroom": 30, "study": 20]
     var individualVolume = false
 
@@ -106,7 +111,7 @@ final class PlayerModel {
     var groupName: String {
         if let phone = RemoteController.shared.active { return phone.name }
         if let speakers = SonosOutput.shared.groupName { return speakers }
-        let names = Sample.rooms.filter { group.contains($0.id) }.map(\.name)
+        let names = Library.shared.isSample ? Sample.rooms.filter { group.contains($0.id) }.map(\.name) : []
         if names.isEmpty { return "This Mac" }
         return names.count == 1 ? names[0] : names.joined(separator: " + ")
     }
@@ -146,7 +151,23 @@ final class PlayerModel {
         }
     }
 
+    /// Plays a whole list from the top, or in a shuffled order.
+    func play(_ songs: [Song], shuffled: Bool = false) {
+        let list = shuffled ? songs.shuffled() : songs
+        if let first = list.first { play(first, in: list) }
+    }
+
+    /// The order each list of songs is shown in, once it was changed from the sort menu.
+    var trackOrders: [Route: TrackOrder] = [:]
+
     func setPlaying(_ playing: Bool) {
+        // Play with nothing chosen yet: Your Mix from the top, or the whole library when there is no mix.
+        if playing, current.id.isEmpty, !Library.shared.isSample {
+            let mix = Library.shared.yourMix
+            let songs = mix.isEmpty ? Library.shared.songs(for: .songs) : mix
+            if let first = songs.first { play(first, in: songs) }
+            return
+        }
         withAnimation(Motion.bouncy) { isPlaying = playing }
         Playback.shared.setPlaying(playing)
     }
@@ -185,6 +206,6 @@ func timeString(_ seconds: Double) -> String {
 
 extension Song {
     /// What the player shows before anything has played.
-    static let nothing = Song(id: "", title: "Not playing", album: Album(id: "", title: "", artist: "", year: 0, genre: ""), seconds: 1,
+    static let nothing = Song(id: "", title: "Not playing", album: Album(id: "", title: "", artist: "", year: 0, genre: ""), seconds: 0,
                               artistName: "Pick something to play")
 }

@@ -1,5 +1,6 @@
 import SwiftUI
 import Charts
+import PixelPlayerKit
 
 /// One margin for every page, so headers, rows and shelves start on the same line.
 private let margin: CGFloat = 28
@@ -21,29 +22,34 @@ struct RouteContent: View {
             case .songs:
                 TrackListPage(header: TrackHeader(kind: "Library", title: "All Songs", meta: Library.shared.isSample ? "1,284 songs · 81 h 12 m" : Library.summary(Library.shared.songs),
                                                   art: .songs, tint: Color(hex: 0x0058CA)),
-                              songs: Library.shared.songs.sorted { $0.title < $1.title })
+                              songs: Library.shared.songs, firstOrder: .title)
             case .liked:
                 TrackListPage(header: TrackHeader(kind: "Playlist", title: "Liked Songs", meta: Library.shared.isSample ? "141 songs · 9 h 12 m" : Library.summary(Library.shared.liked),
                                                   art: .liked, tint: Color(hex: 0x4B37D8)),
-                              songs: Library.shared.liked)
+                              songs: Library.shared.liked, share: "Liked Songs")
             case .playlist(let id):
                 let list = Library.shared.playlists.first { $0.id == id } ?? Playlist(id: id, title: "Playlist", songs: [])
                 TrackListPage(header: TrackHeader(kind: "Playlist", title: list.title, meta: "\(list.songs.count) songs",
-                                                  art: .collage(list.songs.map(\.album)), tint: Color(hex: list.songs[0].album.tint)),
-                              songs: list.songs)
+                                                  art: .collage(list.songs.map(\.album)), tint: Color(hex: list.songs.first?.album.tint ?? 0x23408F)),
+                              songs: list.songs, orders: TrackOrder.allCases, firstOrder: .custom, share: list.title)
             case .album(let id):
                 let album = Library.shared.albums.first { $0.id == id } ?? Library.shared.album(at: 0)
-                let songs = Library.shared.songs.filter { $0.album.id == album.id }.sorted { ($0.track ?? 0) < ($1.track ?? 0) }
-                TrackListPage(header: TrackHeader(kind: "Album", title: album.title, meta: "\(album.artist) · \(album.year) · \(songs.count) songs",
+                let songs = Library.shared.songs(for: .album(album.id))
+                TrackListPage(header: TrackHeader(kind: "Album", title: album.title,
+                                                  meta: [album.artist, album.year > 0 ? String(album.year) : "", "\(songs.count) songs"].filter { !$0.isEmpty }.joined(separator: " · "),
                                                   art: .album(album), tint: Color(hex: album.tint)),
-                              songs: songs, showAlbum: false, showAdded: false, showCover: false, showSort: false,
-                              more: Array(Library.shared.albums.filter { $0.id != album.id }.prefix(8)))
+                              songs: songs, showAlbum: false, showAdded: false, showCover: false, showSort: false, share: "\(album.title) by \(album.artist)",
+                              more: Shelves.items("more-album:\(album.id)"), moreRoute: .shelf("more-album:\(album.id)"))
             case .artist(let name):
                 let album = Library.shared.albums.first { $0.artist == name } ?? Library.shared.album(at: 0)
-                TrackListPage(header: TrackHeader(kind: "Artist", title: album.artist, meta: "\(album.genre) · 1 album",
+                let albumCount = Library.shared.albums.filter { $0.artist == name }.count
+                TrackListPage(header: TrackHeader(kind: "Artist", title: album.artist,
+                                                  meta: [album.genre, albumCount == 1 ? "1 album" : "\(albumCount) albums"].filter { !$0.isEmpty }.joined(separator: " · "),
                                                   art: .artist(album), tint: Color(hex: album.tint)),
-                              songs: Library.shared.songs.filter { $0.artist == name }, showAdded: false,
-                              more: Array(Library.shared.albums.filter { $0.artist == name || $0.genre == album.genre }.filter { $0.id != album.id }.prefix(8)))
+                              songs: Library.shared.songs(for: .artist(name)), showAdded: false, firstOrder: .album, share: album.artist,
+                              more: Shelves.items("more-artist:\(name)"), moreRoute: .shelf("more-artist:\(name)"))
+            case .shelf(let key):
+                ShelfPage(key: key)
             }
         }
     }
@@ -67,21 +73,19 @@ struct HomePage: View {
                     ForEach(quick) { QuickTile(item: $0) }
                 }
                 .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
-                Shelf(title: "Mixes for you") {
-                    FittingRow(items: Library.shared.mixes, minWidth: 160) { mix in
-                        CoverCell(art: .collage(mix.covers + mix.covers.reversed()), title: mix.title, subtitle: mix.subtitle)
+                // A shelf with nothing on it is left out.
+                if !Shelves.items("mixes").isEmpty {
+                    Shelf(title: Shelves.title("mixes"), showAll: .shelf("mixes")) {
+                        FittingRow(items: Shelves.items("mixes"), minWidth: 160) { ShelfCell(item: $0) }
                     }
                 }
-                Shelf(title: "Recently played") {
-                    FittingRow(items: Array(Library.shared.recentAlbums.enumerated()), minWidth: 160) { pair in
-                        if pair.offset % 3 == 2 {
-                            CoverCell(art: .artist(pair.element), title: pair.element.artist, subtitle: "Artist", round: true)
-                        } else {
-                            CoverCell(art: .album(pair.element), title: pair.element.title, subtitle: pair.element.artist)
-                        }
+                if !Shelves.items("recent").isEmpty {
+                    Shelf(title: Shelves.title("recent"), showAll: .shelf("recent")) {
+                        FittingRow(items: Shelves.items("recent"), minWidth: 160) { ShelfCell(item: $0) }
                     }
                 }
-                WeekCard()
+                // Listening time is only known for the sample music so far.
+                if Library.shared.isSample { WeekCard() }
             }
             .padding(.horizontal, margin)
             .padding(.top, margin)
@@ -105,9 +109,9 @@ struct MixHero: View {
                 Text(Library.shared.yourMixSummary).foregroundStyle(.white.opacity(0.8)).lineLimit(1)
                 Spacer(minLength: 8)
                 HStack(spacing: 12) {
-                    PlayCircle { let mix = Library.shared.yourMix; if let first = mix.first { PlayerModel.shared.play(first, in: mix) } }
-                    RoundButton(symbol: "shuffle", label: "Shuffle")
-                    RoundMenu()
+                    PlayCircle { PlayerModel.shared.play(Library.shared.yourMix) }
+                    RoundButton(symbol: "shuffle", label: "Shuffle") { PlayerModel.shared.play(Library.shared.yourMix, shuffled: true) }
+                    RoundMenu(songs: Library.shared.yourMix, share: "Your Mix: \(Library.shared.yourMixSummary)")
                 }
             }
             .frame(height: 184)
@@ -159,10 +163,17 @@ struct RoundIcon: View {
 
 /// More actions, in the same round glass button.
 struct RoundMenu: View {
+    /// The songs the menu acts on, and the line that is shared.
+    var songs: [Song] = []
+    var share: String? = nil
+
     var body: some View {
         Menu {
-            Button("Add to queue", systemImage: "text.line.first.and.arrowtriangle.forward") {}
-            Button("Share", systemImage: "square.and.arrow.up") {}
+            Button("Add to queue", systemImage: "text.line.first.and.arrowtriangle.forward") { PlayerModel.shared.userQueue.append(contentsOf: songs) }
+                .disabled(songs.isEmpty)
+            if let share {
+                Button("Share", systemImage: "square.and.arrow.up") { Share.text(share) }
+            }
         } label: {
             RoundIcon(symbol: "ellipsis")
         }
@@ -206,6 +217,8 @@ struct QuickTile: View {
 
 struct Shelf<Content: View>: View {
     let title: String
+    /// The page with everything on the shelf.
+    var showAll: Route? = nil
     @ViewBuilder var content: Content
 
     var body: some View {
@@ -213,7 +226,9 @@ struct Shelf<Content: View>: View {
             HStack(alignment: .firstTextBaseline) {
                 Text(title).font(.title2.weight(.bold))
                 Spacer()
-                Button("Show all") {}.buttonStyle(.link)
+                if let showAll {
+                    Button("Show all") { PlayerModel.shared.go(showAll) }.buttonStyle(.link)
+                }
             }
             content
         }
@@ -326,12 +341,21 @@ struct TrackListPage: View {
     var showAdded = true
     var showCover = true
     var showSort = true
+    /// The orders the sort menu offers, and the one the page opens in.
+    var orders: [TrackOrder] = [.added, .title, .artist, .album]
+    var firstOrder: TrackOrder = .added
+    /// The line Share sends; no Share without it.
+    var share: String? = nil
     /// Albums to show under the songs, so a short album does not leave the page empty.
-    var more: [Album] = []
+    var more: [ShelfItem] = []
+    var moreRoute: Route? = nil
+    @Environment(PlayerModel.self) private var model
     @LocalState private var width: CGFloat = 900
 
     var body: some View {
         let wide = width > 760
+        let order = model.trackOrders[model.route] ?? firstOrder
+        let songs = showSort ? order.sorted(self.songs, fields: \.orderFields) : self.songs
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(alignment: .bottom, spacing: 24) {
@@ -347,15 +371,17 @@ struct TrackListPage: View {
                 .padding(.horizontal, margin)
                 .padding(.top, margin)
                 HStack(spacing: 12) {
-                    PlayCircle { if let first = songs.first { PlayerModel.shared.play(first, in: songs) } }
-                    RoundButton(symbol: "shuffle", label: "Shuffle")
-                    RoundMenu()
+                    PlayCircle { PlayerModel.shared.play(songs) }
+                    RoundButton(symbol: "shuffle", label: "Shuffle") { PlayerModel.shared.play(songs, shuffled: true) }
+                    RoundMenu(songs: songs, share: share)
                     Spacer()
                     if showSort {
-                        Menu("Recently added") {
-                            Button("Title") {}
-                            Button("Artist") {}
-                            Button("Album") {}
+                        Menu(order.label) {
+                            Picker("Sort by", selection: Binding(get: { order }, set: { model.trackOrders[model.route] = $0 })) {
+                                ForEach(orders, id: \.self) { Text($0.label).tag($0) }
+                            }
+                            .pickerStyle(.inline)
+                            .labelsHidden()
                         }
                         .menuStyle(.borderlessButton).fixedSize()
                         // The menu has its own inset; this puts its edge on the duration column below.
@@ -376,10 +402,8 @@ struct TrackListPage: View {
                 }
                 .padding(.horizontal, margin - 12)
                 if !more.isEmpty {
-                    Shelf(title: "More like this") {
-                        FittingRow(items: more, minWidth: 160) { album in
-                            CoverCell(art: .album(album), title: album.title, subtitle: album.artist)
-                        }
+                    Shelf(title: "More like this", showAll: moreRoute) {
+                        FittingRow(items: more, minWidth: 160) { ShelfCell(item: $0) }
                     }
                     .padding(.horizontal, margin)
                     .padding(.top, 36)
@@ -506,16 +530,21 @@ struct SearchPage: View {
 
     private var browse: some View {
         VStack(alignment: .leading, spacing: 36) {
-            VStack(alignment: .leading, spacing: 14) {
-                Text("Browse").font(.title2.weight(.bold))
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: 4), spacing: 16) {
-                    ForEach(genres) { album in BrowseTile(title: album.genre, album: album) }
+            if !genres.isEmpty {
+                VStack(alignment: .leading, spacing: 14) {
+                    Text("Browse").font(.title2.weight(.bold))
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: 4), spacing: 16) {
+                        ForEach(genres) { album in BrowseTile(title: album.genre, album: album) }
+                    }
                 }
             }
-            VStack(alignment: .leading, spacing: 14) {
-                Text("Moods").font(.title2.weight(.bold))
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: 4), spacing: 16) {
-                    ForEach(moods, id: \.0) { mood in BrowseTile(title: mood.0, album: Library.shared.album(at: mood.1)) }
+            // The moods are made up: only the sample music has them.
+            if Library.shared.isSample {
+                VStack(alignment: .leading, spacing: 14) {
+                    Text("Moods").font(.title2.weight(.bold))
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: 4), spacing: 16) {
+                        ForEach(moods, id: \.0) { mood in BrowseTile(title: mood.0, album: Library.shared.album(at: mood.1)) }
+                    }
                 }
             }
         }
@@ -540,7 +569,7 @@ struct SearchPage: View {
                         Spacer(minLength: 0)
                         HStack {
                             Spacer()
-                            PlayCircle()
+                            PlayCircle { PlayerModel.shared.play(Library.shared.songs(for: .album(album.id))) }
                         }
                     }
                     .padding(20)
@@ -560,9 +589,11 @@ struct SearchPage: View {
                 .frame(height: 224, alignment: .top)
             }
         }
-        Shelf(title: "Albums") {
-            FittingRow(items: albums, minWidth: 160) { album in
-                CoverCell(art: .album(album), title: album.title, subtitle: "\(album.year) · \(album.artist)")
+        if !albums.isEmpty {
+            Shelf(title: "Albums", showAll: .shelf("albums:\(term)")) {
+                FittingRow(items: albums, minWidth: 160) { album in
+                    CoverCell(art: .album(album), title: album.title, subtitle: "\(album.year) · \(album.artist)")
+                }
             }
         }
     }
@@ -630,5 +661,106 @@ struct ConnectPage: View {
         }
         .frame(maxWidth: 440)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+// MARK: Shelves
+
+/// One thing on a shelf: an album, an artist (round) or a mix.
+enum ShelfItem {
+    case album(Album), artist(Album), mix(Mix)
+}
+
+/// What each shelf holds, the same in its row and on its Show all page.
+@MainActor
+enum Shelves {
+    static func title(_ key: String) -> String {
+        if key == "mixes" { return "Mixes for you" }
+        if key == "recent" { return "Recently played" }
+        if key.hasPrefix("albums:") { return "Albums for \u{201C}\(key.dropFirst("albums:".count))\u{201D}" }
+        return "More like this"
+    }
+
+    static func items(_ key: String) -> [ShelfItem] {
+        let library = Library.shared
+        let parts = key.split(separator: ":", maxSplits: 1).map(String.init)
+        let value = parts.count > 1 ? parts[1] : ""
+        switch parts.first ?? "" {
+        case "mixes":
+            return library.mixes.map(ShelfItem.mix)
+        case "recent":
+            // Every third one as its artist, the way a list of recent things reads.
+            return library.recentAlbums.enumerated().map { $0.offset % 3 == 2 ? .artist($0.element) : .album($0.element) }
+        case "more-album":
+            return library.albums.filter { $0.id != value }.map(ShelfItem.album)
+        case "more-artist":
+            let album = library.albums.first { $0.artist == value } ?? library.album(at: 0)
+            return library.albums.filter { ($0.artist == value || $0.genre == album.genre) && $0.id != album.id }.map(ShelfItem.album)
+        case "albums":
+            return library.albums.filter { [$0.title, $0.artist].contains { $0.localizedCaseInsensitiveContains(value) } }.map(ShelfItem.album)
+        default:
+            return []
+        }
+    }
+}
+
+/// A cover on a shelf. A click opens the album or the artist, or plays the mix.
+struct ShelfCell: View {
+    let item: ShelfItem
+
+    var body: some View {
+        Group {
+            switch item {
+            case .album(let album): CoverCell(art: .album(album), title: album.title, subtitle: album.artist)
+            case .artist(let album): CoverCell(art: .artist(album), title: album.artist, subtitle: "Artist", round: true)
+            case .mix(let mix): CoverCell(art: .collage(mix.covers + mix.covers.reversed()), title: mix.title, subtitle: mix.subtitle)
+            }
+        }
+        .onTapGesture {
+            let model = PlayerModel.shared
+            switch item {
+            case .album(let album): model.go(.album(album.id))
+            case .artist(let album): model.go(.artist(album.artist))
+            case .mix(let mix): model.play(Library.shared.songs(for: mix))
+            }
+        }
+    }
+}
+
+/// Everything on one shelf, from its Show all: the covers in a grid, as many across as fit.
+struct ShelfPage: View {
+    let key: String
+
+    var body: some View {
+        let items = Shelves.items(key)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                Text(Shelves.title(key)).font(.largeTitle.weight(.bold))
+                if items.isEmpty {
+                    Text("Nothing here yet").foregroundStyle(.secondary)
+                }
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 20, alignment: .top)], alignment: .leading, spacing: 28) {
+                    ForEach(items.indices, id: \.self) { ShelfCell(item: items[$0]) }
+                }
+            }
+            .padding(.horizontal, margin)
+            .padding(.top, margin)
+            .padding(.bottom, 24)
+        }
+        // The same margin above as at the sides, whatever the title bar's safe area is at that moment.
+        .ignoresSafeArea(.container, edges: .top)
+    }
+}
+
+extension TrackOrder {
+    /// The words in the sort menu.
+    var label: String {
+        switch self {
+        case .custom: "Custom order"
+        case .added: "Recently added"
+        case .title: "Title"
+        case .artist: "Artist"
+        case .album: "Album"
+        }
     }
 }

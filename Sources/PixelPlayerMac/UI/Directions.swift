@@ -223,16 +223,17 @@ struct LibraryRow: View {
         .onHover { hovering = $0 && !Debug.active }
         .animation(Motion.hover, value: hovering)
         .contextMenu {
-            Button("Play", systemImage: "play.fill") {}
-            Button("Shuffle", systemImage: "shuffle") {}
-            Button("Add to Queue", systemImage: "text.line.last.and.arrowtriangle.forward") {}
-            Divider()
+            Button("Play", systemImage: "play.fill") { model.play(Library.shared.songs(for: item.route)) }
+            Button("Shuffle", systemImage: "shuffle") { model.play(Library.shared.songs(for: item.route), shuffled: true) }
+            Button("Add to Queue", systemImage: "text.line.last.and.arrowtriangle.forward") {
+                model.userQueue.append(contentsOf: Library.shared.songs(for: item.route))
+            }
             if case .album(let id) = item.route {
+                Divider()
                 Button("Go to Artist", systemImage: "music.microphone") {
                     model.go(.artist(Library.shared.albums.first { $0.id == id }?.artist ?? ""))
                 }
             }
-            Button("Remove from Library", systemImage: "minus.circle") {}
         }
     }
 }

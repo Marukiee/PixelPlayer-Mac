@@ -68,6 +68,7 @@ if let stub = ProcessInfo.processInfo.environment["PP_STUB"], let server = URL(s
 
 matchingChecks()
 remoteChecks()
+libraryChecks()
 // The pure Sonos checks always run; the live part only with PP_FAKE_SONOS set.
 do {
     let done = DispatchSemaphore(value: 0)
