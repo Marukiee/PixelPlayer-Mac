@@ -52,13 +52,16 @@ struct BarIcon: View {
 }
 
 /// Lyrics, where it plays, what plays next and full screen, on the right of the player.
+/// The lyrics button's symbol. PP_LYRICS_SYMBOL tries another one in a scripted run.
+let lyricsSymbol = ProcessInfo.processInfo.environment["PP_LYRICS_SYMBOL"] ?? "music.mic"
+
 struct PlayerSideButtons: View {
     @Environment(PlayerModel.self) private var model
 
     var body: some View {
         @Bindable var model = model
         HStack(spacing: 4) {
-            BarIcon(symbol: "quote.bubble", label: "Lyrics", active: model.fullPlayer) { model.setFullPlayer(!model.fullPlayer) }
+            BarIcon(symbol: lyricsSymbol, label: "Lyrics", active: model.fullPlayer) { model.setFullPlayer(!model.fullPlayer) }
             BarIcon(symbol: RemoteController.shared.isActive ? "iphone" : "hifispeaker", label: "Connect · \(model.groupName)", active: !model.group.isEmpty || RemoteController.shared.isActive || SonosOutput.shared.controlsPlayback) { model.showDevices.toggle() }
                 .popover(isPresented: $model.showDevices, arrowEdge: .top) { DevicesPopover() }
             BarIcon(symbol: "list.bullet", label: "Up Next", active: model.showQueue) {

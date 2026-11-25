@@ -3,15 +3,21 @@
     "version": "0.1.1",
     "date": "2026-11-25",
     "en": {
-      "title": "No blue squares",
+      "title": "Microphone for lyrics",
       "fixed": [
         "With keyboard navigation on in macOS, buttons and covers no longer get a square blue ring"
+      ],
+      "better": [
+        "The lyrics button is a microphone"
       ]
     },
     "nl": {
-      "title": "Geen blauwe vakjes",
+      "title": "Microfoon voor songtekst",
       "fixed": [
         "Met toetsenbordnavigatie aan in macOS krijgen knoppen en hoezen geen blauw vierkant meer"
+      ],
+      "better": [
+        "De knop voor de songtekst is een microfoon"
       ]
     }
   },
