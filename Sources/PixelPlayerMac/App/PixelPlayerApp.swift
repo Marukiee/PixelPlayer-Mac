@@ -47,6 +47,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.regular)
         Debug.launch()
         NSApp.activate()
+        // The spacebar plays and pauses, as in Spotify, unless you are typing. Without this it pressed whatever button had
+        // keyboard focus, such as Lyrics.
+        NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            let typing = NSApp.keyWindow?.firstResponder is NSText
+            guard event.keyCode == 49, event.modifierFlags.intersection([.command, .option, .control, .shift]).isEmpty, !typing,
+                  NSApp.keyWindow?.attachedSheet == nil else { return event }
+            MainActor.assumeIsolated {
+                let model = PlayerModel.shared
+                // A sheet of its own (the welcome, song info) keeps the spacebar for its buttons.
+                guard !model.showOnboarding, model.infoSong == nil else { return }
+                model.setPlaying(!model.isPlaying)
+            }
+            return nil
+        }
         // macOS starts a fresh window with a narrow sidebar, whatever its minimum says; give it its intended width once.
         for delay in [0.2, 0.8] {
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) { Self.widenSidebar() }

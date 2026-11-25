@@ -465,10 +465,18 @@ struct TrackRow: View {
         let playing = song == model.current
         HStack(spacing: 16) {
             ZStack {
-                if playing {
+                if hovering {
+                    // The play mark under the pointer plays this song, as in Spotify; on the song that plays it pauses.
+                    Button {
+                        if playing { model.setPlaying(!model.isPlaying) } else { model.play(song, in: context) }
+                    } label: {
+                        Image(systemName: playing && model.isPlaying ? "pause.fill" : "play.fill").font(.callout)
+                            .frame(width: 24, height: 24)
+                    }
+                    .buttonStyle(PressStyle())
+                    .help(playing && model.isPlaying ? "Pause" : "Play \(song.title)")
+                } else if playing {
                     NowPlayingMark()
-                } else if hovering {
-                    Image(systemName: "play.fill").font(.callout)
                 } else {
                     Text("\(index)").monospacedDigit().foregroundStyle(.secondary)
                 }

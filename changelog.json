@@ -6,7 +6,7 @@
       "title": "Your own music, properly",
       "new": [
         "A welcome at first start for your music folder, Navidrome and Sonos",
-        "Real lyrics, following the song when they are timed",
+        "Real lyrics that follow the song; click a line to go there",
         "Sort lists by title, artist or album, and Show all on Home"
       ],
       "better": [
@@ -14,14 +14,16 @@
         "Genres and covers from your own FLAC files, so mixes and covers show up"
       ],
       "fixed": [
-        "Buttons that did nothing now work, such as Play and Shuffle in menus and clearing the queue"
+        "Buttons that did nothing now work, such as Play and Shuffle in menus, the play mark in a song row and clearing the queue",
+        "The spacebar plays and pauses",
+        "Opening the lyrics no longer flickers or colours the sidebar"
       ]
     },
     "nl": {
       "title": "Je eigen muziek, goed",
       "new": [
         "Een welkom bij de eerste start voor je muziekmap, Navidrome en Sonos",
-        "Echte songteksten, die meelopen met het nummer als ze getimed zijn",
+        "Echte songteksten die meelopen met het nummer; klik op een regel om daarheen te gaan",
         "Lijsten sorteren op titel, artiest of album, en Show all op Home"
       ],
       "better": [
@@ -29,7 +31,9 @@
         "Genres en hoezen uit je eigen FLAC-bestanden, zodat mixen en hoezen verschijnen"
       ],
       "fixed": [
-        "Knoppen die niets deden werken nu, zoals Play en Shuffle in menu's en de wachtrij leegmaken"
+        "Knoppen die niets deden werken nu, zoals Play en Shuffle in menu's, het afspeelteken in een rij en de wachtrij leegmaken",
+        "De spatiebalk speelt en pauzeert",
+        "De songtekst openen flikkert niet meer en kleurt de zijbalk niet mee"
       ]
     }
   },

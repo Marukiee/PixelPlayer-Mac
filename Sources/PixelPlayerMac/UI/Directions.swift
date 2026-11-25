@@ -45,7 +45,7 @@ struct RootView: View {
             ZStack {
                 if model.fullPlayer {
                     NowPlayingView()
-                        .transition(.opacity.combined(with: .scale(scale: 0.98)))
+                        .transition(.opacity)
                 } else {
                     // The update card pushes the page down rather than lying over it.
                     VStack(spacing: 0) {

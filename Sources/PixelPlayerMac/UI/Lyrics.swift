@@ -50,6 +50,8 @@ struct LyricsLines: View {
     var size: CGFloat = 40
     @Environment(PlayerModel.self) private var model
     @LocalState private var loaded: Loaded?
+    /// Synced lyrics stay hidden until they are scrolled to the line sung now, so opening the panel never shows a jump.
+    @LocalState private var placed = false
 
     private struct Loaded: Equatable {
         let songID: String
@@ -94,20 +96,60 @@ struct LyricsLines: View {
         return ScrollViewReader { proxy in
             VStack(alignment: .leading, spacing: size * 0.55) {
                 ForEach(lyrics.lines.indices, id: \.self) { i in
-                    // A timed empty line is a pause in the singing.
-                    Text(lyrics.lines[i].text.isEmpty && lyrics.lines[i].time != nil ? "\u{266A}" : lyrics.lines[i].text)
-                        .font(.system(size: size, weight: .bold))
-                        .foregroundStyle(plain || i == current ? AnyShapeStyle(.primary)
-                                         : i < (current ?? -1) ? AnyShapeStyle(.tertiary) : AnyShapeStyle(.secondary))
-                        .fixedSize(horizontal: false, vertical: true)
+                    LyricLine(line: lyrics.lines[i], size: size,
+                              state: plain || i == current ? .now : i < (current ?? -1) ? .sung : .coming)
                         .id(i)
                 }
             }
-            .onAppear { if follow, let current { proxy.scrollTo(current, anchor: UnitPoint(x: 0, y: 0.35)) } }
+            .opacity(follow && !placed ? 0 : 1)
+            .onAppear {
+                guard follow else { placed = true; return }
+                if let current { proxy.scrollTo(current, anchor: UnitPoint(x: 0, y: 0.35)) }
+                // One turn later the scroll has landed; then the lines fade in where they belong.
+                DispatchQueue.main.async { withAnimation(Motion.fade) { placed = true } }
+            }
             .onChange(of: current) { _, line in
                 guard follow else { return }
                 withAnimation(Motion.panel) { proxy.scrollTo(line ?? 0, anchor: line == nil ? .top : UnitPoint(x: 0, y: 0.35)) }
             }
+        }
+    }
+}
+
+/// One line of lyrics. A timed line is a place in the song: a click goes there, and under the pointer it lights up a little.
+private struct LyricLine: View {
+    enum State { case sung, now, coming }
+    let line: Lyrics.Line
+    let size: CGFloat
+    let state: State
+    @Environment(PlayerModel.self) private var model
+    @LocalState private var hovering = false
+
+    var body: some View {
+        // A timed empty line is a pause in the singing.
+        Text(line.text.isEmpty && line.time != nil ? "\u{266A}" : line.text)
+            .font(.system(size: size, weight: .bold))
+            .foregroundStyle(color)
+            .fixedSize(horizontal: false, vertical: true)
+            .contentShape(Rectangle())
+            .onHover { inside in
+                guard line.time != nil, !Debug.active else { return }
+                hovering = inside
+                if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+            }
+            .onTapGesture {
+                guard let time = line.time else { return }
+                model.seek(to: time)
+                if !model.isPlaying { model.setPlaying(true) }
+            }
+            .animation(Motion.fade, value: hovering)
+    }
+
+    private var color: AnyShapeStyle {
+        switch state {
+        case .now: AnyShapeStyle(.primary)
+        case .sung: hovering ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tertiary)
+        case .coming: hovering ? AnyShapeStyle(Color.primary.opacity(0.8)) : AnyShapeStyle(.secondary)
         }
     }
 }

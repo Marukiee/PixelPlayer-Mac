@@ -133,7 +133,8 @@ final class PlayerModel {
     }
 
     func setFullPlayer(_ on: Bool) {
-        withAnimation(Motion.morph) { fullPlayer = on }
+        // A calm crossfade: a spring here also moved covers elsewhere in the window.
+        withAnimation(Motion.fade) { fullPlayer = on }
     }
 
     /// The full screen player, and the window in macOS full screen with it (not during scripted captures).

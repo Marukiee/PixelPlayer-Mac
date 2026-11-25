@@ -134,9 +134,17 @@ struct NowPlayingView: View {
             ScrollView {
                 LyricsLines(size: 40)
                     .frame(maxWidth: 820, alignment: .leading)
+                    .padding(.top, 12)
                     .padding(.bottom, 48)
             }
             .scrollIndicators(.never)
+            // Lines fade out under the title instead of being cut off by it.
+            .mask {
+                VStack(spacing: 0) {
+                    LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom).frame(height: 36)
+                    Color.black
+                }
+            }
         }
         .padding(.horizontal, 28)
         .padding(.top, 28)
@@ -159,7 +167,8 @@ struct CoverBackdrop: View {
             Rectangle().fill(.regularMaterial)
         }
         .clipped()
-        .ignoresSafeArea()
+        // Up to the top and bottom of the window, but not under the sidebar: the sidebar keeps its own colour.
+        .ignoresSafeArea(.container, edges: [.top, .bottom])
     }
 }
 
