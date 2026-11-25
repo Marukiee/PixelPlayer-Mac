@@ -50,7 +50,7 @@ struct Song: Identifiable, Hashable {
     var lastPlayed: Double? = nil
 
     var artist: String { artistName ?? album.artist }
-    var orderFields: TrackOrder.Fields { TrackOrder.Fields(title: title, artist: artist, album: album.title, track: track, added: addedAt) }
+    var orderFields: TrackOrder.Fields { TrackOrder.Fields(title: title, artist: artist, album: album.title, track: track, added: addedAt, seconds: seconds) }
     var duration: String { String(format: "%d:%02d", seconds / 60, seconds % 60) }
     var added: String { addedText }
     var isLocal: Bool { source.localURL != nil }

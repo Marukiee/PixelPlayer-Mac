@@ -10,7 +10,9 @@
         "Mixes open, green button plays",
         "Artist pages look richer",
         "Time shows over the progress bar",
-        "Hide sidebar while lyrics show"
+        "Hide sidebar while lyrics show",
+        "Sort by clicking column titles",
+        "Compact view for song lists"
       ],
       "fixed": [
         "Bar no longer jumps on pause",
@@ -26,7 +28,9 @@
         "Mixes openen, groene knop speelt",
         "Rijkere artiestpagina",
         "Tijd boven de voortgangsbalk",
-        "Zijbalk weg bij songteksten"
+        "Zijbalk weg bij songteksten",
+        "Sorteren via de kolomtitels",
+        "Compacte weergave voor lijsten"
       ],
       "fixed": [
         "Balk springt niet meer bij pauze",

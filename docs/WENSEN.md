@@ -28,6 +28,9 @@ Alles wat Mark vroeg, met wat klaar is en wat nog moet. Bijgewerkt bij elke rond
 - Zijbalk: selectie grijs in plaats van blauw, hover en play-knop lopen gelijk, geen blijvende hover meer.
 - Sonos: balk springt niet meer terug bij pauze of vooruit bij doorspelen; kleine correcties van de speaker glijden in. De leidende kamer kun je uitvinken, de andere kamer neemt het over.
 - Zoekveld pakt geen focus meer bij het openen; ⌘L zet de cursor erin.
+- Speler zoals Spotify: knoppen met de balk eronder, volume rechts, witte play-knop; shuffle, vorige, volgende, herhalen, microfoon, wachtrij en Add to Queue nagetekend over Marks Spotify-screenshots.
+- Sorteren via de kolomtitels (Title, Artist, Album, Date added, lengte) met een groen pijltje; nog een klik draait om, # zet de eigen volgorde terug. View as: List of Compact in plaats van het sorteermenu.
+- Songtekstkop met titel en artiest; grijze sorteer- en filtermenu's.
 
 ## In 0.2.6
 

@@ -271,8 +271,8 @@ struct PlainIcon: View {
             if symbol == "shuffle" {
                 // The same drawn shuffle as in the player: square, with a fine line, like Spotify's.
                 ShuffleGlyph()
-                    .stroke(style, style: StrokeStyle(lineWidth: 2.2, lineCap: .round, lineJoin: .round))
-                    .frame(width: 26, height: 26)
+                    .stroke(style, style: StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
+                    .frame(width: 28, height: 24.5)
             } else {
                 Image(systemName: symbol)
                     .font(.system(size: 26, weight: .semibold))
@@ -498,11 +498,15 @@ struct TrackListPage: View {
     var moreRoute: Route? = nil
     @Environment(PlayerModel.self) private var model
     @LocalState private var width: CGFloat = 900
+    /// List rows with covers, or compact lines without them (View as, as in Spotify). Remembered for every list.
+    @AppStorage("tracks.view") private var viewMode = "list"
 
     var body: some View {
         let wide = width > 760
+        let compact = viewMode == "compact"
         let order = model.trackOrders[model.route] ?? firstOrder
-        let songs = showSort ? order.sorted(self.songs, fields: \.orderFields) : self.songs
+        let reversed = model.trackReversed[model.route] ?? false
+        let songs = showSort ? order.sorted(self.songs, reversed: reversed, fields: \.orderFields) : self.songs
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(alignment: .bottom, spacing: 24) {
@@ -529,31 +533,23 @@ struct TrackListPage: View {
                     PlainIconButton(symbol: "shuffle", label: "Shuffle") { PlayerModel.shared.play(songs, shuffled: true) }
                     RoundMenu(songs: songs, share: share)
                     Spacer()
-                    if showSort {
-                        Menu(order.label) {
-                            Picker("Sort by", selection: Binding(get: { order }, set: { model.trackOrders[model.route] = $0 })) {
-                                ForEach(orders, id: \.self) { Text($0.label).tag($0) }
-                            }
-                            .pickerStyle(.inline)
-                            .labelsHidden()
-                        }
-                        .menuStyle(.borderlessButton).fixedSize()
-                        // Grey like Spotify's sort menu, not the green of buttons that play.
-                        .tint(PP.icon)
-                        // The menu has its own inset; this puts its edge on the duration column below.
-                        .padding(.trailing, -6)
-                    }
+                    // How the list looks; sorting is done with the column titles below, as in Spotify.
+                    ViewAsMenu(viewMode: $viewMode)
                 }
                 .padding(.horizontal, margin)
                 .padding(.vertical, 24)
-                TrackColumns(showAlbum: showAlbum, showAdded: showAdded && wide)
+                TrackColumns(showAlbum: showAlbum, showAdded: showAdded && wide, compact: compact,
+                             order: showSort ? order : nil, reversed: reversed) { key in
+                    withAnimation(Motion.panel) { model.sortTracks(by: key, current: order, default: firstOrder) }
+                }
                     .padding(.horizontal, margin - 12)
                 Divider()
                     .padding(.horizontal, margin)
                     .padding(.bottom, 8)
                 LazyVStack(spacing: 0) {
                     ForEach(Array(songs.enumerated()), id: \.element.id) { index, song in
-                        TrackRow(index: index + 1, song: song, context: songs, showAlbum: showAlbum, showAdded: showAdded && wide, showCover: showCover)
+                        TrackRow(index: index + 1, song: song, context: songs, showAlbum: showAlbum, showAdded: showAdded && wide, showCover: showCover,
+                                 compact: compact)
                     }
                 }
                 .padding(.horizontal, margin - 12)
@@ -577,26 +573,100 @@ struct TrackListPage: View {
     }
 }
 
-/// The same frames as `TrackRow`, so every title sits above its column.
+/// The same frames as `TrackRow`, so every title sits above its column. As in Spotify a click on a title sorts the list by
+/// it and a second click turns it round, with a small green arrow on the title that sorts; `#` goes back to the list's own order.
 struct TrackColumns: View {
     var showAlbum = true
     var showAdded = true
+    var compact = false
+    /// The order the list is in; nil where the titles do not sort (an album).
+    var order: TrackOrder? = nil
+    var reversed = false
+    var onSort: (TrackOrder) -> Void = { _ in }
 
     var body: some View {
         HStack(spacing: 16) {
-            Text("#").frame(width: 24)
-            Text("Title").frame(maxWidth: .infinity, alignment: .leading)
-            if showAlbum { Text("Album").frame(maxWidth: .infinity, alignment: .leading) }
-            if showAdded { Text("Date added").frame(width: 130, alignment: .leading) }
+            header("#", .custom).frame(width: 24)
+            header("Title", .title).frame(maxWidth: .infinity, alignment: .leading)
+            if compact { header("Artist", .artist).frame(maxWidth: .infinity, alignment: .leading) }
+            if showAlbum { header("Album", .album).frame(maxWidth: .infinity, alignment: .leading) }
+            if showAdded { header("Date added", .added).frame(width: 130, alignment: .leading) }
             // Room for the saved check, then the clock centred over the times, then room for the more button.
             Color.clear.frame(width: 24)
-            Image(systemName: "clock").frame(width: 44, alignment: .center)
+            header(nil, .duration).frame(width: 44, alignment: .center)
             Color.clear.frame(width: 24)
         }
         .font(.callout)
-        .foregroundStyle(.secondary)
         .padding(.horizontal, 12)
         .frame(height: 32)
+    }
+
+    private func header(_ title: String?, _ key: TrackOrder) -> some View {
+        // Newest first is the natural way for dates, smallest first for the rest; the arrow points up for A to Z.
+        let active = order == key && key != .custom
+        let ascending = key == .added ? reversed : !reversed
+        return SortHeader(title: title, active: active, ascending: ascending, sortable: order != nil) { onSort(key) }
+    }
+}
+
+private struct SortHeader: View {
+    let title: String?
+    let active: Bool
+    let ascending: Bool
+    let sortable: Bool
+    let action: () -> Void
+    @LocalState private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 4) {
+                if let title { Text(title).lineLimit(1) } else { Image(systemName: "clock") }
+                if active {
+                    Image(systemName: ascending ? "arrowtriangle.up.fill" : "arrowtriangle.down.fill")
+                        .font(.system(size: 7))
+                        .foregroundStyle(PP.primary)
+                }
+            }
+            .foregroundStyle(active || (hovering && sortable) ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!sortable)
+        .onHover { hovering = $0 }
+        .animation(Motion.fade, value: hovering)
+        .help(sortable ? (title.map { "Sort by \($0.lowercased())" } ?? "Sort by length") : "")
+    }
+}
+
+/// View as, as in Spotify: List (rows with covers) or Compact (plain lines), in a small grey menu.
+struct ViewAsMenu: View {
+    @Binding var viewMode: String
+    @LocalState private var hovering = false
+
+    var body: some View {
+        let compact = viewMode == "compact"
+        Menu {
+            Picker("View as", selection: $viewMode) {
+                Label { Text("Compact") } icon: { Image(nsImage: GlyphImage.compactView) }.tag("compact")
+                Label { Text("List") } icon: { Image(nsImage: GlyphImage.listView) }.tag("list")
+            }
+            .pickerStyle(.inline)
+        } label: {
+            HStack(spacing: 8) {
+                Text(compact ? "Compact" : "List").font(.callout.weight(.medium))
+                ViewModeGlyph(compact: compact)
+                    .stroke(style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
+                    .frame(width: 15, height: 12)
+            }
+            .foregroundStyle(hovering ? PP.iconHover : PP.icon)
+            .contentShape(Rectangle())
+        }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .onHover { hovering = $0 }
+        .help("View as")
     }
 }
 
@@ -608,6 +678,8 @@ struct TrackRow: View {
     var showAlbum = true
     var showAdded = true
     var showCover = true
+    /// Compact: one line, no cover, the artist in a column of its own.
+    var compact = false
     @Environment(PlayerModel.self) private var model
     @LocalState private var hovering = false
     @LocalState private var showPlaylists = false
@@ -635,14 +707,20 @@ struct TrackRow: View {
             }
             .frame(width: 24)
             HStack(spacing: 12) {
-                if showCover { CoverArt(album: song.album, radius: 4).frame(width: 40, height: 40) }
+                if showCover && !compact { CoverArt(album: song.album, radius: 4).frame(width: 40, height: 40) }
                 VStack(alignment: .leading, spacing: 2) {
                     Text(song.title).foregroundStyle(playing ? AnyShapeStyle(.tint) : AnyShapeStyle(.primary))
-                    LinkText(song.artist) { model.go(.artist(song.artist)) }.font(.callout).foregroundStyle(.secondary)
+                    if !compact {
+                        LinkText(song.artist) { model.go(.artist(song.artist)) }.font(.callout).foregroundStyle(.secondary)
+                    }
                 }
                 .lineLimit(1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            if compact {
+                LinkText(song.artist) { model.go(.artist(song.artist)) }.foregroundStyle(.secondary).lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
             if showAlbum {
                 LinkText(song.album.title) { model.go(.album(song.album.id)) }.foregroundStyle(.secondary).lineLimit(1)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -690,7 +768,7 @@ struct TrackRow: View {
             .frame(width: 24)
         }
         .padding(.horizontal, 12)
-        .frame(height: 56)
+        .frame(height: compact ? 34 : 56)
         .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Color.primary.opacity(hovering ? 0.07 : 0)))
         .contentShape(Rectangle())
         .onTapGesture(count: 2) { model.play(song, in: context) }
@@ -985,6 +1063,7 @@ extension TrackOrder {
         case .title: "Title"
         case .artist: "Artist"
         case .album: "Album"
+        case .duration: "Length"
         }
     }
 }

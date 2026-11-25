@@ -191,6 +191,12 @@ enum Debug {
         case "sort":
             // `sort:title|artist|album|added|custom` orders the list on the page, as the sort menu does.
             if let order = TrackOrder(rawValue: value) { model.trackOrders[model.route] = order }
+        case "reverse":
+            // `reverse:1` turns the list on the page round, as a second click on its column title does.
+            model.trackReversed[model.route] = value == "1"
+        case "view":
+            // `view:compact|list` picks how lists look, as View as does.
+            UserDefaults.standard.set(value, forKey: "tracks.view")
         case "minimize":
             mainWindow()?.miniaturize(nil)
         case "openapp":
@@ -259,6 +265,29 @@ enum Debug {
             } else {
                 try? line.write(to: url, atomically: true, encoding: .utf8)
             }
+        case "glyphs":
+            // The drawn player icons on the canvases of Mark's Spotify screenshots, white on clear, to lay over them.
+            func save<V: View>(_ name: String, _ size: CGSize, _ view: V) {
+                let renderer = ImageRenderer(content: view.frame(width: size.width, height: size.height))
+                renderer.scale = 1
+                if let image = renderer.nsImage, let tiff = image.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff) {
+                    try? rep.representation(using: .png, properties: [:])?.write(to: file("\(name).png"))
+                }
+            }
+            func stroke<S: Shape>(_ shape: S, _ width: CGFloat) -> some View {
+                shape.stroke(Color.white, style: StrokeStyle(lineWidth: width, lineCap: .round, lineJoin: .round))
+            }
+            save("glyph-shuffle", CGSize(width: 76, height: 60),
+                 ZStack(alignment: .topLeading) { stroke(ShuffleGlyph(), 52 * 0.091).frame(width: 52, height: 45.6).offset(x: 14.4, y: 5.6) }
+                    .frame(width: 76, height: 60, alignment: .topLeading))
+            save("glyph-mic", CGSize(width: 96, height: 54),
+                 ZStack(alignment: .topLeading) {
+                     stroke(MicGlyph(), 26 * 0.062).frame(width: 26, height: 26).offset(x: 9.2, y: 13)
+                     stroke(QueueGlyph(), 23.7 * 0.075).frame(width: 23.7, height: 23.7).offset(x: 64.4, y: 14.4)
+                 }.frame(width: 96, height: 54, alignment: .topLeading))
+            save("glyph-addqueue", CGSize(width: 40, height: 44),
+                 ZStack(alignment: .topLeading) { stroke(AddQueueGlyph(), 27 * 0.075).frame(width: 27, height: 25).offset(x: 8, y: 8) }
+                    .frame(width: 40, height: 44, alignment: .topLeading))
         case "quit":
             try? await Task.sleep(for: .seconds(0.5))
             NSApp.terminate(nil)

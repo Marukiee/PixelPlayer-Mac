@@ -300,6 +300,21 @@ final class PlayerModel {
 
     /// The order each list of songs is shown in, once it was changed from the sort menu.
     var trackOrders: [Route: TrackOrder] = [:]
+    /// Lists shown the other way round, after a second click on the column title.
+    var trackReversed: [Route: Bool] = [:]
+
+    /// A click on a column title: sort by it, or turn it round when it already sorts by it. `#` goes back to the list's own order.
+    func sortTracks(by order: TrackOrder, current: TrackOrder, default first: TrackOrder) {
+        if order == .custom {
+            trackOrders[route] = first
+            trackReversed[route] = false
+        } else if order == current {
+            trackReversed[route] = !(trackReversed[route] ?? false)
+        } else {
+            trackOrders[route] = order
+            trackReversed[route] = false
+        }
+    }
 
     func setPlaying(_ playing: Bool) {
         // Play with nothing chosen yet: Your Mix from the top, or the whole library when there is no mix.

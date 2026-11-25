@@ -652,7 +652,9 @@ struct SongMenu: View {
         let liked = model.likedIDs.contains(song.id)
         Button("Play", systemImage: "play.fill") { model.play(song) }
         Button("Play Next", systemImage: "text.line.first.and.arrowtriangle.forward") { model.userQueue.insert(song, at: 0) }
-        Button("Add to Queue", systemImage: "text.line.last.and.arrowtriangle.forward") { model.userQueue.append(song) }
+        Button { model.userQueue.append(song) } label: {
+            Label { Text("Add to Queue") } icon: { Image(nsImage: GlyphImage.addToQueue) }
+        }
         Divider()
         // Shown, but greyed: adding would change the playlists on the server.
         Menu("Add to Playlist", systemImage: "text.badge.plus") {

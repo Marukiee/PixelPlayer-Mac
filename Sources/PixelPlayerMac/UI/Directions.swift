@@ -358,8 +358,10 @@ struct LibraryRow: View {
         .contextMenu {
             Button("Play", systemImage: "play.fill") { model.play(Library.shared.songs(for: item.route)) }
             Button("Shuffle", systemImage: "shuffle") { model.play(Library.shared.songs(for: item.route), shuffled: true) }
-            Button("Add to Queue", systemImage: "text.line.last.and.arrowtriangle.forward") {
+            Button {
                 model.userQueue.append(contentsOf: Library.shared.songs(for: item.route))
+            } label: {
+                Label { Text("Add to Queue") } icon: { Image(nsImage: GlyphImage.addToQueue) }
             }
             Divider()
             let pinned = Library.shared.isPinned(item.route)
