@@ -1,5 +1,31 @@
 [
   {
+    "version": "0.2.3",
+    "date": "2026-11-25",
+    "en": {
+      "title": "Small fixes",
+      "better": [
+        "The update popup sits higher, with the same room above as on the right",
+        "A log of what happens with the speakers, to find out what goes wrong"
+      ],
+      "fixed": [
+        "The song title in the player opens the right album",
+        "Only one row in the sidebar lights up under the pointer"
+      ]
+    },
+    "nl": {
+      "title": "Kleine verbeteringen",
+      "better": [
+        "De updatemelding staat hoger, met evenveel ruimte boven als rechts",
+        "Een logboek van wat er met de speakers gebeurt, om te vinden wat misgaat"
+      ],
+      "fixed": [
+        "De titel in de speler opent het juiste album",
+        "Maar een rij in de zijbalk licht op onder de muis"
+      ]
+    }
+  },
+  {
     "version": "0.2.2",
     "date": "2026-11-25",
     "en": {

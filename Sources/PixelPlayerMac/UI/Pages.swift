@@ -33,7 +33,8 @@ struct RouteContent: View {
                                                   art: .collage(list.songs.map(\.album)), tint: Color(hex: list.songs.first?.album.tint ?? 0x23408F)),
                               songs: list.songs, orders: TrackOrder.allCases, firstOrder: .custom, share: list.title)
             case .album(let id):
-                let album = Library.shared.albums.first { $0.id == id } ?? Library.shared.album(at: 0)
+                let album = Library.shared.albums.first { $0.id == id } ?? Library.shared.songs.first { $0.album.id == id }?.album
+                    ?? Library.shared.album(at: 0)
                 let songs = Library.shared.songs(for: .album(album.id))
                 TrackListPage(header: TrackHeader(kind: "Album", title: album.title,
                                                   meta: [album.artist, album.year > 0 ? String(album.year) : "", "\(songs.count) songs"].filter { !$0.isEmpty }.joined(separator: " · "),

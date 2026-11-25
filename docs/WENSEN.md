@@ -5,6 +5,7 @@ Alles wat Mark vroeg, met wat klaar is en wat nog moet. Bijgewerkt bij elke rond
 
 ## Nog te doen
 
+- **Sonos wisselt snel door veel nummers bij verbinden.** Serverbibliotheek laadt nu goed (970 nummers); oorzaak nog niet gevonden, logboek in 0.2.3.
 - **Sonos overnemen zonder wachtrij te verliezen.** Speelt de telefoon op een speaker en start je vanaf de Mac, dan eerst
   vragen (achter dit nummer, nu spelen, of vervangen), de wachtrij van de speaker overnemen en de telefoon netjes laten
   loslaten. Andersom laat de Mac los. Voorstel staat klaar, nog niet gebouwd.
@@ -12,9 +13,12 @@ Alles wat Mark vroeg, met wat klaar is en wat nog moet. Bijgewerkt bij elke rond
 - **Spotify.** Grijs in de welkom en in Instellingen tot het er is.
 - **Nederlandse vertaling** (zie ROADMAP).
 
-## In de volgende versie, klaar op main
+## In 0.2.3
 
-- Updatemelding hoger: bovenin het venster, op de hoogte van de knopjes linksboven.
+- Updatemelding hoger, met evenveel ruimte boven als rechts.
+- Titel in de speler opent het juiste album (viel terug op het eerste album).
+- Maar een rij in de zijbalk licht op onder de muis (bij wisselen naar Albums stonden er twee).
+- Logboek van wat er met de speakers gebeurt (~/Library/Logs/PixelPlayer/sonos.log), om het overslaan bij Sonos te vinden.
 
 ## In 0.2.2
 

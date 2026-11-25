@@ -294,7 +294,12 @@ final class Library {
         // A server song with a local copy plays from the copy, also inside a playlist.
         let localForServer = Dictionary(locals.compactMap { song in song.source.serverID.map { ($0, song) } }, uniquingKeysWith: { first, _ in first })
         func preferLocal(_ song: Song) -> Song { localForServer[song.id] ?? song }
-        albums = serverAlbums.map(makeAlbum) + localAlbums.values.filter { $0.id.hasPrefix("local-album:") }.sorted { $0.title < $1.title }
+        // The server's albums and the local ones, plus any album a song points at that neither list has, so an album page
+        // always finds its album instead of falling back to another one.
+        var known = serverAlbums.map(makeAlbum) + localAlbums.values.filter { $0.id.hasPrefix("local-album:") }.sorted { $0.title < $1.title }
+        var ids = Set(known.map(\.id))
+        for song in songs where ids.insert(song.album.id).inserted { known.append(song.album) }
+        albums = known
         playlists = serverPlaylists.map { list in
             Playlist(id: list.id, title: list.name, songs: (list.entry ?? []).map { preferLocal(serverByID[$0.id] ?? makeSong($0)) })
         }

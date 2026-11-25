@@ -29,6 +29,7 @@ final class SonosOutput {
     @ObservationIgnored private var clock: Timer?
     @ObservationIgnored private var tracks: [String: SonosTrackInput] = [:]
     @ObservationIgnored private var tracksClient: SubsonicClient?
+    @ObservationIgnored private var lastLoggedSession = ""
 
     private var model: PlayerModel { .shared }
     private var sample: Bool { Library.shared.isSample }
@@ -141,9 +142,12 @@ final class SonosOutput {
         anchor = (Int(model.position * 1000), .now)
         Playback.shared.handOff()
         startClock()
+        let withoutServer = ([model.current] + model.userQueue + model.upNext).prefix(50).filter { $0.source.serverID == nil }.count
+        SonosLog.write("connect \(groupID) current=\(model.current.title) server=\(model.current.source.serverID ?? "none") notOnServerInNext50=\(withoutServer) login=\(Library.shared.client != nil)")
         Task {
             await controller.setSettings(addressSettings)
             let ok = await controller.connect(groupID: groupID)
+            SonosLog.write("connect result \(ok)")
             connecting = false
             // The speakers did not take it: the Mac plays on from the same spot.
             if !ok, session == nil {
@@ -212,6 +216,19 @@ final class SonosOutput {
 
     private func handle(_ event: SonosEvent) {
         switch event {
+        case .session(let state):
+            // Only when something changes, not every poll.
+            let key = state.map { "\($0.group.id)|\($0.isConnecting)|\($0.transportState)|\($0.track)" } ?? "none"
+            if key != lastLoggedSession {
+                lastLoggedSession = key
+                SonosLog.write(state.map { "session \($0.group.displayName) connecting=\($0.isConnecting) state=\($0.transportState) track=\($0.track) pos=\($0.positionMs)" } ?? "session ended")
+            }
+        case .message(let message):
+            SonosLog.write("message \(message)")
+        case .groups(let found):
+            SonosLog.write("groups \(found.count)")
+        }
+        switch event {
         case .groups(let found):
             groups = found
             if let data = try? JSONEncoder().encode(found), !Debug.active { UserDefaults.standard.set(data, forKey: "sonos.groups") }
@@ -247,6 +264,7 @@ final class SonosOutput {
     // MARK: What the listener does here
 
     func userChangedTrack() {
+        SonosLog.write("user picked \(model.current.title) server=\(model.current.source.serverID ?? "none")")
         model.isPlaying = true
         anchor = (0, .now)
         guard let controller else { return }
@@ -318,6 +336,7 @@ final class SonosOutput {
     }
 
     fileprivate func applyPlaying(_ playing: Bool) {
+        SonosLog.write("speaker says play=\(playing)")
         anchor = (currentMs, .now)
         model.isPlaying = playing
     }
@@ -328,6 +347,7 @@ final class SonosOutput {
     }
 
     fileprivate func applyMove(to id: String, positionMs: Int) {
+        SonosLog.write("speaker moved to \(Library.shared.song(id: id)?.title ?? id) at \(positionMs)")
         applying = true
         defer { applying = false }
         Playback.shared.follow(to: id)
@@ -335,18 +355,21 @@ final class SonosOutput {
     }
 
     fileprivate func applyNext() -> Bool {
+        SonosLog.write("skip to next (from \(model.current.title), server=\(model.current.source.serverID ?? "none"))")
         guard let next = model.userQueue.first ?? model.upNext.first else { return false }
         applyMove(to: next.id, positionMs: 0)
         return true
     }
 
     fileprivate func applyPrevious() -> Bool {
+        SonosLog.write("back to previous")
         guard currentMs <= 3000, let last = Playback.shared.history.last else { applySeek(0); return false }
         applyMove(to: last.id, positionMs: 0)
         return true
     }
 
     fileprivate func applyReplace(_ inputs: [SonosTrackInput], startAt index: Int, positionMs: Int, playing: Bool) {
+        SonosLog.write("queue replaced, \(inputs.count) songs, start \(index)")
         let songs = inputs.compactMap { Library.shared.song(id: $0.id) }
         guard songs.indices.contains(index) else { return }
         applying = true
@@ -369,5 +392,31 @@ final class SonosBridge: SonosLocalPlayer, @unchecked Sendable {
     func sonosSkipToPrevious() async -> Bool { await MainActor.run { SonosOutput.shared.applyPrevious() } }
     func sonosReplaceQueue(_ tracks: [SonosTrackInput], startAt index: Int, positionMs: Int, playing: Bool) async {
         await MainActor.run { SonosOutput.shared.applyReplace(tracks, startAt: index, positionMs: positionMs, playing: playing) }
+    }
+}
+
+/// What happens with the speakers, for finding out why something went wrong: ~/Library/Logs/PixelPlayer/sonos.log
+/// (in a scripted run, sonos.log in its folder). No passwords: song titles, ids and what the speaker reports.
+@MainActor
+enum SonosLog {
+    private static let url: URL = {
+        if let dir = Debug.directory { return dir.appendingPathComponent("sonos.log") }
+        let logs = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask)[0].appendingPathComponent("Logs/PixelPlayer")
+        try? FileManager.default.createDirectory(at: logs, withIntermediateDirectories: true)
+        return logs.appendingPathComponent("sonos.log")
+    }()
+
+    static func write(_ line: String) {
+        let text = "\(Date.now.formatted(.iso8601)) \(line)\n"
+        // Kept small: past half a megabyte the older half goes.
+        if let size = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.size] as? Int, size > 512_000,
+           let data = try? Data(contentsOf: url) {
+            try? data.suffix(256_000).write(to: url)
+        }
+        if let handle = try? FileHandle(forWritingTo: url) {
+            handle.seekToEndOfFile(); handle.write(Data(text.utf8)); try? handle.close()
+        } else {
+            try? text.write(to: url, atomically: true, encoding: .utf8)
+        }
     }
 }

@@ -202,6 +202,8 @@ struct Sidebar: View {
         .scrollContentBackground(.hidden)
         .background(PP.sidebar.ignoresSafeArea())
         .navigationSplitViewColumnWidth(min: 260, ideal: 280, max: 420)
+        // A filter change moves rows under a still pointer, and macOS sends no hover end for them.
+        .onChange(of: model.filter) { SidebarHoverState.shared.route = nil }
         .toolbar(removing: .sidebarToggle)
     }
 }
@@ -210,7 +212,7 @@ struct Sidebar: View {
 struct LibraryRow: View {
     let item: LibraryItem
     @Environment(PlayerModel.self) private var model
-    @LocalState private var hovering = false
+    private var hovering: Bool { SidebarHoverState.shared.route == item.route }
 
     private var playing: Bool {
         if case .album(let id) = item.route { return id == model.current.album.id }
@@ -246,8 +248,8 @@ struct LibraryRow: View {
         // The hover box is the system's selection box, same size and corners, so moving over the open item shows one box.
         .listRowBackground(SidebarHover(on: hovering && !selected))
         .contentShape(Rectangle())
-        .onHover { hovering = $0 && !Debug.active }
-        .onAppear { if Debug.hovered(item.title) { hovering = true } }
+        .onHover { inside in SidebarHoverState.shared.set(item.route, inside) }
+        .onAppear { if Debug.hovered(item.title) { SidebarHoverState.shared.route = item.route } }
         .animation(Motion.fade, value: hovering)
         .contextMenu {
             Button("Play", systemImage: "play.fill") { model.play(Library.shared.songs(for: item.route)) }
@@ -271,7 +273,7 @@ struct NavRow: View {
     let title: String
     let route: Route
     @Environment(PlayerModel.self) private var model
-    @LocalState private var hovering = false
+    private var hovering: Bool { SidebarHoverState.shared.route == route }
 
     /// Browse is open while searching too.
     private var selected: Bool { route == .search ? (model.route == .search || !model.searchText.isEmpty) : (model.searchText.isEmpty && model.route == route) }
@@ -291,7 +293,7 @@ struct NavRow: View {
         .padding(.horizontal, 6)
         .listRowBackground(SidebarHover(on: hovering && !selected))
         .contentShape(Rectangle())
-        .onHover { hovering = $0 && !Debug.active }
+        .onHover { inside in SidebarHoverState.shared.set(route, inside) }
         .animation(Motion.fade, value: hovering)
     }
 }
@@ -306,5 +308,18 @@ struct SidebarHover: View {
             .padding(.horizontal, 10)
             .padding(.vertical, 1)
             .animation(Motion.fade, value: on)
+    }
+}
+
+/// Which sidebar row the pointer is on. One for the whole sidebar, so two rows can never both look hovered when the list
+/// changes under a still pointer.
+@MainActor @Observable
+final class SidebarHoverState {
+    static let shared = SidebarHoverState()
+    var route: Route?
+
+    func set(_ route: Route, _ inside: Bool) {
+        guard !Debug.active else { return }
+        if inside { self.route = route } else if self.route == route { self.route = nil }
     }
 }

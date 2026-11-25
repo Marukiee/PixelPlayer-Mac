@@ -68,7 +68,8 @@ struct UpdateCard: View {
         .padding(.leading, 12).padding(.trailing, 14).padding(.vertical, 10)
         .frame(width: 420)
         .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .padding(.top, 12)
+        // As far from the top of the window as from its right side.
+        .padding(.top, 20)
         .padding(.trailing, 20)
     }
 
