@@ -58,7 +58,9 @@ linear([color(0x6FA8FF), color(0x0058CA)], from: CGPoint(x: 280, y: 196), to: CG
 linear([color(0xFFFFFF, 0.3), color(0xFFFFFF, 0)], from: CGPoint(x: 512, y: 196), to: CGPoint(x: 512, y: 440))
 ctx.restoreGState()
 
-// The note in a light round, as on Android.
+// The note in a light round, as on Android, a little above the middle of the play shape so it sits in its widest part.
+ctx.saveGState()
+ctx.translateBy(x: 0, y: -36)
 let center = CGPoint(x: 470, y: 566)
 ctx.addEllipse(in: CGRect(x: center.x - 132, y: center.y - 132, width: 264, height: 264))
 ctx.setFillColor(color(0xD6E4FF)); ctx.fillPath()
@@ -74,6 +76,7 @@ flag.addLine(to: CGPoint(x: center.x + 150, y: 432))
 flag.addCurve(to: CGPoint(x: center.x + 50, y: 392), control1: CGPoint(x: center.x + 128, y: 404), control2: CGPoint(x: center.x + 96, y: 392))
 flag.closeSubpath()
 ctx.addPath(flag); ctx.setFillColor(ink); ctx.fillPath()
+ctx.restoreGState()
 
 guard let image = ctx.makeImage() else { exit(1) }
 let rep = NSBitmapImageRep(cgImage: image)

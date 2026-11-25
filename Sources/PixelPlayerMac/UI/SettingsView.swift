@@ -27,6 +27,12 @@ private struct GeneralPane: View {
             Section {
                 Toggle("Open at login", isOn: $launchAtLogin)
                 Toggle("Player in the menu bar", isOn: $menuBar)
+                LabeledContent("Welcome") {
+                    Button("Show Again") {
+                        PlayerModel.shared.onboardingStep = 0
+                        PlayerModel.shared.showOnboarding = true
+                    }
+                }
             }
             Section("Updates") {
                 Toggle("Check for updates automatically", isOn: $updater.autoCheck)
@@ -42,7 +48,7 @@ private struct GeneralPane: View {
             }
         }
         .formStyle(.grouped)
-        .frame(height: 262)
+        .frame(height: 300)
     }
 
     private var updaterStatus: String {
@@ -77,7 +83,10 @@ private struct SourcesPane: View {
                     HStack {
                         Text(folder.map { ($0 as NSString).abbreviatingWithTildeInPath } ?? "None").foregroundStyle(.secondary)
                         Button("Choose…") {
-                            if let chosen = MusicFolder.choose() { folder = chosen }
+                            if let chosen = MusicFolder.choose() {
+                                folder = chosen
+                                Task { await library.scanLocal() }
+                            }
                         }
                     }
                 }

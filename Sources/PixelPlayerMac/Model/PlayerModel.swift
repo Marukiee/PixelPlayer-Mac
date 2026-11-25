@@ -71,6 +71,9 @@ final class PlayerModel {
         if !Library.shared.isSample { FavoritesSync.shared.localChange(songID: song.id, liked: on) }
     }
     var fullScreen = false
+    /// The welcome at first launch (not in scripted runs, which open it with a script step).
+    var showOnboarding = !Library.shared.isSample && !Debug.active && !UserDefaults.standard.bool(forKey: "onboarding.done")
+    var onboardingStep = 0
     /// The song whose details are shown in a sheet.
     var infoSong: Song?
     var shuffle = false

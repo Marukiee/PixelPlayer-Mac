@@ -27,6 +27,7 @@ struct RootView: View {
         // With keyboard navigation on in macOS, every button would get a square blue ring, also round covers and glass
         // buttons. The app's own buttons go without; Tab still moves between them.
         .focusEffectDisabled()
+        .sheet(isPresented: $model.showOnboarding) { OnboardingView().environment(model) }
         .sheet(item: $model.infoSong) { SongInfoSheet(song: $0) }
         // Room for the sidebar, the content and the queue side by side, so none of them is ever pushed aside.
         .frame(minWidth: 1100, minHeight: 640)

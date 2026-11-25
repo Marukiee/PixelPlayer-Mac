@@ -143,6 +143,9 @@ enum Debug {
             } else {
                 try? line.write(to: url, atomically: true, encoding: .utf8)
             }
+        case "onboarding":
+            // `onboarding:<step>` opens the welcome at that step (0 to 4), `onboarding:off` closes it.
+            if value == "off" { model.showOnboarding = false } else { model.onboardingStep = Int(value) ?? 0; model.showOnboarding = true }
         case "testupdate":
             // The whole update path against the real latest release: check, download, the checks, and the swap.
             // Run a release build with PP_UPDATE_TEST_FROM set; the new app is put in place but not opened.
