@@ -1,4 +1,4 @@
-// Draws the app icon: the rounded play shape of PixelPlayer on Android with the app's own note, in the Mac app's blue,
+// Draws the app icon: the rounded play shape with a note of PixelPlayer on Android, in the Mac app's blue,
 // on the macOS icon grid (1024 canvas, a rounded square of 824 with room for its shadow).
 //   swift scripts/make-icon.swift <out.png> [size]
 import AppKit
@@ -62,15 +62,18 @@ ctx.restoreGState()
 let center = CGPoint(x: 470, y: 566)
 ctx.addEllipse(in: CGRect(x: center.x - 132, y: center.y - 132, width: 264, height: 264))
 ctx.setFillColor(color(0xD6E4FF)); ctx.fillPath()
-// The same note as the All Songs tile in the app: the system's music.note, semibold.
-let ink = NSColor(srgbRed: 0x0B / 255.0, green: 0x2A / 255.0, blue: 0x6B / 255.0, alpha: 1)
-let config = NSImage.SymbolConfiguration(pointSize: 176, weight: .semibold).applying(NSImage.SymbolConfiguration(paletteColors: [ink]))
-guard let note = NSImage(systemSymbolName: "music.note", accessibilityDescription: nil)?.withSymbolConfiguration(config) else { exit(1) }
-NSGraphicsContext.saveGraphicsState()
-NSGraphicsContext.current = NSGraphicsContext(cgContext: ctx, flipped: true)
-note.draw(in: CGRect(x: center.x - note.size.width / 2, y: center.y - note.size.height / 2, width: note.size.width, height: note.size.height),
-          from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
-NSGraphicsContext.restoreGraphicsState()
+let ink = color(0x0B2A6B)
+ctx.addEllipse(in: CGRect(x: center.x - 64, y: center.y - 64, width: 128, height: 128))
+ctx.setFillColor(ink); ctx.fillPath()
+let stem = CGPath(roundedRect: CGRect(x: center.x + 38, y: 330, width: 26, height: center.y - 330 + 8), cornerWidth: 13, cornerHeight: 13, transform: nil)
+ctx.addPath(stem); ctx.setFillColor(ink); ctx.fillPath()
+let flag = CGMutablePath()
+flag.move(to: CGPoint(x: center.x + 50, y: 330))
+flag.addCurve(to: CGPoint(x: center.x + 150, y: 410), control1: CGPoint(x: center.x + 120, y: 330), control2: CGPoint(x: center.x + 150, y: 360))
+flag.addLine(to: CGPoint(x: center.x + 150, y: 432))
+flag.addCurve(to: CGPoint(x: center.x + 50, y: 392), control1: CGPoint(x: center.x + 128, y: 404), control2: CGPoint(x: center.x + 96, y: 392))
+flag.closeSubpath()
+ctx.addPath(flag); ctx.setFillColor(ink); ctx.fillPath()
 
 guard let image = ctx.makeImage() else { exit(1) }
 let rep = NSBitmapImageRep(cgImage: image)
