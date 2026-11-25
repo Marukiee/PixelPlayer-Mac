@@ -13,7 +13,10 @@ final class Playback {
     private var timeObserver: Any?
     private var endObserver: NSObjectProtocol?
     private var history: [Song] = []
-    private var scrobbled = false
+    /// Real listening time of the song that plays, for counting the listen (spec section 4).
+    private var listenedMs = 0
+    private var lastTick: Double?
+    private var lastReport = Date.distantPast
     private var model: PlayerModel { PlayerModel.shared }
 
     private init() {
@@ -46,24 +49,34 @@ final class Playback {
     }
 
     private func start(_ song: Song) {
+        endListen()
         if model.current.id != "" && model.current.id != song.id { history.append(model.current) }
         model.current = song
         model.position = 0
-        scrobbled = false
         guard !Library.shared.isSample, let url = url(for: song) else { return }
         player.replaceCurrentItem(with: AVPlayerItem(url: url))
-        player.volume = Float(model.volume / 100)
+        player.volume = Debug.active ? 0 : Float(model.volume / 100)
         player.play()
         model.isPlaying = true
         updateNowPlaying()
-        scrobble(song, submission: false)
+        report("starting")
+        report("playing")
+    }
+
+    /// The listen of the song that played ends here: it goes into the queue when it was long enough.
+    private func endListen() {
+        if listenedMs > 0, !model.current.id.isEmpty { ScrobbleQueue.shared.record(song: model.current, listenedMs: listenedMs) }
+        listenedMs = 0
+        lastTick = nil
     }
 
     func setPlaying(_ playing: Bool) {
         guard !Library.shared.isSample else { return }
         if player.currentItem == nil, playing, model.current.id != "" { start(model.current); return }
         playing ? player.play() : player.pause()
+        lastTick = nil
         updateNowPlaying()
+        report(playing ? "playing" : "paused")
     }
 
     func seek(to seconds: Double) {
@@ -73,7 +86,8 @@ final class Playback {
     }
 
     func setVolume(_ value: Double) {
-        player.volume = Float(value / 100)
+        // Scripted runs stay silent: they play real audio, and nobody at the Mac asked for it.
+        player.volume = Debug.active ? 0 : Float(value / 100)
     }
 
     /// The next song: one the listener queued first, then the rest of the list.
@@ -85,6 +99,8 @@ final class Playback {
         } else if automatic, model.repeatAll, let first = history.first {
             start(first)
         } else if automatic {
+            report("stopped", positionMs: model.current.seconds * 1000)
+            endListen()
             model.isPlaying = false
         }
     }
@@ -105,16 +121,29 @@ final class Playback {
     private func tick(_ seconds: Double) {
         guard !Library.shared.isSample, seconds.isFinite else { return }
         model.position = seconds
-        // A play counts once half of the song has played, as on the phone.
-        if !scrobbled, model.duration > 0, seconds >= model.duration / 2 {
-            scrobbled = true
-            scrobble(model.current, submission: true)
+        // Only time that really played counts: a seek is not listening.
+        if player.rate > 0 {
+            if let last = lastTick { listenedMs += Int(max(0, min(1, seconds - last)) * 1000) }
+            lastTick = seconds
+            if Date.now.timeIntervalSince(lastReport) >= 30 { report("playing") }
         }
     }
 
-    private func scrobble(_ song: Song, submission: Bool) {
-        guard let id = song.source.serverID, let client = Library.shared.client else { return }
-        Task.detached { try? await client.scrobble(id: id, time: .now, submission: submission) }
+    /// What plays now, for the server's now playing list. Never counts a listen; that is the queue's job.
+    private func report(_ state: String, positionMs: Int? = nil) {
+        guard let id = model.current.source.serverID, let client = Library.shared.client else { return }
+        lastReport = .now
+        let position = positionMs ?? Int(model.position * 1000)
+        Task.detached {
+            do {
+                try await client.reportPlayback(id: id, positionMs: position, state: state)
+            } catch {
+                // Servers without the report fall back to the old now playing call.
+                if "\(error)".contains("404") || (error as? SubsonicError) == .http(404), state == "playing" || state == "starting" {
+                    try? await client.scrobble(id: id, time: .now, submission: false)
+                }
+            }
+        }
     }
 
     // MARK: Media keys and Control Center

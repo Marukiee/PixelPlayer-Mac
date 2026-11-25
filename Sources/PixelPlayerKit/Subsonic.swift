@@ -243,6 +243,14 @@ public struct SubsonicClient: Sendable {
                           key: nil, as: Empty.self)
     }
 
+    /// OpenSubsonic playback report: shows what plays now on the server without counting a listen (ignoreScrobble).
+    public func reportPlayback(id: String, positionMs: Int, state: String) async throws {
+        _ = try await get("reportPlayback", [.init(name: "mediaId", value: id), .init(name: "mediaType", value: "song"),
+                                             .init(name: "positionMs", value: "\(positionMs)"), .init(name: "state", value: state),
+                                             .init(name: "playbackRate", value: "1.0"), .init(name: "ignoreScrobble", value: "true")],
+                          key: nil, as: Empty.self)
+    }
+
     public func streamURL(id: String) -> URL { url("stream", [.init(name: "id", value: id)]) }
 
     public func coverArtURL(id: String, size: Int? = nil) -> URL {

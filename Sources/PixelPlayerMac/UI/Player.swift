@@ -357,7 +357,7 @@ struct SongMenu: View {
             Button("New Playlist…") {}
         }
         Button(liked ? "Remove from Liked Songs" : "Save to Liked Songs", systemImage: liked ? "heart.slash" : "heart") {
-            if liked { model.likedIDs.remove(song.id) } else { model.likedIDs.insert(song.id) }
+            model.setLiked(song, !liked)
         }
         Divider()
         Button("Go to Artist", systemImage: "music.microphone") { model.go(.artist(song.artist)) }

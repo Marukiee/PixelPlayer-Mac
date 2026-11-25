@@ -1,8 +1,10 @@
 import AppKit
 
 /// The folder with music on this Mac. Songs found here win over the same songs on the server.
+@MainActor
 enum MusicFolder {
     static var path: String? {
+        if Debug.active { return ProcessInfo.processInfo.environment["PP_MUSIC_FOLDER"] }
         if let saved = UserDefaults.standard.string(forKey: "music.folder") { return saved }
         let music = FileManager.default.urls(for: .musicDirectory, in: .userDomainMask)[0].path
         return FileManager.default.fileExists(atPath: music) ? music : nil

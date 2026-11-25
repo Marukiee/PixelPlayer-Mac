@@ -62,7 +62,13 @@ final class PlayerModel {
     }
     var liked: Bool {
         get { likedIDs.contains(current.id) }
-        set { if newValue { likedIDs.insert(current.id) } else { likedIDs.remove(current.id) } }
+        set { setLiked(current, newValue) }
+    }
+
+    /// A like here: stored, and sent to the server through the two-way sync.
+    func setLiked(_ song: Song, _ on: Bool) {
+        if on { likedIDs.insert(song.id) } else { likedIDs.remove(song.id) }
+        if !Library.shared.isSample { FavoritesSync.shared.localChange(songID: song.id, liked: on) }
     }
     var fullScreen = false
     /// The song whose details are shown in a sheet.

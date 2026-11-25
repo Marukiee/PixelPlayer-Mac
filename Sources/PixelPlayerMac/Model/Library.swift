@@ -52,6 +52,24 @@ final class Library {
     var recentSearches: [String] = []
     var recentAlbums: [Album] = []
     private(set) var client: SubsonicClient?
+    /// What the server and the music folder gave, kept so the merged library can be rebuilt when either changes.
+    private var serverAlbums: [SubsonicAlbum] = []
+    private var serverSongs: [SubsonicSong] = []
+    private var serverPlaylists: [SubsonicPlaylist] = []
+    private var serverRecent: [SubsonicAlbum] = []
+    private var localTracks: [LocalTrack] = []
+    private var hiddenServer: [String: Song] = [:]
+    /// Every server song, hidden copies included, as the matching rules see it.
+    private(set) var serverKeys: [TrackKey] = []
+    /// The merged library as the matching rules see it: local files without a server id, server rows with their own.
+    private(set) var songKeys: [TrackKey] = []
+
+    func hiddenServerSong(id: String) -> Song? { hiddenServer[id] }
+
+    static func key(for song: SubsonicSong) -> TrackKey {
+        TrackKey(id: song.id, title: song.title, artist: song.artist ?? "", album: song.album ?? "", durationMs: (song.duration ?? 0) * 1000,
+                 serverID: song.id)
+    }
 
     var liked: [Song] { songs.filter { likedIDs.contains($0.id) } }
 
@@ -95,13 +113,27 @@ final class Library {
         if Debug.active, let server = env["PP_LIVE_SERVER"], let url = URL(string: server) {
             // A scripted run against a fake server: the login comes from the run, not the keychain.
             client = SubsonicClient(config: SubsonicConfig(server: url, user: env["PP_LIVE_USER"] ?? "test", password: env["PP_LIVE_PASSWORD"] ?? "test"))
-            Task { await reload() }
+            FavoritesSync.shared.use(account: "\(server)|test")
+            Task { await scanLocal(); await reload() }
         } else if Debug.active {
             loadSample()
         } else if let settings = ServerSettings.saved, let config = settings.config {
             client = SubsonicClient(config: config)
-            Task { await reload() }
+            FavoritesSync.shared.use(account: "\(settings.server)|\(settings.user)")
+            Task { await scanLocal(); await reload() }
+        } else if !Debug.active {
+            Task { await scanLocal() }
         }
+    }
+
+    /// Reads the music folder on this Mac and merges it with the server library.
+    func scanLocal() async {
+        guard !isSample, let folder = MusicFolder.path else { return }
+        let cache = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("PixelPlayer/local-library.json")
+        localTracks = await LocalScanner(cacheURL: cache).scan(root: URL(fileURLWithPath: folder))
+        rebuild()
+        if status == .notConnected, hasMusic { status = .ready }
     }
 
     func loadSample() {
@@ -127,6 +159,7 @@ final class Library {
         do {
             try await candidate.ping()
             settings.save(password: password)
+            FavoritesSync.shared.use(account: "\(settings.server)|\(settings.user)")
             client = candidate
             await reload()
         } catch {
@@ -157,19 +190,29 @@ final class Library {
                 lists.append((try? await client.playlist(id: list.id)) ?? list)
             }
             let recent = (try? await client.albums(type: "recent", size: 20)) ?? []
-            apply(albums: serverAlbums, songs: serverSongs, starred: starred, playlists: lists, recent: recent)
+            // Never replace a library with a partial or empty answer.
+            guard !serverSongs.isEmpty else { status = hasMusic ? .ready : .failed("The server has no songs."); return }
+            self.serverAlbums = serverAlbums
+            self.serverSongs = serverSongs
+            self.serverPlaylists = lists
+            self.serverRecent = recent
+            _ = starred
+            rebuild()
             status = .ready
+            await FavoritesSync.shared.sync()
+            await ScrobbleQueue.shared.send()
         } catch {
             status = .failed(error.localizedDescription)
         }
     }
 
-    private func apply(albums serverAlbums: [SubsonicAlbum], songs serverSongs: [SubsonicSong], starred: SubsonicStarred,
-                       playlists serverLists: [SubsonicPlaylist], recent: [SubsonicAlbum]) {
+    /// Builds the one library: local files first, each knowing its server twin, and the server songs that have no local copy.
+    private func rebuild() {
         let tints: [UInt32] = [0x23408F, 0x5B2A86, 0x14594F, 0x8C3A1E, 0x2B5C8F, 0x0F7C80, 0x4A2C7A]
+        func tint(_ id: String) -> UInt32 { tints[abs(id.hashValue) % tints.count] }
         func makeAlbum(_ album: SubsonicAlbum) -> Album {
             Album(id: album.id, title: album.name, artist: album.artist ?? "Unknown artist", year: album.year ?? 0, genre: album.genre ?? "",
-                  coverArtID: album.coverArt ?? album.id, tint: tints[abs(album.id.hashValue) % tints.count])
+                  coverArtID: album.coverArt ?? album.id, tint: tint(album.id))
         }
         let albumByID = Dictionary(serverAlbums.map { ($0.id, makeAlbum($0)) }, uniquingKeysWith: { first, _ in first })
         let relative = RelativeDateTimeFormatter()
@@ -184,15 +227,48 @@ final class Library {
                         source: SongSource(serverID: song.id, serverPath: song.path, suffix: song.suffix, bitRate: song.bitRate),
                         addedText: created.map { relative.localizedString(for: $0, relativeTo: .now) } ?? "")
         }
-        albums = serverAlbums.map(makeAlbum)
-        songs = serverSongs.map(makeSong)
-        let songByID = Dictionary(songs.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-        playlists = serverLists.map { list in
-            Playlist(id: list.id, title: list.name, songs: (list.entry ?? []).map { songByID[$0.id] ?? makeSong($0) })
+        let server = serverSongs.map(makeSong)
+        serverKeys = serverSongs.map(Library.key(for:))
+        let index = FavoriteIndex(server: serverKeys)
+        let serverByID = Dictionary(server.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+
+        // Local files: albums by album name and artist, borrowing the server's album (and cover) when it is the same one.
+        var localAlbums: [String: Album] = [:]
+        var locals: [Song] = []
+        for track in localTracks {
+            let key = TrackKey(id: "local:" + track.relativePath, title: track.title, artist: track.artist, album: track.album,
+                               durationMs: track.durationMs)
+            let twin = index.serverID(for: key)
+            let albumKey = TextMatch.fold((track.albumArtist ?? track.artist) + "|" + track.album)
+            let album = localAlbums[albumKey] ?? twin.flatMap { serverByID[$0]?.album }
+                ?? Album(id: "local-album:" + albumKey, title: track.album.isEmpty ? "Unknown album" : track.album,
+                         artist: track.albumArtist ?? track.artist, year: track.year ?? 0, genre: track.genre ?? "",
+                         localCover: URL(fileURLWithPath: track.path), tint: tint(albumKey))
+            localAlbums[albumKey] = album
+            locals.append(Song(id: key.id, title: track.title, album: album, seconds: track.durationMs / 1000,
+                               artistName: track.artist.isEmpty ? nil : track.artist, track: track.track,
+                               source: SongSource(localURL: URL(fileURLWithPath: track.path), serverID: twin,
+                                                  serverPath: twin.flatMap { serverByID[$0]?.source.serverPath }, suffix: track.suffix),
+                               addedText: ""))
         }
-        likedIDs = Set((starred.song ?? []).map(\.id))
-        recentAlbums = recent.map { albumByID[$0.id] ?? makeAlbum($0) }
-        // Genre mixes from the genres with the most songs.
+        let localKeys = locals.map { TrackKey(id: $0.id, title: $0.title, artist: $0.artist, album: $0.album.title, durationMs: $0.seconds * 1000) }
+        let hidden = LocalFirst.hiddenServerIDs(locals: localKeys, server: serverKeys)
+        hiddenServer = Dictionary(server.filter { hidden.contains($0.id) }.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let visibleServer = server.filter { !hidden.contains($0.id) }
+        songs = locals + visibleServer
+        songKeys = localKeys + visibleServer.map { TrackKey(id: $0.id, title: $0.title, artist: $0.artist, album: $0.album.title,
+                                                            durationMs: $0.seconds * 1000, serverID: $0.id) }
+        // A server song with a local copy plays from the copy, also inside a playlist.
+        let localForServer = Dictionary(locals.compactMap { song in song.source.serverID.map { ($0, song) } }, uniquingKeysWith: { first, _ in first })
+        func preferLocal(_ song: Song) -> Song { localForServer[song.id] ?? song }
+        albums = serverAlbums.map(makeAlbum) + localAlbums.values.filter { $0.id.hasPrefix("local-album:") }.sorted { $0.title < $1.title }
+        playlists = serverPlaylists.map { list in
+            Playlist(id: list.id, title: list.name, songs: (list.entry ?? []).map { preferLocal(serverByID[$0.id] ?? makeSong($0)) })
+        }
+        likedIDs = FavoritesSync.shared.storedLikes
+        recentAlbums = serverRecent.map { albumByID[$0.id] ?? makeAlbum($0) }
+        if recentAlbums.isEmpty { recentAlbums = Array(albums.prefix(12)) }
+        // Genre mixes from the genres with the most songs, local copies first.
         let genres = Dictionary(grouping: songs.filter { !$0.album.genre.isEmpty }, by: { $0.album.genre })
             .sorted { $0.value.count > $1.value.count }.prefix(5)
         let tones: [Tone] = [.pink, .blue, .green, .amber, .teal]

@@ -91,6 +91,17 @@ enum Debug {
             model.showDevices = value == "1"
         case "full":
             model.setFullPlayer(value == "1")
+        case "playsong":
+            // `playsong:<title>` starts that song with the whole library after it.
+            if let song = Library.shared.songs.first(where: { $0.title == value }) { model.play(song, in: Library.shared.songs) }
+        case "like", "unlike":
+            if let song = Library.shared.songs.first(where: { $0.title == value }) { model.setLiked(song, parts[0] == "like") }
+        case "seek":
+            model.seek(to: Double(value) ?? 0)
+        case "dump":
+            // What the merged library looks like, for checks of the local-first rules.
+            let lines = Library.shared.songs.map { "\($0.id)\t\($0.title)\t\($0.artist)\tlocal=\($0.isLocal)\tserver=\($0.source.serverID ?? "-")\tliked=\(Library.shared.likedIDs.contains($0.id))" }
+            try? lines.joined(separator: "\n").write(to: file("library.txt"), atomically: true, encoding: .utf8)
         case "fullscreen":
             model.setFullScreen(value == "1")
         case "info":
