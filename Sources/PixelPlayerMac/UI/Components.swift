@@ -175,34 +175,172 @@ struct TransportButtons: View {
     var large = false
     /// Shuffle and repeat on either side; left out where room is short.
     var modes = true
+    /// Play in a filled round, white in dark and black in light, as in Spotify's bar.
+    var roundPlay = false
     @Environment(PlayerModel.self) private var model
 
     var body: some View {
-        HStack(spacing: large ? 28 : 20) {
-            if modes { toggle("shuffle", "Shuffle", on: model.shuffle) { model.shuffle.toggle() } }
-            Button { Playback.shared.previous() } label: { Image(systemName: "backward.fill") }.help("Previous")
+        // Spotify's set: single skip arrows with a bar, grey until the pointer is on them, shuffle and repeat green with a
+        // dot under them while on.
+        let size: CGFloat = large ? 22 : 15
+        HStack(spacing: large ? 30 : 22) {
+            if modes { TransportIcon(glyph: .shuffle, label: "Shuffle", size: size, on: model.shuffle) { model.shuffle.toggle() } }
+            TransportIcon(glyph: .back, label: "Previous", size: size) { Playback.shared.previous() }
             Button { model.setPlaying(!model.isPlaying) } label: {
-                Image(systemName: model.isPlaying ? "pause.fill" : "play.fill")
-                    .font(.system(size: large ? 34 : 24))
-                    // A quick swap, no bounce: the button answers at once.
-                    .contentTransition(.opacity)
-                    .frame(width: large ? 40 : 28)
+                if roundPlay {
+                    Image(systemName: model.isPlaying ? "pause.fill" : "play.fill")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(PP.page)
+                        .contentTransition(.opacity)
+                        .frame(width: 32, height: 32)
+                        // A solid colour: the text colour on glass is blended with what lies under it and came out grey.
+                        .background(Circle().fill(PP.adaptive(0x000000, 0xFFFFFF)))
+                } else {
+                    Image(systemName: model.isPlaying ? "pause.fill" : "play.fill")
+                        .font(.system(size: large ? 34 : 24))
+                        // A quick swap, no bounce: the button answers at once.
+                        .contentTransition(.opacity)
+                        .frame(width: large ? 40 : 28)
+                        .foregroundStyle(.primary)
+                }
             }
+            .buttonStyle(PressStyle())
             .help(model.isPlaying ? "Pause" : "Play")
-            Button { Playback.shared.next() } label: { Image(systemName: "forward.fill") }.help("Next")
-            if modes { toggle("repeat", "Repeat", on: model.repeatAll) { model.repeatAll.toggle() } }
+            TransportIcon(glyph: .forward, label: "Next", size: size) { Playback.shared.next() }
+            if modes { TransportIcon(glyph: .loop, label: "Repeat", size: size, on: model.repeatAll) { model.repeatAll.toggle() } }
         }
-        .font(large ? .title2 : .title3)
-        .buttonStyle(PressStyle())
-        .foregroundStyle(.primary)
     }
+}
 
-    private func toggle(_ symbol: String, _ label: String, on: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: symbol)
-                .font(large ? .title3 : .body)
-                .foregroundStyle(on ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
+enum TransportGlyph { case back, forward, loop, shuffle }
+
+/// Shuffle: two crossing arrows in a square, taller than the system's wide symbol, like Spotify's.
+struct ShuffleGlyph: Shape {
+    func path(in rect: CGRect) -> Path {
+        let head = rect.height * 0.2
+        let top = rect.minY + head
+        let bottom = rect.maxY - head
+        let w = rect.width
+        var path = Path()
+        for (from, to) in [(top, bottom), (bottom, top)] {
+            path.move(to: CGPoint(x: rect.minX, y: from))
+            path.addLine(to: CGPoint(x: rect.minX + w * 0.18, y: from))
+            path.addCurve(to: CGPoint(x: rect.minX + w * 0.72, y: to),
+                          control1: CGPoint(x: rect.minX + w * 0.45, y: from), control2: CGPoint(x: rect.minX + w * 0.45, y: to))
+            path.addLine(to: CGPoint(x: rect.maxX, y: to))
+            path.move(to: CGPoint(x: rect.maxX - head, y: to - head))
+            path.addLine(to: CGPoint(x: rect.maxX, y: to))
+            path.addLine(to: CGPoint(x: rect.maxX - head, y: to + head))
         }
+        return path
+    }
+}
+
+/// Previous or next: a triangle against a thin bar, with softly rounded corners.
+struct SkipGlyph: Shape {
+    var forward: Bool
+
+    func path(in rect: CGRect) -> Path {
+        let bar = max(1.6, rect.width * 0.15)
+        let gap = rect.width * 0.04
+        let tip = rect.width - bar - gap
+        var path = Path()
+        // Drawn pointing right, then mirrored for previous.
+        let triangle = [CGPoint(x: 0, y: 0), CGPoint(x: tip, y: rect.height / 2), CGPoint(x: 0, y: rect.height)]
+        path.addRoundedTriangle(triangle, radius: rect.width * 0.08)
+        path.addRoundedRect(in: CGRect(x: rect.width - bar, y: 0, width: bar, height: rect.height),
+                            cornerSize: CGSize(width: bar / 2, height: bar / 2))
+        let flip = forward ? CGAffineTransform.identity : CGAffineTransform(a: -1, b: 0, c: 0, d: 1, tx: rect.width, ty: 0)
+        return path.applying(flip).applying(CGAffineTransform(translationX: rect.minX, y: rect.minY))
+    }
+}
+
+/// Repeat: two arrows like the system's, but further apart: the top one runs right to an arrowhead at the right end, the
+/// bottom one runs left to an arrowhead at the left end, each turning down or up at its other end.
+struct LoopGlyph: Shape {
+    func path(in rect: CGRect) -> Path {
+        let head = rect.height * 0.2
+        let top = rect.minY + head
+        let bottom = rect.maxY - head
+        let radius = (bottom - top) * 0.4
+        var path = Path()
+        // Top: from the left side, up and round, to the right.
+        path.move(to: CGPoint(x: rect.minX, y: rect.midY + head * 0.4))
+        path.addArc(tangent1End: CGPoint(x: rect.minX, y: top), tangent2End: CGPoint(x: rect.maxX, y: top), radius: radius)
+        path.addLine(to: CGPoint(x: rect.maxX, y: top))
+        path.move(to: CGPoint(x: rect.maxX - head, y: top - head))
+        path.addLine(to: CGPoint(x: rect.maxX, y: top))
+        path.addLine(to: CGPoint(x: rect.maxX - head, y: top + head))
+        // Bottom: from the right side, down and round, to the left.
+        path.move(to: CGPoint(x: rect.maxX, y: rect.midY - head * 0.4))
+        path.addArc(tangent1End: CGPoint(x: rect.maxX, y: bottom), tangent2End: CGPoint(x: rect.minX, y: bottom), radius: radius)
+        path.addLine(to: CGPoint(x: rect.minX, y: bottom))
+        path.move(to: CGPoint(x: rect.minX + head, y: bottom - head))
+        path.addLine(to: CGPoint(x: rect.minX, y: bottom))
+        path.addLine(to: CGPoint(x: rect.minX + head, y: bottom + head))
+        return path
+    }
+}
+
+extension Path {
+    /// A closed triangle whose corners are rounded with the given radius.
+    mutating func addRoundedTriangle(_ points: [CGPoint], radius: CGFloat) {
+        guard points.count == 3 else { return }
+        let a = points[0], b = points[1], c = points[2]
+        move(to: CGPoint(x: (a.x + c.x) / 2, y: (a.y + c.y) / 2))
+        addArc(tangent1End: a, tangent2End: b, radius: radius)
+        addArc(tangent1End: b, tangent2End: c, radius: radius)
+        addArc(tangent1End: c, tangent2End: a, radius: radius)
+        closeSubpath()
+    }
+}
+
+/// One of the small player buttons: grey, white under the pointer, and for shuffle and repeat green with a dot while on.
+struct TransportIcon: View {
+    var symbol = ""
+    /// A drawn icon instead of a symbol: the system's skip bars are thick, and its repeat arrows sit off centre.
+    var glyph: TransportGlyph? = nil
+    let label: String
+    let size: CGFloat
+    /// Nil for a plain button; true or false for a mode that can be on.
+    var on: Bool? = nil
+    let action: () -> Void
+    @LocalState private var hovering = false
+
+    var body: some View {
+        let colour = on == true ? PP.primary : hovering ? PP.iconHover : PP.icon
+        Button(action: action) {
+            Group {
+                switch glyph {
+                case .back?, .forward?:
+                    SkipGlyph(forward: glyph == .forward)
+                        .fill(colour)
+                        .frame(width: size * 0.82, height: size * 0.86)
+                case .shuffle?:
+                    ShuffleGlyph()
+                        .stroke(colour, style: StrokeStyle(lineWidth: max(1.4, size * 0.1), lineCap: .round, lineJoin: .round))
+                        .frame(width: size * 1.0, height: size * 1.0)
+                case .loop?:
+                    LoopGlyph()
+                        .stroke(colour, style: StrokeStyle(lineWidth: max(1.4, size * 0.1), lineCap: .round, lineJoin: .round))
+                        .frame(width: size * 1.0, height: size * 1.0)
+                case nil:
+                    Image(systemName: symbol)
+                        .font(.system(size: size, weight: on == nil ? .regular : .medium))
+                        .foregroundStyle(colour)
+                }
+            }
+                .frame(width: size + 12, height: size + 12)
+                .overlay(alignment: .bottom) {
+                    if on == true {
+                        Circle().fill(PP.primary).frame(width: 4, height: 4).offset(y: 3)
+                    }
+                }
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(PressStyle())
+        .onHover { hovering = $0 && !Debug.active }
+        .animation(Motion.fade, value: hovering)
         .help(label)
     }
 }

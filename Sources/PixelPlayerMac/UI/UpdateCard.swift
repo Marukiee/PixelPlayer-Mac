@@ -53,8 +53,7 @@ struct UpdateCard: View {
                         .id(subtitleKey(phase))
                         .transition(.push(from: .bottom))
                     if phase == .available, !Updater.highlights(release.notes).isEmpty {
-                        Button("What's new") { showNotes.toggle() }
-                            .buttonStyle(.link)
+                        ShowAllButton(title: "What's new") { showNotes.toggle() }
                             .popover(isPresented: $showNotes, arrowEdge: .bottom) { notes(release) }
                     }
                 }

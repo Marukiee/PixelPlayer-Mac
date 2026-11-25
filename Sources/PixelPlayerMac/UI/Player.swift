@@ -43,7 +43,7 @@ struct BarIcon: View {
         Button(action: action) {
             Image(systemName: symbol)
                 .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(active ? AnyShapeStyle(.tint) : AnyShapeStyle(.primary))
+                .foregroundStyle(active ? PP.primary : hovering ? PP.iconHover : PP.icon)
                 .frame(width: 32, height: 32)
                 .background(Circle().fill(Color.primary.opacity(hovering ? 0.1 : 0)))
                 .contentShape(Circle())
@@ -60,6 +60,8 @@ struct BarIcon: View {
 let lyricsSymbol = ProcessInfo.processInfo.environment["PP_LYRICS_SYMBOL"] ?? "music.mic"
 
 struct PlayerSideButtons: View {
+    /// The volume slider between Up Next and full screen, as in Spotify; left out where room is short.
+    var volume = false
     @Environment(PlayerModel.self) private var model
 
     var body: some View {
@@ -71,44 +73,108 @@ struct PlayerSideButtons: View {
             BarIcon(symbol: "list.bullet", label: "Up Next", active: model.showQueue) {
                 withAnimation(Motion.panel) { model.showQueue.toggle() }
             }
+            if volume { BarVolume().padding(.horizontal, 4) }
             BarIcon(symbol: "arrow.up.left.and.arrow.down.right", label: "Full screen") { model.setFullScreen(true) }
         }
     }
 }
 
-/// The player: a glass capsule floating at the bottom of the content. The cover is round so it sits concentric
-/// in the capsule: 56 high, 8 in, so a circle of 40. When the column is narrow (the queue open) the position
-/// slider steps aside, so the capsule never runs over the queue.
+/// The volume in the player, as in Spotify: a speaker that mutes with a click and a thin bar that turns green under the
+/// pointer, with its knob while it is dragged.
+struct BarVolume: View {
+    @Environment(PlayerModel.self) private var model
+    @LocalState private var hovering = false
+    @LocalState private var dragging = false
+    /// The volume before muting, for the second click.
+    @LocalState private var beforeMute: Double = 50
+
+    var body: some View {
+        let volume = model.groupVolume
+        HStack(spacing: 6) {
+            Button {
+                if volume > 0 { beforeMute = volume; model.groupVolume = 0 } else { model.groupVolume = max(beforeMute, 10) }
+            } label: {
+                Image(systemName: volume == 0 ? "speaker.slash.fill" : volume < 34 ? "speaker.wave.1.fill" : volume < 67 ? "speaker.wave.2.fill" : "speaker.wave.3.fill")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(PP.icon)
+                    .frame(width: 22, height: 28, alignment: .leading)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help(volume == 0 ? "Unmute" : "Mute")
+            GeometryReader { geo in
+                let width = max(1, geo.size.width)
+                let filled = CGFloat(volume / 100) * width
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Color.primary.opacity(0.2)).frame(height: 3)
+                    Capsule().fill(hovering || dragging ? AnyShapeStyle(PP.primary) : AnyShapeStyle(Color.primary.opacity(0.8)))
+                        .frame(width: filled, height: 3)
+                }
+                .frame(height: 3)
+                .overlay(alignment: .leading) {
+                    Circle().fill(.white)
+                        .shadow(color: .black.opacity(0.3), radius: 1.5, y: 0.5)
+                        .frame(width: 11, height: 11)
+                        .offset(x: filled - 5.5)
+                        .opacity(dragging ? 1 : 0)
+                }
+                .frame(maxHeight: .infinity)
+                .contentShape(Rectangle())
+                .onHover { hovering = $0 }
+                .gesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { value in
+                            dragging = true
+                            model.groupVolume = Double(min(max(value.location.x / width, 0), 1) * 100).rounded()
+                        }
+                        .onEnded { _ in dragging = false }
+                )
+            }
+            .frame(width: 92, height: 16)
+            .animation(.easeOut(duration: 0.12), value: hovering || dragging)
+        }
+        .help("Volume")
+    }
+}
+
+/// The player: a glass capsule floating at the bottom of the content, laid out like Spotify's bar: the song on the left,
+/// the controls with the position under them in the middle, and the buttons and volume on the right. The cover is round
+/// so it sits concentric in the capsule: 68 high, 10 in, so a circle of 48. When the column is narrow (the queue open)
+/// the volume and then the title step aside, so the capsule never runs over the queue.
 struct FloatingPlayer: View {
     var body: some View {
         ViewThatFits(in: .horizontal) {
-            capsule(withPosition: true)
-            capsule(withPosition: false)
-            capsule(withPosition: false, withTitle: false)
+            capsule(volume: true)
+            capsule(volume: false)
+            capsule(volume: false, withTitle: false)
+            capsule(volume: false, withTitle: false, narrow: true)
         }
     }
 
-    private func capsule(withPosition: Bool, withTitle: Bool = true) -> some View {
-        HStack(spacing: 16) {
+    private func capsule(volume: Bool, withTitle: Bool = true, narrow: Bool = false) -> some View {
+        HStack(spacing: 18) {
             HStack(spacing: 12) {
                 if withTitle {
-                    NowPlayingInfo(cover: 40, round: true)
+                    NowPlayingInfo(cover: 48, round: true)
                 } else {
-                    CoverArt(album: PlayerModel.shared.current.album, radius: 20).frame(width: 40, height: 40)
+                    CoverArt(album: PlayerModel.shared.current.album, radius: 24).frame(width: 48, height: 48)
                 }
                 LikeButton().font(.title3)
             }
-            .frame(minWidth: withTitle ? 150 : 0, maxWidth: 230, alignment: .leading)
-            TransportButtons(modes: false)
-            if withPosition {
-                InlinePosition().frame(width: 240)
+            .frame(minWidth: withTitle ? 170 : 0, maxWidth: 240, alignment: .leading)
+            VStack(spacing: 2) {
+                TransportButtons(modes: !narrow, roundPlay: true)
+                InlinePosition()
             }
-            PlayerSideButtons()
+            .frame(width: narrow ? 230 : 340)
+            PlayerSideButtons(volume: volume)
         }
-        .padding(.leading, 8)
-        .padding(.trailing, 12)
-        .frame(height: 56)
-        .glassEffect(.regular, in: .capsule)
+        .padding(.leading, 10)
+        .padding(.trailing, 14)
+        .frame(height: 68)
+        // Glass with a dark tint in dark mode (a light one in light), so the icons read over bright covers, closer to
+        // Spotify's black bar.
+        .glassEffect(.regular.tint(PP.adaptive(0xFFFFFF, 0x000000, opacityLight: 0.25, opacityDark: 0.45)), in: .capsule)
         .fixedSize(horizontal: true, vertical: false)
         // A longer or shorter title makes the capsule grow or shrink smoothly, never in a jump.
         .animation(Motion.panel, value: PlayerModel.shared.current.id)
@@ -343,8 +409,7 @@ struct QueueInspector: View {
                 NowPlayingCard()
                 if !model.userQueue.isEmpty {
                     QueueHeading(text: "Next in queue") {
-                        Button("Clear") { withAnimation(Motion.panel) { model.userQueue = [] } }
-                            .buttonStyle(.link)
+                        ShowAllButton(title: "Clear") { withAnimation(Motion.panel) { model.userQueue = [] } }
                             .help("Remove the songs you added")
                     }
                     ForEach(model.userQueue) { song in

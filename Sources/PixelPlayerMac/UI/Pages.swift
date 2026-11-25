@@ -266,10 +266,19 @@ struct PlainIcon: View {
     var onColour = false
 
     var body: some View {
-        Image(systemName: symbol)
-            .font(.system(size: 26, weight: .semibold))
-            .foregroundStyle(onColour ? AnyShapeStyle(.white.opacity(hovering ? 1 : 0.75))
-                             : (hovering ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary)))
+        let style = onColour ? AnyShapeStyle(.white.opacity(hovering ? 1 : 0.75)) : (hovering ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
+        Group {
+            if symbol == "shuffle" {
+                // The same drawn shuffle as in the player: square, with a fine line, like Spotify's.
+                ShuffleGlyph()
+                    .stroke(style, style: StrokeStyle(lineWidth: 2.2, lineCap: .round, lineJoin: .round))
+                    .frame(width: 26, height: 26)
+            } else {
+                Image(systemName: symbol)
+                    .font(.system(size: 26, weight: .semibold))
+                    .foregroundStyle(style)
+            }
+        }
             .frame(width: 44, height: 56)
             .contentShape(Rectangle())
             .animation(Motion.fade, value: hovering)
@@ -313,6 +322,26 @@ struct QuickTile: View {
     }
 }
 
+/// "Show all" as in Spotify: grey and bold, white with an underline under the pointer. Not the system's blue link.
+struct ShowAllButton: View {
+    var title = "Show all"
+    let action: () -> Void
+    @LocalState private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(.callout.weight(.semibold))
+                .foregroundStyle(hovering ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
+                .underline(hovering)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .pointerStyle(.link)
+    }
+}
+
 struct Shelf<Content: View>: View {
     let title: String
     /// The page with everything on the shelf.
@@ -325,7 +354,7 @@ struct Shelf<Content: View>: View {
                 Text(title).font(.title2.weight(.bold))
                 Spacer()
                 if let showAll {
-                    Button("Show all") { PlayerModel.shared.go(showAll) }.buttonStyle(.link)
+                    ShowAllButton { PlayerModel.shared.go(showAll) }
                 }
             }
             content
@@ -1127,7 +1156,7 @@ struct ArtistPage: View {
                 Text("Discography").font(.title2.weight(.bold))
                 Spacer()
                 if own.count > shown.count {
-                    Button("Show all") { model.go(.shelf("more-artist:\(name)")) }.buttonStyle(.link)
+                    ShowAllButton { model.go(.shelf("more-artist:\(name)")) }
                 }
             }
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 20, alignment: .top), count: columns), alignment: .leading, spacing: 24) {

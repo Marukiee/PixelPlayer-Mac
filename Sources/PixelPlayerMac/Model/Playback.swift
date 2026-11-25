@@ -69,7 +69,15 @@ final class Playback {
         guard let url = url(for: song) else { return }
         player.replaceCurrentItem(with: AVPlayerItem(url: url))
         player.volume = Debug.active ? 0 : Float(model.volume / 100)
-        if seconds > 0 { player.seek(to: CMTime(seconds: seconds, preferredTimescale: 600)) }
+        if seconds > 0 {
+            // Exactly to the saved spot, and the new item's first reports (still at 0:00) are ignored until it is there,
+            // so the bar does not flash to the start and jump back.
+            seeking += 1
+            let tolerance = CMTime(seconds: 0.05, preferredTimescale: 600)
+            player.seek(to: CMTime(seconds: seconds, preferredTimescale: 600), toleranceBefore: tolerance, toleranceAfter: tolerance) { [weak self] _ in
+                DispatchQueue.main.async { MainActor.assumeIsolated { self?.seeking -= 1; self?.lastTick = nil } }
+            }
+        }
         player.play()
         model.isPlaying = true
         updateNowPlaying()
