@@ -130,6 +130,8 @@ final class RemoteController {
 
     func connect(_ phone: RemotePhone) {
         guard phone != active, !Library.shared.isSample else { return }
+        // One place at a time: speakers that played stop first.
+        SonosOutput.shared.stopForOtherOutput()
         // From one phone to another the music carries on.
         let wasPlaying = model.isPlaying
         if active != nil { disconnect() }

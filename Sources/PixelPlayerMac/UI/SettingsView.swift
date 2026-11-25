@@ -45,7 +45,9 @@ private struct SourcesPane: View {
     @LocalState private var user = ""
     @LocalState private var password = ""
     @LocalState private var folder = MusicFolder.path
-    @LocalState private var sonos = true
+    @LocalState private var sonos = UserDefaults.standard.object(forKey: "sonos.search") as? Bool ?? true
+    @LocalState private var sonosHosts = UserDefaults.standard.string(forKey: "sonos.hosts") ?? ""
+    @LocalState private var sonosHome = UserDefaults.standard.string(forKey: "sonos.home") ?? ""
     @LocalState private var remoteHosts = UserDefaults.standard.string(forKey: "remote.hosts") ?? ""
 
     private var library: Library { Library.shared }
@@ -95,9 +97,19 @@ private struct SourcesPane: View {
                 Text("Pair the phone with this Mac, then on the phone: \(Text("PixelPlayer › Settings › Play from › Use this phone as remote player").bold()). It shows up in Connect.")
                     .foregroundStyle(.secondary)
             }
-            Section("Sonos") {
+            Section {
                 Toggle("Find speakers on this network", isOn: $sonos)
-                LabeledContent("Found", value: library.isSample ? "4 rooms" : "Coming in the next step")
+                    .onChange(of: sonos) { UserDefaults.standard.set(sonos, forKey: "sonos.search") }
+                TextField("Speakers", text: $sonosHosts, prompt: Text("192.168.1.30"))
+                    .onChange(of: sonosHosts) { UserDefaults.standard.set(sonosHosts, forKey: "sonos.hosts") }
+                TextField("Home address", text: $sonosHome, prompt: Text("http://192.168.1.10:4533"))
+                    .onChange(of: sonosHome) { UserDefaults.standard.set(sonosHome, forKey: "sonos.home") }
+                LabeledContent("Found", value: SonosOutput.shared.rooms.isEmpty ? "None yet" : "\(SonosOutput.shared.rooms.count) rooms")
+            } header: {
+                Text("Sonos")
+            } footer: {
+                Text("Speakers: addresses of speakers the search misses. Home address: how the speakers reach Navidrome, when this Mac uses another address (such as Tailscale).")
+                    .foregroundStyle(.secondary)
             }
             Section("Spotify") {
                 LabeledContent("Account") { Text("Coming later").foregroundStyle(.secondary) }

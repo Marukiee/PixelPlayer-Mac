@@ -59,7 +59,7 @@ struct PlayerSideButtons: View {
         @Bindable var model = model
         HStack(spacing: 4) {
             BarIcon(symbol: "quote.bubble", label: "Lyrics", active: model.fullPlayer) { model.setFullPlayer(!model.fullPlayer) }
-            BarIcon(symbol: RemoteController.shared.isActive ? "iphone" : "hifispeaker", label: "Connect · \(model.groupName)", active: !model.group.isEmpty || RemoteController.shared.isActive) { model.showDevices.toggle() }
+            BarIcon(symbol: RemoteController.shared.isActive ? "iphone" : "hifispeaker", label: "Connect · \(model.groupName)", active: !model.group.isEmpty || RemoteController.shared.isActive || SonosOutput.shared.controlsPlayback) { model.showDevices.toggle() }
                 .popover(isPresented: $model.showDevices, arrowEdge: .top) { DevicesPopover() }
             BarIcon(symbol: "list.bullet", label: "Up Next", active: model.showQueue) {
                 withAnimation(Motion.panel) { model.showQueue.toggle() }
@@ -427,23 +427,27 @@ struct SongInfoSheet: View {
 struct DevicesPopover: View {
     @Environment(PlayerModel.self) private var model
     private var remote: RemoteController { .shared }
+    private var sonos: SonosOutput { .shared }
+
+    private var onSonos: Bool { sonos.controlsPlayback || !model.group.isEmpty }
+    private var groupedRooms: [SonosOutput.Room] { sonos.rooms.filter { sonos.isOn($0) } }
 
     var body: some View {
         @Bindable var model = model
         Form {
             Section("Playing on") {
                 LabeledContent {
-                    Button("Disconnect") { remote.disconnect(); model.group = [] }.controlSize(.small)
-                        .disabled(model.group.isEmpty && !remote.isActive)
+                    Button("Disconnect") { remote.disconnect(); sonos.backToMac(); model.group = [] }.controlSize(.small)
+                        .disabled(!onSonos && !remote.isActive)
                 } label: {
                     Label {
                         VStack(alignment: .leading, spacing: 1) {
                             Text(model.groupName)
-                            Text(remote.isActive ? "Phone" : model.group.isEmpty ? "Mac speakers" : "Sonos")
+                            Text(remote.isActive ? "Phone" : onSonos ? "Sonos" : "Mac speakers")
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                     } icon: {
-                        Image(systemName: remote.isActive ? "iphone" : model.group.count > 1 ? "hifispeaker.2.fill" : "hifispeaker.fill")
+                        Image(systemName: remote.isActive ? "iphone" : groupedRooms.count > 1 ? "hifispeaker.2.fill" : "hifispeaker.fill")
                             .foregroundStyle(.tint)
                     }
                 }
@@ -454,10 +458,12 @@ struct DevicesPopover: View {
                 } maximumValueLabel: {
                     Image(systemName: "speaker.wave.3.fill")
                 }
-                if model.group.count > 1 {
+                if groupedRooms.count > 1 {
                     DisclosureGroup("Individual volume", isExpanded: $model.individualVolume) {
-                        ForEach(Sample.rooms.filter { model.group.contains($0.id) }) { room in
-                            Slider(value: Binding(get: { model.volumes[room.id] ?? 0 }, set: { model.volumes[room.id] = $0 }), in: 0...100) {
+                        ForEach(groupedRooms) { room in
+                            Slider(value: Binding(get: { Library.shared.isSample ? model.volumes[room.id] ?? 0 : sonos.volume(of: room) },
+                                                  set: { Library.shared.isSample ? (model.volumes[room.id] = $0) : sonos.setVolume(of: room, $0) }),
+                                   in: 0...100) {
                                 Text(room.name)
                             }
                         }
@@ -465,17 +471,26 @@ struct DevicesPopover: View {
                 }
             }
             Section("This Mac") {
-                Toggle(isOn: Binding(get: { model.group.isEmpty && !remote.isActive },
-                                     set: { if $0 { remote.disconnect(); model.group = [] } })) {
+                Toggle(isOn: Binding(get: { !onSonos && !remote.isActive },
+                                     set: { if $0 { remote.disconnect(); sonos.backToMac(); model.group = [] } })) {
                     Label("Mac speakers", systemImage: "laptopcomputer")
                 }
             }
-            Section("Sonos") {
-                ForEach(Sample.rooms) { room in
-                    Toggle(isOn: Binding(get: { model.group.contains(room.id) },
-                                         set: { on in if on { model.group.insert(room.id) } else { model.group.remove(room.id) } })) {
+            Section {
+                ForEach(sonos.rooms) { room in
+                    Toggle(isOn: Binding(get: { sonos.isOn(room) }, set: { sonos.setRoom(room, on: $0) })) {
                         Label(room.name, systemImage: "hifispeaker")
                     }
+                    .disabled(sonos.isLocked(room))
+                    .help(sonos.isLocked(room) ? "This room leads the group. Remove the other rooms first." : "")
+                }
+            } header: {
+                Text("Sonos")
+            } footer: {
+                if let note = sonos.note {
+                    Text(note).foregroundStyle(.secondary)
+                } else if sonos.rooms.isEmpty {
+                    Text("Looking for speakers…").foregroundStyle(.secondary)
                 }
             }
             Section {
@@ -506,6 +521,7 @@ struct DevicesPopover: View {
         .formStyle(.grouped)
         .toggleStyle(.checkbox)
         .frame(width: 280, height: 600)
-        .onAppear { remote.refreshPhones() }
+        .onAppear { remote.refreshPhones(); sonos.connectShown(true) }
+        .onDisappear { sonos.connectShown(false) }
     }
 }

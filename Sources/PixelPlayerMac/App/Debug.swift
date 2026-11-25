@@ -117,6 +117,28 @@ enum Debug {
             if let song = Library.shared.songs.first(where: { $0.title == value }) {
                 if parts[0] == "playnext" { model.userQueue.insert(song, at: 0) } else { model.userQueue.append(song) }
             }
+        case "sonos", "sonosoff":
+            // `sonos:<room>` adds a room (PP_SONOS_HOSTS lists the speakers), `sonosoff:<room>` takes it out.
+            let sonos = SonosOutput.shared
+            sonos.connectShown(true)
+            for _ in 0..<40 where !sonos.rooms.contains(where: { $0.name == value }) { try? await Task.sleep(for: .milliseconds(250)) }
+            if let room = sonos.rooms.first(where: { $0.name == value }) { sonos.setRoom(room, on: parts[0] == "sonos") }
+        case "sonosmac":
+            SonosOutput.shared.backToMac()
+        case "groupvolume":
+            model.groupVolume = Double(value) ?? 30
+        case "sonosstate":
+            let sonos = SonosOutput.shared
+            let rooms = sonos.session?.group.members.map(\.name).joined(separator: "+") ?? "-"
+            let line = "\(value)\tcurrent=\(model.current.title)\tpos=\(Int(model.position))\tplaying=\(model.isPlaying)\trooms=\(rooms)"
+                + "\tvolume=\(sonos.session?.groupVolume.map(String.init) ?? "-")\tspeakerPlaying=\(sonos.session?.isPlaying ?? false)"
+                + "\tqueue=\(model.userQueue.count)+\(model.upNext.count)\tnote=\(sonos.note ?? "-")\n"
+            let url = file("sonos.txt")
+            if let handle = try? FileHandle(forWritingTo: url) {
+                handle.seekToEndOfFile(); handle.write(Data(line.utf8)); try? handle.close()
+            } else {
+                try? line.write(to: url, atomically: true, encoding: .utf8)
+            }
         case "remotestate":
             // What the Mac shows while a phone plays, for the remote checks.
             let remote = RemoteController.shared

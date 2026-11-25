@@ -95,24 +95,29 @@ final class PlayerModel {
     var individualVolume = false
 
     var userQueue: [Song] = Library.shared.isSample ? Sample.userQueue : [] {
-        didSet { RemoteController.shared.queueChanged() }
+        didSet { RemoteController.shared.queueChanged(); SonosOutput.shared.queueChanged() }
     }
     var upNext: [Song] = Library.shared.isSample ? Sample.upNext : [] {
-        didSet { RemoteController.shared.queueChanged() }
+        didSet { RemoteController.shared.queueChanged(); SonosOutput.shared.queueChanged() }
     }
 
     var duration: Double { Double(current.seconds) }
 
     var groupName: String {
         if let phone = RemoteController.shared.active { return phone.name }
+        if let speakers = SonosOutput.shared.groupName { return speakers }
         let names = Sample.rooms.filter { group.contains($0.id) }.map(\.name)
         if names.isEmpty { return "This Mac" }
         return names.count == 1 ? names[0] : names.joined(separator: " + ")
     }
 
     var groupVolume: Double {
-        get { group.isEmpty ? volume : group.map { volumes[$0] ?? 0 }.reduce(0, +) / Double(group.count) }
+        get {
+            if SonosOutput.shared.session != nil { return SonosOutput.shared.groupVolume }
+            return group.isEmpty ? volume : group.map { volumes[$0] ?? 0 }.reduce(0, +) / Double(group.count)
+        }
         set {
+            if SonosOutput.shared.session != nil { SonosOutput.shared.groupVolume = newValue; return }
             guard !group.isEmpty else { volume = newValue; return }
             let delta = newValue - groupVolume
             for id in group { volumes[id] = min(100, max(0, (volumes[id] ?? 0) + delta)) }
