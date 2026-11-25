@@ -120,6 +120,8 @@ struct FloatingPlayer: View {
 /// The lyrics over the content, across its whole width. The cover and the song are already in the player.
 struct NowPlayingView: View {
     @Environment(PlayerModel.self) private var model
+    /// With the sidebar gone the view starts under the traffic lights, so it keeps more room at the top and side.
+    @AppStorage("lyrics.hideSidebar") private var sidebarHidden = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -139,7 +141,7 @@ struct NowPlayingView: View {
             .padding(.bottom, 28)
             ScrollView {
                 LyricsLines(size: 40)
-                    .frame(maxWidth: 820, alignment: .leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.top, 12)
                     .padding(.bottom, 48)
             }
@@ -152,9 +154,11 @@ struct NowPlayingView: View {
                 }
             }
         }
-        .padding(.horizontal, 28)
-        .padding(.top, 28)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        // One column, left aligned inside but in the middle of the window, as in Spotify; on a narrow window it fills it.
+        .frame(maxWidth: 820, alignment: .leading)
+        .padding(.horizontal, sidebarHidden ? 56 : 28)
+        .padding(.top, sidebarHidden ? 52 : 28)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .ignoresSafeArea(.container, edges: .top)
         .background { CoverBackdrop(album: model.current.album).ignoresSafeArea(.all, edges: [.top, .bottom]) }
     }
@@ -184,23 +188,35 @@ struct CoverBackdrop: View {
 /// The player for full screen: the cover large with everything you need under it, and the lyrics beside it.
 struct FullScreenPlayer: View {
     @Environment(PlayerModel.self) private var model
+    /// Lyrics beside the cover, or only the cover, large in the middle. Remembered for next time.
+    @AppStorage("fullscreen.lyrics") private var showLyrics = true
+    /// Whether the song that plays has lyrics; nil while that is being looked up.
+    @LocalState private var hasLyrics: Bool?
+    /// Holds keyboard focus while open, so the search field in the sidebar beneath does not draw its ring on top.
+    @FocusState private var focused: Bool
+
+    /// A song without lyrics shows the cover alone, as if the lyrics were switched off.
+    private var lyricsShown: Bool { showLyrics && hasLyrics != false }
 
     var body: some View {
+        let showLyrics = lyricsShown
         GeometryReader { geo in
-            let cover = min(geo.size.height * 0.52, geo.size.width * 0.34, 520)
-            HStack(alignment: .center, spacing: 72) {
+            // With lyrics the cover shares the screen; without, it grows and moves to the middle.
+            let cover = showLyrics ? min(geo.size.height * 0.52, geo.size.width * 0.34, 520) : min(geo.size.height * 0.62, geo.size.width * 0.5, 680)
+            HStack(alignment: .center, spacing: showLyrics ? 72 : 0) {
                 VStack(alignment: .leading, spacing: 22) {
                     CoverArt(album: model.current.album, radius: 12)
                         .frame(width: cover, height: cover)
                         .shadow(color: .black.opacity(0.3), radius: 30, y: 14)
-                    HStack(alignment: .center) {
+                    // The check sits level with the artist, large like in Spotify's full screen player.
+                    HStack(alignment: .bottom) {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(model.current.title).font(.system(size: 30, weight: .bold))
                             Text(model.current.artist).font(.title3).foregroundStyle(.secondary)
                         }
                         .lineLimit(1)
                         Spacer()
-                        LikeButton().font(.title2)
+                        LikeButton().font(.system(size: 30))
                     }
                     PositionSlider()
                     HStack {
@@ -210,28 +226,54 @@ struct FullScreenPlayer: View {
                     }
                 }
                 .frame(width: cover)
-                ScrollView {
-                    LyricsLines(size: 36)
-                        .padding(.vertical, 40)
+                if showLyrics {
+                    ScrollView {
+                        LyricsLines(size: 36)
+                            .padding(.vertical, 40)
+                    }
+                    .scrollIndicators(.never)
+                    .frame(maxWidth: 620, maxHeight: cover + 180)
+                    .mask(LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black, location: 0.1),
+                                                 .init(color: .black, location: 0.9), .init(color: .clear, location: 1)],
+                                         startPoint: .top, endPoint: .bottom))
+                    .transition(.asymmetric(insertion: .move(edge: .trailing).combined(with: .opacity),
+                                            removal: .move(edge: .trailing).combined(with: .opacity)))
                 }
-                .scrollIndicators(.never)
-                .frame(maxWidth: 620, maxHeight: cover + 180)
-                .mask(LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black, location: 0.1),
-                                             .init(color: .black, location: 0.9), .init(color: .clear, location: 1)],
-                                     startPoint: .top, endPoint: .bottom))
             }
             .frame(width: geo.size.width, height: geo.size.height)
         }
         .background { CoverBackdrop(album: model.current.album) }
+        .focusable()
+        .focused($focused)
+        .onAppear { focused = true }
+        .onKeyPress(.escape) { model.setFullScreen(false); return .handled }
+        .task(id: model.current.id) {
+            let song = model.current
+            let found: Bool = Library.shared.isSample ? true : (song.id.isEmpty ? false : await LyricsLoader.lyrics(for: song) != nil)
+            withAnimation(Motion.morph) { hasLyrics = found }
+        }
         .overlay(alignment: .topTrailing) {
-            Button { model.setFullScreen(false) } label: {
-                Image(systemName: "arrow.down.right.and.arrow.up.left").font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(.primary).frame(width: 40, height: 40).contentShape(Circle())
+            HStack(spacing: 10) {
+                // Lyrics on or off, in the accent while they show, like the lyrics button in the player.
+                Button { withAnimation(Motion.morph) { self.showLyrics.toggle() } } label: {
+                    Image(systemName: lyricsSymbol).font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(showLyrics ? AnyShapeStyle(.tint) : AnyShapeStyle(.primary))
+                        .frame(width: 40, height: 40).contentShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .glassEffect(.regular.interactive(), in: Circle())
+                .disabled(hasLyrics == false)
+                .opacity(hasLyrics == false ? 0.5 : 1)
+                .help(hasLyrics == false ? "No lyrics for this song" : showLyrics ? "Hide lyrics" : "Show lyrics")
+                Button { model.setFullScreen(false) } label: {
+                    Image(systemName: "arrow.down.right.and.arrow.up.left").font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(.primary).frame(width: 40, height: 40).contentShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .glassEffect(.regular.interactive(), in: Circle())
+                .keyboardShortcut(.escape, modifiers: [])
+                .help("Exit full screen")
             }
-            .buttonStyle(.plain)
-            .glassEffect(.regular.interactive(), in: Circle())
-            .keyboardShortcut(.escape, modifiers: [])
-            .help("Exit full screen")
             .padding(28)
         }
     }

@@ -6,6 +6,10 @@ struct RootView: View {
     @Environment(PlayerModel.self) private var model
     @Environment(\.openSettings) private var openSettings
     @LocalState private var columns = NavigationSplitViewVisibility.all
+    /// The lyrics get the whole width: the sidebar slides away while they show (Settings › General).
+    @AppStorage("lyrics.hideSidebar") private var hideSidebarForLyrics = true
+    /// The search field only has focus after a click or ⌘L; otherwise its ring shows at launch and over full screen.
+    @FocusState private var searchFocused: Bool
 
     var body: some View {
         @Bindable var model = model
@@ -20,6 +24,7 @@ struct RootView: View {
                     .background(PP.page.ignoresSafeArea())
             }
             .searchable(text: $model.searchText, placement: .sidebar, prompt: "Search")
+            .searchFocused($searchFocused)
             if model.fullScreen {
                 FullScreenPlayer()
                     .transition(.opacity.combined(with: .scale(scale: 1.02)))
@@ -38,6 +43,23 @@ struct RootView: View {
             Debug.windowAppeared()
         }
         .onChange(of: model.settingsRequest) { openSettings() }
+        .onChange(of: model.fullScreen) { if model.fullScreen { searchFocused = false } }
+        .onChange(of: model.fullPlayer) {
+            let hide = model.fullPlayer && hideSidebarForLyrics
+            withAnimation(Motion.panel) { columns = hide ? .detailOnly : .all }
+        }
+        .onChange(of: hideSidebarForLyrics) {
+            guard model.fullPlayer else { return }
+            withAnimation(Motion.panel) { columns = hideSidebarForLyrics ? .detailOnly : .all }
+        }
+        .onChange(of: model.searchRequest) { searchFocused = true }
+        .task {
+            // The window gives the first field focus when it opens; take it back.
+            for delay in [0.1, 0.5, 1.0] {
+                try? await Task.sleep(for: .seconds(delay))
+                if model.searchText.isEmpty { searchFocused = false }
+            }
+        }
     }
 
     /// The content with the floating player over it, and the queue as a column on the right. A column of our
@@ -224,11 +246,60 @@ struct Sidebar: View {
             }
         }
         .scrollContentBackground(.hidden)
+        // Never the keyboard focus: a focused list draws its selection in bright blue, an unfocused one in a calm grey,
+        // as Spotify does. Clicks still select and double clicks still play.
+        .focusable(false)
         .background(PP.sidebar.ignoresSafeArea())
         .navigationSplitViewColumnWidth(min: 260, ideal: 280, max: 420)
         // A filter change moves rows under a still pointer, and macOS sends no hover end for them.
         .onChange(of: model.filter) { SidebarHoverState.shared.route = nil }
+        // A quick move out of the sidebar can skip the last row's hover end; leaving the sidebar clears it for sure.
+        .onHover { inside in if !inside { SidebarHoverState.shared.route = nil } }
         .toolbar(removing: .sidebarToggle)
+        // Back and forward beside the traffic lights, as in a browser and in Spotify.
+        .overlay(alignment: .topLeading) {
+            HistoryButtons()
+                .padding(.leading, 82)
+                .padding(.top, 5)
+                .ignoresSafeArea(.container, edges: .top)
+        }
+    }
+}
+
+/// Back and forward through the pages, small and plain like the traffic lights beside them, grey when there is nowhere to go.
+struct HistoryButtons: View {
+    @Environment(PlayerModel.self) private var model
+
+    var body: some View {
+        HStack(spacing: 2) {
+            HistoryButton(symbol: "chevron.left", label: "Back", enabled: model.canGoBack) { model.goBack() }
+            HistoryButton(symbol: "chevron.right", label: "Forward", enabled: model.canGoForward) { model.goForward() }
+        }
+    }
+}
+
+private struct HistoryButton: View {
+    let symbol: String
+    let label: String
+    let enabled: Bool
+    let action: () -> Void
+    @LocalState private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(enabled ? (hovering ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary)) : AnyShapeStyle(.quaternary))
+                .frame(width: 28, height: 28)
+                .background(Circle().fill(Color.primary.opacity(hovering && enabled ? 0.08 : 0)))
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
+        .onHover { hovering = $0 }
+        .animation(Motion.fade, value: hovering)
+        .animation(Motion.fade, value: enabled)
+        .help(label)
     }
 }
 
@@ -249,22 +320,22 @@ struct LibraryRow: View {
         HStack(spacing: 10) {
             ArtworkView(art: item.art, radius: 4).frame(width: 40, height: 40)
                 .overlay {
-                    // Hovering shows play on the cover, as in Spotify, instead of a zoom.
-                    if hovering {
-                        ZStack {
-                            Color.black.opacity(0.4)
-                            Image(systemName: "play.fill").font(.system(size: 15, weight: .bold)).foregroundStyle(.white)
-                        }
-                        .clipShape(item.kind == .artists ? AnyShape(Circle()) : AnyShape(RoundedRectangle(cornerRadius: 4, style: .continuous)))
-                        .transition(.opacity)
+                    // Hovering shows play on the cover, as in Spotify, instead of a zoom. Always there and shown at once,
+                    // like the grey box behind the row, so the two always change together, also under a quick pointer.
+                    ZStack {
+                        Color.black.opacity(0.4)
+                        Image(systemName: "play.fill").font(.system(size: 15, weight: .bold)).foregroundStyle(.white)
                     }
+                    .clipShape(item.kind == .artists ? AnyShape(Circle()) : AnyShape(RoundedRectangle(cornerRadius: 4, style: .continuous)))
+                    .opacity(hovering ? 1 : 0)
+                    .animation(nil, value: hovering)
                 }
             VStack(alignment: .leading, spacing: 1) {
                 Text(item.title).foregroundStyle(playing ? AnyShapeStyle(.tint) : AnyShapeStyle(.primary))
                 HStack(spacing: 4) {
                     // A pinned item carries a small green pin, as in Spotify.
                     if Library.shared.isPinned(item.route) {
-                        Image(systemName: "pin.fill").font(.caption2).foregroundStyle(Color.green).rotationEffect(.degrees(45))
+                        Image(systemName: "pin.fill").font(.caption2).foregroundStyle(PP.primary).rotationEffect(.degrees(45))
                     }
                     Text(item.subtitle)
                 }
@@ -283,7 +354,6 @@ struct LibraryRow: View {
         .simultaneousGesture(TapGesture(count: 2).onEnded { model.play(Library.shared.songs(for: item.route)) })
         .onHover { inside in SidebarHoverState.shared.set(item.route, inside) }
         .onAppear { if Debug.hovered(item.title) { SidebarHoverState.shared.route = item.route } }
-        .animation(Motion.fade, value: hovering)
         .contextMenu {
             Button("Play", systemImage: "play.fill") { model.play(Library.shared.songs(for: item.route)) }
             Button("Shuffle", systemImage: "shuffle") { model.play(Library.shared.songs(for: item.route), shuffled: true) }
@@ -320,8 +390,8 @@ struct NavRow: View {
         HStack(spacing: 10) {
             Image(systemName: symbol)
                 .font(.system(size: 17, weight: .semibold))
-                // White in dark mode, as in Spotify; the accent in light.
-                .foregroundStyle(PP.adaptive(0x0058CA, 0xFFFFFF))
+                // White in dark mode, as in Spotify; near black in light.
+                .foregroundStyle(PP.adaptive(0x1A1B21, 0xFFFFFF))
                 .frame(width: 40, height: 40)
                 .background(RoundedRectangle(cornerRadius: 4, style: .continuous).fill(Color.primary.opacity(0.07)))
             Text(title).fontWeight(.medium)
@@ -332,7 +402,6 @@ struct NavRow: View {
         .listRowBackground(SidebarHover(on: hovering && !selected))
         .contentShape(Rectangle())
         .onHover { inside in SidebarHoverState.shared.set(route, inside) }
-        .animation(Motion.fade, value: hovering)
     }
 }
 
@@ -341,11 +410,12 @@ struct SidebarHover: View {
     let on: Bool
 
     var body: some View {
+        // At once, as in Spotify: a fade here ran behind the play button on the cover, which is drawn apart from it.
         RoundedRectangle(cornerRadius: 10, style: .continuous)
             .fill(Color.primary.opacity(on ? 0.07 : 0))
             .padding(.horizontal, 10)
             .padding(.vertical, 1)
-            .animation(Motion.fade, value: on)
+            .animation(nil, value: on)
     }
 }
 

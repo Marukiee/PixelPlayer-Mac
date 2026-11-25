@@ -15,6 +15,20 @@ Alles wat Mark vroeg, met wat klaar is en wat nog moet. Bijgewerkt bij elke rond
 - **Spotify.** Grijs in de welkom en in Instellingen tot het er is.
 - **Nederlandse vertaling** (zie ROADMAP).
 
+## In 0.2.7 (nog niet uitgebracht, eerst door Mark bekeken)
+
+- Accent Spotify-groen in plaats van blauw: play-knoppen massief groen met zwart teken, schuifjes, vinkjes.
+- Mixes for You: klik op de hoes opent de mix als pagina; de groene knop op de hoes speelt en wordt pauze zolang die mix speelt. Zo ook op albums, artiesten, tegels op Home en de grote play-knop.
+- Terug en vooruit zoals in een browser, naast de verkeerslichtjes; ook met ⌘[ en ⌘] en de zijknoppen van de muis.
+- Artiestpagina: banner loopt over in de kleur van de hoes en daarna zwart, Liked Songs van die artiest, Discography met jaartallen, Appears On en meer uit hetzelfde genre.
+- Voortgangsbalk zoals Spotify: dun, groen bij hover met de tijd erboven en grijs tot waar je klikt, bolletje alleen bij slepen. Klik op de rechtertijd wisselt tussen resterend en totaal.
+- Songteksten: zijbalk gaat vanzelf weg (instelling in Algemeen, standaard aan), kolom in het midden.
+- Volledig scherm: plusje of vinkje (groter, op hoogte van de artiest), songteksten aan en uit, alleen de hoes als een nummer geen tekst heeft, geen blauw zoekveldkader eroverheen; Esc sluit.
+- Speler en menubalk: plusje of vinkje in plaats van hartje; Add to playlist opent zonder vertraging.
+- Zijbalk: selectie grijs in plaats van blauw, hover en play-knop lopen gelijk, geen blijvende hover meer.
+- Sonos: balk springt niet meer terug bij pauze of vooruit bij doorspelen; kleine correcties van de speaker glijden in. De leidende kamer kun je uitvinken, de andere kamer neemt het over.
+- Zoekveld pakt geen focus meer bij het openen; ⌘L zet de cursor erin.
+
 ## In 0.2.6
 
 - De app gebruikte soms de halve processor (het menubalk-item liet de hele app steeds opnieuw opbouwen); nu rustig.

@@ -266,6 +266,64 @@ public actor SonosController {
     /// Every room of the group plays on its own again.
     public func ungroup(groupID: String) async { await setGroupMembers(groupID: groupID, memberUUIDs: []) }
 
+    /// Takes the room that leads the group out of it, as the Sonos app does: another room of the group takes over the
+    /// music with its queue and place, and the session follows it. Speakers that cannot hand over get the local queue
+    /// again on the rooms that are left.
+    public func removeCoordinator(groupID: String) async {
+        guard let group = groups.first(where: { $0.id == groupID }), group.members.count > 1 else { return }
+        let old = group.coordinator
+        let rest = group.members.filter { $0.uuid != old.uuid }
+        guard let heir = rest.sorted(by: { $0.name < $1.name }).first else { return }
+        let wasActive = active?.group.coordinatorUUID == old.uuid
+        // All in one turn of the lock, so no poll reads the old leader in between and takes it for a takeover.
+        let handed = await withLock { () -> Bool in
+            do {
+                try await soap.call(old.host, .avTransport, "DelegateGroupCoordinationTo",
+                                    [("InstanceID", "0"), ("NewCoordinator", heir.uuid), ("RejoinGroup", "0")])
+            } catch {
+                return false
+            }
+            for _ in 0..<8 {
+                try? await sleep(SonosTiming.groupSettle)
+                guard let fresh = try? await discovery.readGroups(host: heir.host),
+                      let updated = fresh.first(where: { $0.coordinatorUUID == heir.uuid }) else { continue }
+                groups = fresh
+                if let s = active, s.group.coordinatorUUID == old.uuid {
+                    s.group = updated
+                    session?.group = updated
+                    s.speakerOffset.reset()
+                    s.lastTrackCommandAt = now()
+                }
+                return true
+            }
+            return true
+        }
+        if handed {
+            if let s = active { await refreshVolumes(s) }
+            return
+        }
+        // No handover on these speakers: the old leader goes on its own and the rooms left play the local queue.
+        await withLock {
+            do { try await makeStandalone(old) } catch { report(error) }
+        }
+        try? await sleep(SonosTiming.groupSettle)
+        guard let fresh = try? await discovery.readGroups(host: heir.host) else { return }
+        groups = fresh
+        guard var target = fresh.first(where: { $0.members.contains { $0.uuid == heir.uuid } }) else { return }
+        let missing = rest.filter { speaker in !target.members.contains { $0.uuid == speaker.uuid } }
+        if !missing.isEmpty {
+            await withLock {
+                do { for speaker in missing { try await join(speaker, to: target.coordinatorUUID) } } catch { report(error) }
+            }
+            try? await sleep(SonosTiming.groupSettle)
+            if let again = try? await discovery.readGroups(host: heir.host) {
+                groups = again
+                if let regrouped = again.first(where: { $0.coordinatorUUID == target.coordinatorUUID }) { target = regrouped }
+            }
+        }
+        if wasActive { await connect(groupID: target.id) }
+    }
+
     /// Adds the rooms of `groupID` to the group that is playing now.
     public func addToActiveGroup(groupID: String) async {
         guard let s = active,

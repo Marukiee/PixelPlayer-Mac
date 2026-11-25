@@ -5,13 +5,13 @@ import AppKit
 /// The property wrapper underneath is still there, so this alias builds with the Command Line Tools.
 typealias LocalState<Value> = SwiftUI.State<Value>
 
-/// The Blue palette of PixelPlayer on Android, measured from its screenshots (light), with the
-/// dark tones taken from the same tonal ladder. Every colour is a role, never a raw hex in a view.
+/// The palette: Spotify's green as the accent (Mark's pick), with black on it as in Spotify, and the soft
+/// tones of PixelPlayer on Android for the rest. Every colour is a role, never a raw hex in a view.
 enum PP {
-    static let primary = adaptive(0x0058CA, 0xB0C6FF)
-    static let onPrimary = adaptive(0xFFFFFF, 0x002B6B)
-    static let primaryContainer = adaptive(0xD9E2FF, 0x173A80)
-    static let onPrimaryContainer = adaptive(0x00429B, 0xDCE4FF)
+    static let primary = adaptive(0x1DB954, 0x1ED760)
+    static let onPrimary = adaptive(0x000000, 0x000000)
+    static let primaryContainer = adaptive(0xD2F5DE, 0x1B4A2C)
+    static let onPrimaryContainer = adaptive(0x0B5A28, 0xC4F3D4)
     static let secondary = adaptive(0x485D92, 0xB1C5FF)
     static let secondaryContainer = adaptive(0xE8DDFF, 0x3D3560)
     static let onSecondaryContainer = adaptive(0x4A3D78, 0xE8DDFF)

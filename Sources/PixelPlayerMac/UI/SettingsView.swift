@@ -22,6 +22,7 @@ private struct GeneralPane: View {
     @LocalState private var launchAtLogin = SMAppService.mainApp.status == .enabled
     private var menuBar: Binding<Bool> { Binding(get: { MenuBarSetting.shared.show }, set: { MenuBarSetting.shared.set($0) }) }
     @LocalState private var updater = Updater.shared
+    @AppStorage("lyrics.hideSidebar") private var hideSidebarForLyrics = true
 
     var body: some View {
         Form {
@@ -34,6 +35,7 @@ private struct GeneralPane: View {
                     // Only the installed app opens at login, not a development build.
                     .disabled(Updater.isDevelopmentBuild)
                 Toggle("Player in the menu bar", isOn: menuBar)
+                Toggle("Hide the sidebar while lyrics show", isOn: $hideSidebarForLyrics)
                 LabeledContent("Welcome") {
                     Button("Show Again") {
                         PlayerModel.shared.onboardingStep = 0
@@ -55,7 +57,7 @@ private struct GeneralPane: View {
             }
         }
         .formStyle(.grouped)
-        .frame(height: 300)
+        .frame(height: 330)
     }
 
     private var updaterStatus: String {
@@ -220,7 +222,7 @@ private struct PlaybackPane: View {
 
 private struct AppearancePane: View {
     @AppStorage("appearance.mode") private var theme = "System"
-    @LocalState private var accent = "Blue"
+    @LocalState private var accent = "Green"
     @LocalState private var fromCover = false
 
     var body: some View {
@@ -234,7 +236,7 @@ private struct AppearancePane: View {
             }
             Section {
                 Picker("Accent colour", selection: $accent) {
-                    ForEach(["Blue", "Purple", "Pink", "Green"], id: \.self) { Text($0) }
+                    ForEach(["Green", "Blue", "Purple", "Pink"], id: \.self) { Text($0) }
                 }
                 Toggle("Colour from the cover in Now Playing", isOn: $fromCover)
             } footer: {

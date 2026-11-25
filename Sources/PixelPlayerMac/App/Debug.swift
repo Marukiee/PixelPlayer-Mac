@@ -100,6 +100,15 @@ enum Debug {
         case "playsong":
             // `playsong:<title>` starts that song with the whole library after it.
             if let song = Library.shared.songs.first(where: { $0.title == value }) { model.play(song, in: Library.shared.songs) }
+        case "playmix":
+            // `playmix:<id>` presses the green button of that mix, as on its cover.
+            if let mix = Library.shared.mixes.first(where: { $0.id == value }) {
+                model.togglePlay(from: mix.title) { Library.shared.songs(for: mix) }
+            }
+        case "back":
+            model.goBack()
+        case "forward":
+            model.goForward()
         case "like", "unlike":
             if let song = Library.shared.songs.first(where: { $0.title == value }) { model.setLiked(song, parts[0] == "like") }
         case "seek":
@@ -241,6 +250,15 @@ enum Debug {
         case "windows":
             let lines = NSApp.windows.map { "\(String(describing: type(of: $0))) visible=\($0.isVisible) id=\($0.windowNumber) frame=\($0.frame) level=\($0.level.rawValue) identifier=\($0.identifier?.rawValue ?? "-") minimized=\($0.isMiniaturized)" }
             try? lines.joined(separator: "\n").write(to: file("windows.txt"), atomically: true, encoding: .utf8)
+        case "responder":
+            // Which view has keyboard focus, for checks of stray focus rings.
+            let line = "\(value)\t\(mainWindow()?.firstResponder.map { String(describing: type(of: $0)) } ?? "-")\tkey=\(mainWindow()?.isKeyWindow ?? false)\n"
+            let url = file("responder.txt")
+            if let handle = try? FileHandle(forWritingTo: url) {
+                handle.seekToEndOfFile(); handle.write(Data(line.utf8)); try? handle.close()
+            } else {
+                try? line.write(to: url, atomically: true, encoding: .utf8)
+            }
         case "quit":
             try? await Task.sleep(for: .seconds(0.5))
             NSApp.terminate(nil)

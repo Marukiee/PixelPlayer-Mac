@@ -11,6 +11,8 @@ enum Route: Hashable {
     case playlist(String), album(String), artist(String)
     /// All songs of one genre, from Browse.
     case genre(String)
+    /// One of the Mixes for you, by id.
+    case mix(String)
     /// Everything on one shelf, from its Show all: `mixes`, `recent`, `more-album:<id>`, `more-artist:<name>`, `albums:<search>`.
     case shelf(String)
 
@@ -25,6 +27,7 @@ enum Route: Hashable {
         case .album(let id): "album:\(id)"
         case .artist(let name): "artist:\(name)"
         case .genre(let name): "genre:\(name)"
+        case .mix(let id): "mix:\(id)"
         case .shelf(let key): "shelf:\(key)"
         }
     }
@@ -42,6 +45,7 @@ enum Route: Hashable {
         case "album": guard let id else { return nil }; self = .album(id)
         case "artist": guard let id else { return nil }; self = .artist(id)
         case "genre": guard let id else { return nil }; self = .genre(id)
+        case "mix": guard let id else { return nil }; self = .mix(id)
         case "shelf": guard id != nil else { return nil }; self = .shelf(parts.dropFirst().joined(separator: ":"))
         default: return nil
         }
@@ -72,7 +76,45 @@ enum SettingsTab: String, CaseIterable, Identifiable, Hashable {
 final class PlayerModel {
     static let shared = PlayerModel()
 
-    var route: Route = .home
+    var route: Route = .home {
+        didSet {
+            // Every move to another page goes on the back list, as in a browser; a new page clears forward.
+            guard route != oldValue, !walkingHistory else { return }
+            backStack.append(oldValue)
+            if backStack.count > 100 { backStack.removeFirst() }
+            forwardStack.removeAll()
+        }
+    }
+    /// The pages before and after this one, for the back and forward buttons.
+    private(set) var backStack: [Route] = []
+    private(set) var forwardStack: [Route] = []
+    @ObservationIgnored private var walkingHistory = false
+
+    var canGoBack: Bool { !backStack.isEmpty || !searchText.isEmpty || fullPlayer }
+    var canGoForward: Bool { !forwardStack.isEmpty }
+
+    /// Back as in a browser: first out of search results or the lyrics, then to the page before.
+    func goBack() {
+        if fullPlayer { setFullPlayer(false); return }
+        if !searchText.isEmpty { searchText = ""; return }
+        guard let previous = backStack.popLast() else { return }
+        forwardStack.append(route)
+        walk(to: previous)
+    }
+
+    func goForward() {
+        guard let next = forwardStack.popLast() else { return }
+        backStack.append(route)
+        walk(to: next)
+    }
+
+    private func walk(to page: Route) {
+        walkingHistory = true
+        searchText = ""
+        fullPlayer = false
+        route = page
+        walkingHistory = false
+    }
     var filter: LibraryFilter = .all
     var current: Song = Library.shared.isSample ? Sample.nowPlaying : (Library.shared.songs.first ?? Song.nothing)
     var isPlaying = Library.shared.isSample
@@ -114,6 +156,8 @@ final class PlayerModel {
     var settingsTab: SettingsTab = .general
     /// Raised to open the Settings window from a script.
     var settingsRequest = 0
+    /// Bumped by ⌘L: the search field takes focus.
+    var searchRequest = 0
 
     /// Devices: where the music plays, and the group around it. Only the sample music has made-up rooms in it.
     var group: Set<String> = Library.shared.isSample ? ["living", "kitchen"] : []
@@ -157,8 +201,11 @@ final class PlayerModel {
 
     /// The full screen player, and the window in macOS full screen with it (not during scripted captures).
     func setFullScreen(_ on: Bool) {
+        let window = NSApp.windows.first(where: { $0.isVisible && $0.frame.width > 800 })
+        // A focused search field would draw its ring over the full screen player.
+        window?.makeFirstResponder(nil)
         withAnimation(Motion.morph) { fullScreen = on }
-        guard !Debug.active, let window = NSApp.windows.first(where: { $0.isVisible && $0.frame.width > 800 }) else { return }
+        guard !Debug.active, let window else { return }
         if window.styleMask.contains(.fullScreen) != on { window.toggleFullScreen(nil) }
     }
 
@@ -232,10 +279,23 @@ final class PlayerModel {
         return ""
     }
 
+    /// Whether the music comes from this list: it was started from a list with this name and the song that plays is in it.
+    func isPlaying(from title: String, songs: () -> [Song]) -> Bool {
+        guard !title.isEmpty, playingFrom == title, !current.id.isEmpty else { return false }
+        return songs().contains { $0.id == current.id }
+    }
+
+    /// A list's play button: pauses or resumes when the music comes from that list, otherwise plays it from the top.
+    func togglePlay(from title: String, songs: () -> [Song]) {
+        if isPlaying(from: title, songs: songs) { setPlaying(!isPlaying) } else { play(songs(), from: title) }
+    }
+
     /// Plays a whole list from the top, or in a shuffled order.
-    func play(_ songs: [Song], shuffled: Bool = false) {
+    /// `from` names the list for its play button and "Next from" in the queue, when the songs alone do not tell.
+    func play(_ songs: [Song], shuffled: Bool = false, from title: String? = nil) {
         let list = shuffled ? songs.shuffled() : songs
         if let first = list.first { play(first, in: list) }
+        if let title, !list.isEmpty { playingFrom = title }
     }
 
     /// The order each list of songs is shown in, once it was changed from the sort menu.

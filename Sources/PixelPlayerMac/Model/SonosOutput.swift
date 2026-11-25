@@ -25,7 +25,11 @@ final class SonosOutput {
     @ObservationIgnored private var controller: SonosController?
     @ObservationIgnored private var discovery: SonosDiscovery?
     @ObservationIgnored private var applying = false
-    @ObservationIgnored private var anchor: (ms: Int, at: Date) = (0, .now)
+    /// The place in the song at a moment, and whether the clock ran from there. The clock keeps its own running flag:
+    /// the player's play state can change a moment before the anchor is moved, and must not change the time already counted.
+    @ObservationIgnored private var anchor: (ms: Int, at: Date, running: Bool) = (0, .now, false)
+    /// A small correction from the speaker still to be eased in, so the bar and the lyrics glide instead of jump.
+    @ObservationIgnored private var slewMs = 0
     @ObservationIgnored private var clock: Timer?
     @ObservationIgnored private var tracks: [String: SonosTrackInput] = [:]
     @ObservationIgnored private var tracksClient: SubsonicClient?
@@ -86,10 +90,8 @@ final class SonosOutput {
     }
 
     /// The room that leads the playing group cannot leave it while other rooms play along.
-    func isLocked(_ room: Room) -> Bool {
-        guard !sample, let group = session?.group else { return false }
-        return group.coordinatorUUID == room.id && group.members.count > 1
-    }
+    /// No room is locked: the room that leads can be unticked too, and another room of the group takes over.
+    func isLocked(_ room: Room) -> Bool { false }
 
     var groupName: String? {
         if sample { return nil }
@@ -120,7 +122,8 @@ final class SonosOutput {
             if on {
                 others.insert(room.id)
             } else if room.id == group.coordinatorUUID {
-                if group.members.count == 1 { backToMac() }
+                // The last room goes back to the Mac; a leading room hands the music to another room of the group.
+                if group.members.count == 1 { backToMac() } else { Task { await controller.removeCoordinator(groupID: group.id) } }
                 return
             } else {
                 others.remove(room.id)
@@ -139,7 +142,7 @@ final class SonosOutput {
         model.isPlaying = wasPlaying
         note = nil
         connecting = true
-        anchor = (Int(model.position * 1000), .now)
+        setAnchor(Int(model.position * 1000), running: model.isPlaying)
         Playback.shared.handOff()
         startClock()
         let withoutServer = ([model.current] + model.userQueue + model.upNext).prefix(50).filter { $0.source.serverID == nil }.count
@@ -266,20 +269,21 @@ final class SonosOutput {
     func userChangedTrack() {
         SonosLog.write("user picked \(model.current.title) server=\(model.current.source.serverID ?? "none") rate=\(model.current.source.sampleRate.map(String.init) ?? "?")")
         model.isPlaying = true
-        anchor = (0, .now)
+        setAnchor(0, running: true)
         guard let controller else { return }
         Task { await controller.localItemChanged(automatic: false) }
     }
 
     func setPlaying(_ playing: Bool) {
-        anchor = (currentMs, .now)
+        // The time so far is counted with the clock as it was, before it stops or starts.
+        setAnchor(currentMs, running: playing)
         model.isPlaying = playing
         guard let controller else { return }
         Task { await controller.localPlayStateChanged(playing: playing) }
     }
 
     func seek(toMs ms: Int) {
-        anchor = (ms, .now)
+        setAnchor(ms, running: model.isPlaying)
         guard let controller else { return }
         Task { await controller.localSeeked(toMs: ms) }
     }
@@ -297,8 +301,13 @@ final class SonosOutput {
 
     private var currentMs: Int {
         var ms = anchor.ms
-        if model.isPlaying { ms += Int(Date.now.timeIntervalSince(anchor.at) * 1000) }
+        if anchor.running { ms += max(0, Int(Date.now.timeIntervalSince(anchor.at) * 1000)) }
         return min(ms, max(model.current.seconds * 1000, 0))
+    }
+
+    private func setAnchor(_ ms: Int, running: Bool) {
+        anchor = (ms, .now, running)
+        slewMs = 0
     }
 
     private func startClock() {
@@ -308,6 +317,13 @@ final class SonosOutput {
             MainActor.assumeIsolated {
                 let output = SonosOutput.shared
                 guard output.controlsPlayback else { return }
+                // A correction is eased in at most 50 ms per tick: the clock runs a little faster or slower for a moment,
+                // and never backwards.
+                if output.slewMs != 0, output.anchor.running {
+                    let step = max(-50, min(50, output.slewMs))
+                    output.anchor.ms += step
+                    output.slewMs -= step
+                }
                 output.model.position = Double(output.currentMs) / 1000
             }
         }
@@ -358,13 +374,23 @@ final class SonosOutput {
 
     fileprivate func applyPlaying(_ playing: Bool) {
         SonosLog.write("speaker says play=\(playing)")
-        anchor = (currentMs, .now)
+        setAnchor(currentMs, running: playing)
         model.isPlaying = playing
     }
 
     fileprivate func applySeek(_ ms: Int) {
-        anchor = (ms, .now)
+        setAnchor(ms, running: model.isPlaying)
         model.position = Double(ms) / 1000
+    }
+
+    /// The speaker's time, from the controller keeping the clock in step: a small difference is eased in, a large one jumps.
+    fileprivate func applySync(_ ms: Int) {
+        let delta = ms - currentMs
+        if anchor.running && abs(delta) <= 1500 {
+            slewMs = delta
+        } else {
+            applySeek(ms)
+        }
     }
 
     fileprivate func applyMove(to id: String, positionMs: Int) {
@@ -407,7 +433,7 @@ final class SonosOutput {
 final class SonosBridge: SonosLocalPlayer, @unchecked Sendable {
     func sonosSnapshot() async -> SonosLocalSnapshot? { await MainActor.run { SonosOutput.shared.snapshot() } }
     func sonosSetPlaying(_ playing: Bool) async { await MainActor.run { SonosOutput.shared.applyPlaying(playing) } }
-    func sonosSeek(toMs positionMs: Int) async { await MainActor.run { SonosOutput.shared.applySeek(positionMs) } }
+    func sonosSeek(toMs positionMs: Int) async { await MainActor.run { SonosOutput.shared.applySync(positionMs) } }
     func sonosMove(toItemID id: String, positionMs: Int) async { await MainActor.run { SonosOutput.shared.applyMove(to: id, positionMs: positionMs) } }
     func sonosSkipToNext() async -> Bool { await MainActor.run { SonosOutput.shared.applyNext() } }
     func sonosSkipToPrevious() async -> Bool { await MainActor.run { SonosOutput.shared.applyPrevious() } }

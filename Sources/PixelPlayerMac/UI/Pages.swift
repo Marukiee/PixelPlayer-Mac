@@ -59,6 +59,14 @@ struct RouteContent: View {
                 TrackListPage(header: TrackHeader(kind: "Genre", title: name, meta: Library.summary(songs),
                                                   art: .collage(Array(Set(songs.map(\.album))).prefix(4).map { $0 }), tint: Color(hex: album.tint)),
                               songs: songs, share: name)
+            case .mix(let id):
+                let mix = Library.shared.mixes.first { $0.id == id }
+                let songs = mix.map { Library.shared.songs(for: $0) } ?? []
+                TrackListPage(header: TrackHeader(kind: "Mix", title: mix?.title ?? "Mix",
+                                                  meta: [mix?.subtitle ?? "", Library.summary(songs)].filter { !$0.isEmpty }.joined(separator: " · "),
+                                                  art: .collage((mix?.covers ?? []) + (mix?.covers.reversed() ?? [])),
+                                                  tint: Color(hex: mix?.covers.first?.tint ?? 0x23408F)),
+                              songs: songs, share: mix?.title)
             case .shelf(let key):
                 ShelfPage(key: key)
             }
@@ -120,7 +128,7 @@ struct MixHero: View {
                 Text(Library.shared.yourMixSummary).foregroundStyle(.white.opacity(0.8)).lineLimit(1)
                 Spacer(minLength: 8)
                 HStack(spacing: 18) {
-                    PlayCircle { PlayerModel.shared.play(Library.shared.yourMix) }
+                    PlayCircle(title: "Your Mix", songs: { Library.shared.yourMix })
                     PlainIconButton(symbol: "shuffle", label: "Shuffle", onColour: true) { PlayerModel.shared.play(Library.shared.yourMix, shuffled: true) }
                     RoundMenu(songs: Library.shared.yourMix, share: "Your Mix: \(Library.shared.yourMixSummary)", onColour: true)
                 }
@@ -134,10 +142,46 @@ struct MixHero: View {
     }
 }
 
-/// The big round play button: the system's prominent glass button.
+/// The big round play button, in Spotify's green. With a list name it turns into pause while that list plays.
 struct PlayCircle: View {
+    var title: String = ""
+    var songs: (() -> [Song])? = nil
     var action: () -> Void = {}
-    var body: some View { RoundButton(symbol: "play.fill", label: "Play", prominent: true, action: action) }
+    @Environment(PlayerModel.self) private var model
+
+    var body: some View {
+        let active = songs.map { model.isPlaying(from: title, songs: $0) } ?? false
+        GreenPlayButton(size: 56, playing: active && model.isPlaying, label: title.isEmpty ? "Play" : title) {
+            if let songs { model.togglePlay(from: title, songs: songs) } else { action() }
+        }
+    }
+}
+
+/// Spotify's play button: a solid green round with a black play or pause, a little larger under the pointer.
+struct GreenPlayButton: View {
+    let size: CGFloat
+    var playing = false
+    var label = "Play"
+    let action: () -> Void
+    @LocalState private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: playing ? "pause.fill" : "play.fill")
+                .font(.system(size: size * 0.36, weight: .bold))
+                .foregroundStyle(PP.onPrimary)
+                .contentTransition(.symbolEffect(.replace))
+                .frame(width: size, height: size)
+                .background(Circle().fill(PP.primary))
+                .shadow(color: .black.opacity(0.25), radius: 6, y: 3)
+                .contentShape(Circle())
+        }
+        .buttonStyle(PressStyle())
+        .scaleEffect(hovering ? 1.05 : 1)
+        .onHover { hovering = $0 }
+        .animation(Motion.fade, value: hovering)
+        .help(playing ? "Pause \(label)" : "Play \(label)")
+    }
 }
 
 /// Round glass buttons that stand together are one size (56): play in the accent, shuffle and more neutral,
@@ -248,16 +292,13 @@ struct QuickTile: View {
         }
         // The play button lies over the end of the tile, so the title has the whole width when it is not shown.
         .overlay(alignment: .trailing) {
-            Button { model.play(Library.shared.songs(for: item.route)) } label: {
-                Image(systemName: "play.fill").font(.system(size: 13, weight: .bold)).foregroundStyle(PP.onPrimary)
-                    .frame(width: 34, height: 34)
-                    .contentShape(Circle())
+            let active = model.isPlaying(from: item.title) { Library.shared.songs(for: item.route) }
+            GreenPlayButton(size: 36, playing: active && model.isPlaying, label: item.title) {
+                model.togglePlay(from: item.title) { Library.shared.songs(for: item.route) }
             }
-            .buttonStyle(.plain)
-            .glassEffect(.regular.tint(PP.primary).interactive(), in: Circle())
-            .help("Play \(item.title)")
-            .padding(.trailing, 11)
-            .opacity(hovering ? 1 : 0)
+            .padding(.trailing, 10)
+            .opacity(hovering || active ? 1 : 0)
+            .allowsHitTesting(hovering || active)
         }
         .frame(minWidth: 0, maxWidth: .infinity)
         .frame(height: 56)
@@ -319,19 +360,28 @@ struct CoverCell: View {
     let title: String
     let subtitle: String
     var round = false
+    /// The songs the play button plays; no button without them.
+    var songs: (() -> [Song])? = nil
+    @Environment(PlayerModel.self) private var model
     @LocalState private var hovering = false
 
     var body: some View {
+        // While this plays, the button stays on the cover as a pause button, as in Spotify.
+        let active = songs.map { model.isPlaying(from: title, songs: $0) } ?? false
+        let showButton = hovering || active
         VStack(alignment: round ? .center : .leading, spacing: 8) {
             ArtworkView(art: art, radius: 6)
                 .shadow(color: .black.opacity(0.12), radius: 8, y: 4)
                 .overlay(alignment: .bottomTrailing) {
-                    Image(systemName: "play.fill").font(.system(size: 16, weight: .bold)).foregroundStyle(PP.onPrimary)
-                        .frame(width: 44, height: 44)
-                        .glassEffect(.regular.tint(PP.primary).interactive(), in: Circle())
+                    if let songs {
+                        GreenPlayButton(size: 46, playing: active && model.isPlaying, label: title) {
+                            model.togglePlay(from: title, songs: songs)
+                        }
                         .padding(10)
-                        .opacity(hovering ? 1 : 0)
-                        .offset(y: hovering ? 0 : 8)
+                        .opacity(showButton ? 1 : 0)
+                        .offset(y: showButton ? 0 : 8)
+                        .allowsHitTesting(showButton)
+                    }
                 }
             VStack(alignment: round ? .center : .leading, spacing: 2) {
                 Text(title).fontWeight(.semibold)
@@ -446,7 +496,7 @@ struct TrackListPage: View {
                 .padding(.horizontal, margin)
                 .padding(.top, margin)
                 HStack(spacing: 18) {
-                    PlayCircle { PlayerModel.shared.play(songs) }
+                    PlayCircle(title: header.title, songs: { songs })
                     PlainIconButton(symbol: "shuffle", label: "Shuffle") { PlayerModel.shared.play(songs, shuffled: true) }
                     RoundMenu(songs: songs, share: share)
                     Spacer()
@@ -575,7 +625,7 @@ struct TrackRow: View {
             ZStack {
                 if saved {
                     Button { showPlaylists = true } label: {
-                        Image(systemName: "checkmark.circle.fill").font(.system(size: 17)).foregroundStyle(Color.green)
+                        Image(systemName: "checkmark.circle.fill").font(.system(size: 17)).foregroundStyle(PP.primary)
                     }
                     .buttonStyle(PressStyle())
                     .help("Saved. Change where")
@@ -700,7 +750,7 @@ struct SearchPage: View {
                         Spacer(minLength: 0)
                         HStack {
                             Spacer()
-                            PlayCircle { PlayerModel.shared.play(Library.shared.songs(for: .album(album.id))) }
+                            PlayCircle(title: album.title, songs: { Library.shared.songs(for: .album(album.id)) })
                         }
                     }
                     .padding(20)
@@ -850,17 +900,21 @@ struct ShelfCell: View {
     var body: some View {
         Group {
             switch item {
-            case .album(let album): CoverCell(art: .album(album), title: album.title, subtitle: album.artist)
-            case .artist(let album): CoverCell(art: .artist(album), title: album.artist, subtitle: "Artist", round: true)
-            case .mix(let mix): CoverCell(art: .collage(mix.covers + mix.covers.reversed()), title: mix.title, subtitle: mix.subtitle)
+            case .album(let album):
+                CoverCell(art: .album(album), title: album.title, subtitle: album.artist) { Library.shared.songs(for: .album(album.id)) }
+            case .artist(let album):
+                CoverCell(art: .artist(album), title: album.artist, subtitle: "Artist", round: true) { Library.shared.songs(for: .artist(album.artist)) }
+            case .mix(let mix):
+                CoverCell(art: .collage(mix.covers + mix.covers.reversed()), title: mix.title, subtitle: mix.subtitle) { Library.shared.songs(for: mix) }
             }
         }
+        // A click on the cover opens it; the green button on the cover plays it.
         .onTapGesture {
             let model = PlayerModel.shared
             switch item {
             case .album(let album): model.go(.album(album.id))
             case .artist(let album): model.go(.artist(album.artist))
-            case .mix(let mix): model.play(Library.shared.songs(for: mix))
+            case .mix(let mix): model.go(.mix(mix.id))
             }
         }
     }
@@ -929,77 +983,199 @@ struct ArtistPage: View {
         return songs.map(\.album).filter { seen.insert($0.id).inserted }.sorted { $0.year > $1.year }
     }
 
+    /// Other artists in the same genre, one album each for their round picture.
+    private func similar(to genre: String) -> [Album] {
+        guard !genre.isEmpty else { return [] }
+        var seen: Set<String> = [name]
+        return Array(Library.shared.albums.filter { $0.genre == genre && seen.insert($0.artist).inserted }.prefix(12))
+    }
+
+    @LocalState private var width: CGFloat = 900
+    private let bannerHeight: CGFloat = 360
+
     var body: some View {
         let songs = songs
         let albums = albums
-        let cover = albums.first ?? Library.shared.album(at: 0)
+        let own = albums.filter { $0.artist == name }
+        let appearsOn = albums.filter { $0.artist != name }
+        let cover = own.first ?? albums.first ?? Library.shared.album(at: 0)
+        let liked = songs.filter { model.likedIDs.contains($0.id) }
+        let similar = similar(to: cover.genre)
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 banner(cover: cover, songs: songs, albums: albums)
                 HStack(spacing: 18) {
-                    PlayCircle { model.play(popular) }
+                    PlayCircle(title: name, songs: { popular })
                     PlainIconButton(symbol: "shuffle", label: "Shuffle") { model.play(songs, shuffled: true) }
                     RoundMenu(songs: songs, share: name)
                 }
                 .padding(.horizontal, margin)
-                .padding(.vertical, 22)
-                VStack(alignment: .leading, spacing: 36) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Popular").font(.title2.weight(.bold))
-                        VStack(spacing: 0) {
-                            let shown = Array(popular.prefix(showMore ? 10 : 5))
-                            ForEach(Array(shown.enumerated()), id: \.element.id) { index, song in
-                                TrackRow(index: index + 1, song: song, context: popular, showAlbum: false, showAdded: false)
-                                    .transition(.opacity)
-                            }
-                        }
-                        if songs.count > 5 {
-                            Button(showMore ? "Show less" : "Show more") { withAnimation(Motion.panel) { showMore.toggle() } }
-                                .buttonStyle(.plain)
-                                .font(.callout.weight(.semibold))
-                                .foregroundStyle(.secondary)
-                                .padding(.top, 6)
-                                .padding(.leading, 12)
+                .padding(.top, 24)
+                .padding(.bottom, 20)
+                VStack(alignment: .leading, spacing: 44) {
+                    // Popular, and beside it on a wide window the songs you liked by this artist, as in Spotify.
+                    HStack(alignment: .top, spacing: 36) {
+                        popularList(songs: songs)
+                        if !liked.isEmpty && width >= 1000 {
+                            likedCard(liked, cover: cover).frame(width: 300)
                         }
                     }
-                    if !albums.isEmpty {
-                        Shelf(title: "Albums") {
-                            FittingRow(items: albums, minWidth: 160) { album in ShelfCell(item: .album(album)) }
+                    if !liked.isEmpty && width < 1000 {
+                        likedCard(liked, cover: cover).frame(maxWidth: 420, alignment: .leading)
+                    }
+                    if !own.isEmpty {
+                        discography(own)
+                    }
+                    if !appearsOn.isEmpty {
+                        Shelf(title: "Appears On") {
+                            FittingRow(items: appearsOn, minWidth: 160) { album in ShelfCell(item: .album(album)) }
+                        }
+                    }
+                    if !similar.isEmpty {
+                        Shelf(title: "More \(cover.genre)") {
+                            FittingRow(items: similar, minWidth: 150) { album in ShelfCell(item: .artist(album)) }
                         }
                     }
                 }
                 .padding(.horizontal, margin)
-                .padding(.bottom, 100)
+                .padding(.bottom, 110)
+            }
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
+            // The artist's colour behind the top of the page: the cover far blurred, running on from the banner and
+            // fading into the page, so the page is not one flat grey under a picture.
+            .background(alignment: .top) {
+                // Darker than the banner and gone soon below it: a glow of colour, then the plain page.
+                CoverArt(album: cover, radius: 0)
+                    .scaledToFill()
+                    .frame(height: bannerHeight + 240)
+                    .frame(maxWidth: .infinity)
+                    .clipped()
+                    .blur(radius: 70, opaque: true)
+                    .overlay(PP.page.opacity(0.62))
+                    .mask(LinearGradient(stops: [.init(color: .black, location: 0),
+                                                 .init(color: .black, location: bannerHeight / (bannerHeight + 240)),
+                                                 .init(color: .clear, location: 1)],
+                                         startPoint: .top, endPoint: .bottom))
+                    .allowsHitTesting(false)
             }
         }
+        .background(PP.page)
         .ignoresSafeArea(.container, edges: .top)
     }
 
-    /// The cover across the whole width, darkened towards the bottom so the name reads on it.
+    private func popularList(songs: [Song]) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Popular").font(.title2.weight(.bold))
+            VStack(spacing: 0) {
+                let shown = Array(popular.prefix(showMore ? 10 : 5))
+                ForEach(Array(shown.enumerated()), id: \.element.id) { index, song in
+                    TrackRow(index: index + 1, song: song, context: popular, showAlbum: false, showAdded: false)
+                        .transition(.opacity)
+                }
+            }
+            if songs.count > 5 {
+                Button(showMore ? "Show less" : "Show more") { withAnimation(Motion.panel) { showMore.toggle() } }
+                    .buttonStyle(.plain)
+                    .font(.callout.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 6)
+                    .padding(.leading, 12)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// "Liked songs": the artist's picture with a green heart, and how many of their songs you saved. Plays them.
+    private func likedCard(_ liked: [Song], cover: Album) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Liked Songs").font(.title2.weight(.bold))
+            Button { model.play(liked, from: "Liked Songs by \(name)") } label: {
+                HStack(spacing: 14) {
+                    ArtworkView(art: .artist(cover), radius: 0)
+                        .frame(width: 64, height: 64)
+                        .clipShape(Circle())
+                        .overlay(alignment: .bottomTrailing) {
+                            Image(systemName: "heart.fill")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundStyle(.white)
+                                .frame(width: 22, height: 22)
+                                .background(Circle().fill(PP.primary))
+                                .overlay(Circle().stroke(PP.page, lineWidth: 2))
+                        }
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(liked.count == 1 ? "You\u{2019}ve liked 1 song" : "You\u{2019}ve liked \(liked.count) songs")
+                            .fontWeight(.semibold)
+                        Text("By \(name)").font(.callout).foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 0)
+                }
+                .padding(12)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .hoverHighlight(radius: 10)
+            .help("Play the songs you liked by \(name)")
+        }
+    }
+
+    /// Every album of the artist, newest first, with its year, as many rows as it takes (two at most, then Show all).
+    private func discography(_ own: [Album]) -> some View {
+        let columns = max(1, Int((width - margin * 2 + 20) / (170 + 20)))
+        let shown = Array(own.prefix(columns * 2))
+        return VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Discography").font(.title2.weight(.bold))
+                Spacer()
+                if own.count > shown.count {
+                    Button("Show all") { model.go(.shelf("more-artist:\(name)")) }.buttonStyle(.link)
+                }
+            }
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 20, alignment: .top), count: columns), alignment: .leading, spacing: 24) {
+                ForEach(shown) { album in
+                    CoverCell(art: .album(album), title: album.title,
+                              subtitle: [album.year > 0 ? String(album.year) : "", "Album"].filter { !$0.isEmpty }.joined(separator: " · ")) {
+                        Library.shared.songs(for: .album(album.id))
+                    }
+                    .onTapGesture { model.go(.album(album.id)) }
+                }
+            }
+        }
+    }
+
+    /// The cover across the whole width, fading at the bottom into the blurred colour behind the page, with the name on it.
     private func banner(cover: Album, songs: [Song], albums: [Album]) -> some View {
-        ZStack(alignment: .bottomLeading) {
+        let plays = songs.reduce(0) { $0 + $1.playCount }
+        return ZStack(alignment: .bottomLeading) {
             GeometryReader { geo in
                 CoverArt(album: cover, radius: 0)
                     .scaledToFill()
                     .frame(width: geo.size.width, height: geo.size.height)
                     .clipped()
+                    .mask(LinearGradient(stops: [.init(color: .black, location: 0), .init(color: .black, location: 0.55),
+                                                 .init(color: .clear, location: 1)], startPoint: .top, endPoint: .bottom))
             }
-            LinearGradient(colors: [.black.opacity(0.05), .black.opacity(0.65)], startPoint: .top, endPoint: .bottom)
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Artist")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white.opacity(0.9))
+                    .shadow(color: .black.opacity(0.4), radius: 8)
                 Text(name)
-                    .font(.system(size: 76, weight: .heavy))
+                    .font(.system(size: 84, weight: .black))
                     .foregroundStyle(.white)
                     .lineLimit(1)
                     .minimumScaleFactor(0.4)
-                Text([songCount(songs.count), albums.count == 1 ? "1 album" : "\(albums.count) albums", cover.genre]
+                    .shadow(color: .black.opacity(0.35), radius: 16, y: 4)
+                Text([songCount(songs.count), albums.count == 1 ? "1 album" : "\(albums.count) albums",
+                      plays > 0 ? (plays == 1 ? "1 play" : "\(plays.formatted()) plays") : "", cover.genre]
                         .filter { !$0.isEmpty }.joined(separator: " · "))
                     .font(.title3.weight(.medium))
-                    .foregroundStyle(.white.opacity(0.85))
+                    .foregroundStyle(.white.opacity(0.9))
+                    .shadow(color: .black.opacity(0.4), radius: 8)
             }
             .padding(.horizontal, margin)
-            .padding(.bottom, 24)
+            .padding(.bottom, 20)
         }
-        .frame(height: 340)
+        .frame(height: bannerHeight)
         .clipped()
     }
 }
@@ -1020,8 +1196,14 @@ struct AddToPlaylistView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Add to playlist").font(.headline)
-            TextField("Find a playlist", text: $search)
-                .textFieldStyle(.roundedBorder)
+            // A plain field on a soft fill: no blue focus ring, and not focused before you click it.
+            HStack(spacing: 6) {
+                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                TextField("Find a playlist", text: $search).textFieldStyle(.plain)
+            }
+            .padding(.horizontal, 10).frame(height: 30)
+            .background(Color.primary.opacity(0.07), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .focusEffectDisabled()
             if naming {
                 HStack {
                     TextField("Playlist name", text: $newName).textFieldStyle(.roundedBorder)
@@ -1036,7 +1218,7 @@ struct AddToPlaylistView: View {
             }
             Divider()
             ScrollView {
-                VStack(alignment: .leading, spacing: 2) {
+                LazyVStack(alignment: .leading, spacing: 2) {
                     Text("Saved in").font(.subheadline.weight(.semibold)).foregroundStyle(.secondary).padding(.top, 2)
                     row(title: "Liked Songs", subtitle: songCount(model.likedIDs.count), art: .liked,
                         on: model.likedIDs.contains(song.id), busy: false) { model.setLiked(song, !model.likedIDs.contains(song.id)) }
@@ -1060,10 +1242,11 @@ struct AddToPlaylistView: View {
                     }
                 }
             }
-            .frame(maxHeight: 300)
+            .frame(height: 300)
         }
         .padding(16)
-        .frame(width: 320)
+        // A fixed size, so the popover opens at once instead of measuring every playlist first.
+        .frame(width: 320, height: 470)
     }
 
     private var noServerNote: String { "This song is only on this Mac, so it can't go into a Navidrome playlist." }
@@ -1090,7 +1273,7 @@ struct AddToPlaylistView: View {
                 } else {
                     Image(systemName: on ? "checkmark.circle.fill" : "circle")
                         .font(.system(size: 18))
-                        .foregroundStyle(on ? AnyShapeStyle(Color.green) : AnyShapeStyle(.secondary))
+                        .foregroundStyle(on ? AnyShapeStyle(PP.primary) : AnyShapeStyle(.secondary))
                 }
             }
             .padding(.vertical, 4).padding(.horizontal, 6)

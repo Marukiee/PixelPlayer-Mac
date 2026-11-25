@@ -482,6 +482,7 @@ final class Library {
         case .album(let id): return songs.filter { $0.album.id == id }.sorted { ($0.track ?? 0) < ($1.track ?? 0) }
         case .artist(let name): return TrackOrder.album.sorted(songs.filter { $0.artist == name || $0.album.artist == name }, fields: \.orderFields)
         case .genre(let name): return TrackOrder.artist.sorted(songs.filter { $0.album.genre == name }, fields: \.orderFields)
+        case .mix(let id): return mixes.first { $0.id == id }.map { songs(for: $0) } ?? []
         case .home, .search, .shelf: return []
         }
     }

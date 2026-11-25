@@ -1,5 +1,41 @@
 [
   {
+    "version": "0.2.7",
+    "date": "2026-11-25",
+    "en": {
+      "title": "Spotify green and a back button",
+      "new": [
+        "Spotify green throughout",
+        "Back and forward like a browser",
+        "Mixes open, green button plays",
+        "Artist pages look richer",
+        "Time shows over the progress bar",
+        "Hide sidebar while lyrics show"
+      ],
+      "fixed": [
+        "Bar no longer jumps on pause",
+        "Untick the leading Sonos room",
+        "Player shows plus or check"
+      ]
+    },
+    "nl": {
+      "title": "Spotify-groen en een terugknop",
+      "new": [
+        "Overal Spotify-groen",
+        "Terug en vooruit zoals een browser",
+        "Mixes openen, groene knop speelt",
+        "Rijkere artiestpagina",
+        "Tijd boven de voortgangsbalk",
+        "Zijbalk weg bij songteksten"
+      ],
+      "fixed": [
+        "Balk springt niet meer bij pauze",
+        "Leidende Sonos-kamer uitvinkbaar",
+        "Speler toont plusje of vinkje"
+      ]
+    }
+  },
+  {
     "version": "0.2.6",
     "date": "2026-11-25",
     "en": {

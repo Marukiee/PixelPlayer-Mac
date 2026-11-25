@@ -63,6 +63,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             return nil
         }
+        // The back and forward buttons on the side of a mouse.
+        NSEvent.addLocalMonitorForEvents(matching: .otherMouseDown) { event in
+            guard event.buttonNumber == 3 || event.buttonNumber == 4 else { return event }
+            MainActor.assumeIsolated {
+                if event.buttonNumber == 3 { PlayerModel.shared.goBack() } else { PlayerModel.shared.goForward() }
+            }
+            return nil
+        }
         // macOS starts a fresh window with a narrow sidebar, whatever its minimum says; give it its intended width once.
         for delay in [0.2, 0.8] {
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) { Self.widenSidebar() }
@@ -82,6 +90,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return nil
         }
         for window in NSApp.windows where window.isVisible && window.frame.width > 800 {
+            // Nothing focused at the start, so the search field does not open with a blue ring around it.
+            window.makeFirstResponder(nil)
             guard let split = split(in: window.contentView), let sidebar = split.arrangedSubviews.first,
                   sidebar.frame.width < 260 else { continue }
             split.setPosition(280, ofDividerAt: 0)
@@ -132,12 +142,22 @@ struct PlaybackCommands: Commands {
             Button("Like or Unlike") { if !model.current.id.isEmpty { model.liked.toggle() } }
                 .keyboardShortcut("b", modifiers: [.option, .shift])
             Divider()
-            Button("Search") { model.go(.search) }
+            Button("Search") { model.go(.search); model.searchRequest += 1 }
                 .keyboardShortcut("l", modifiers: .command)
             Button("Queue") { withAnimation(Motion.panel) { model.showQueue.toggle() } }
                 .keyboardShortcut("q", modifiers: [.option, .shift])
             Button("Lyrics") { model.setFullPlayer(!model.fullPlayer) }
                 .keyboardShortcut("l", modifiers: [.option, .shift])
+        }
+        // Back and forward through the pages, with Spotify's shortcuts on the Mac.
+        CommandMenu("Go") {
+            Button("Back") { model.goBack() }
+                .keyboardShortcut("[", modifiers: .command)
+            Button("Forward") { model.goForward() }
+                .keyboardShortcut("]", modifiers: .command)
+            Divider()
+            Button("Home") { model.go(.home) }
+                .keyboardShortcut("h", modifiers: [.command, .shift])
         }
     }
 }
