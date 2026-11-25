@@ -24,6 +24,10 @@ struct Song: Identifiable, Hashable {
     let seconds: Int
     var artist: String { album.artist }
     var duration: String { String(format: "%d:%02d", seconds / 60, seconds % 60) }
+    /// When it was added, as the library shows it.
+    var added: String {
+        ["today", "yesterday", "3 days ago", "5 days ago", "1 week ago", "2 weeks ago", "3 weeks ago", "12 Oct 2026", "28 Sep 2026"][id % 9]
+    }
 }
 
 struct Playlist: Identifiable, Hashable {
@@ -100,31 +104,31 @@ enum Sample {
                                 "Copper Moon", "Harbour Lights", "Pixel Rain", "Quiet Corner"].map(song)
 
     static let playlists: [Playlist] = [
-        Playlist(id: 1, title: "Avondrit", songs: ["Night Signal", "Afterglow Drive", "Coastline 1987", "Glasshouse", "Low Sun", "Harbour Lights"].map(song)),
-        Playlist(id: 2, title: "Zondagochtend", songs: ["Wildflower Morning", "Bicycle Summer", "Quiet Corner", "Home by Autumn", "Soft Landing"].map(song)),
+        Playlist(id: 1, title: "Night Drive", songs: ["Night Signal", "Afterglow Drive", "Coastline 1987", "Glasshouse", "Low Sun", "Harbour Lights"].map(song)),
+        Playlist(id: 2, title: "Sunday Morning", songs: ["Wildflower Morning", "Bicycle Summer", "Quiet Corner", "Home by Autumn", "Soft Landing"].map(song)),
         Playlist(id: 3, title: "Focus", songs: ["Northern Lines", "Snowfield", "Smoke and Velvet", "Mirror Steps", "Orbit"].map(song)),
-        Playlist(id: 4, title: "Keukendans", songs: ["Golden Static", "Copper Moon", "Slow Burn", "Lemonade Sky", "Pixel Rain"].map(song)),
-        Playlist(id: 5, title: "Regenachtig", songs: ["Blue Hour", "Tidal Hours", "River Stones", "Late Train to Lisbon"].map(song)),
+        Playlist(id: 4, title: "Kitchen Dance", songs: ["Golden Static", "Copper Moon", "Slow Burn", "Lemonade Sky", "Pixel Rain"].map(song)),
+        Playlist(id: 5, title: "Rainy Days", songs: ["Blue Hour", "Tidal Hours", "River Stones", "Late Train to Lisbon"].map(song)),
     ]
 
     static let mixes: [Mix] = [
-        Mix(id: 1, title: "Daily Mix", subtitle: "Op basis van je luistergedrag", symbol: "sparkles", tone: .lilac, covers: [album(2), album(3), album(4)]),
-        Mix(id: 2, title: "Synthwave", subtitle: "Genre-mix", symbol: "pianokeys", tone: .pink, covers: [album(1), album(6)]),
-        Mix(id: 3, title: "Jazz", subtitle: "Genre-mix", symbol: "music.quarternote.3", tone: .blue, covers: [album(2), album(9)]),
-        Mix(id: 4, title: "Folk", subtitle: "Genre-mix", symbol: "guitars.fill", tone: .green, covers: [album(4), album(7)]),
-        Mix(id: 5, title: "Indie Pop", subtitle: "Genre-mix", symbol: "music.mic", tone: .amber, covers: [album(3), album(5)]),
-        Mix(id: 6, title: "Herontdekken", subtitle: "Lang niet gehoord", symbol: "clock.arrow.circlepath", tone: .teal, covers: [album(8), album(7), album(9)]),
+        Mix(id: 1, title: "Daily Mix", subtitle: "Based on your listening", symbol: "sparkles", tone: .lilac, covers: [album(2), album(3), album(4)]),
+        Mix(id: 2, title: "Synthwave", subtitle: "Genre mix", symbol: "pianokeys", tone: .pink, covers: [album(1), album(6)]),
+        Mix(id: 3, title: "Jazz", subtitle: "Genre mix", symbol: "music.quarternote.3", tone: .blue, covers: [album(2), album(9)]),
+        Mix(id: 4, title: "Folk", subtitle: "Genre mix", symbol: "guitars.fill", tone: .green, covers: [album(4), album(7)]),
+        Mix(id: 5, title: "Indie Pop", subtitle: "Genre mix", symbol: "music.mic", tone: .amber, covers: [album(3), album(5)]),
+        Mix(id: 6, title: "Rediscover", subtitle: "Not heard in a while", symbol: "clock.arrow.circlepath", tone: .teal, covers: [album(8), album(7), album(9)]),
     ]
 
     /// Minutes listened per day this week, Monday first.
     static let week: [Int] = [52, 38, 71, 44, 96, 108, 0]
 
-    static let thisMac = Device(id: "mac", name: "Deze Mac", kind: .mac)
+    static let thisMac = Device(id: "mac", name: "This Mac", kind: .mac)
     static let rooms: [Device] = [
-        Device(id: "living", name: "Woonkamer", kind: .sonos),
-        Device(id: "kitchen", name: "Keuken", kind: .sonos),
-        Device(id: "bedroom", name: "Slaapkamer", kind: .sonos),
-        Device(id: "study", name: "Werkkamer", kind: .sonos),
+        Device(id: "living", name: "Living Room", kind: .sonos),
+        Device(id: "kitchen", name: "Kitchen", kind: .sonos),
+        Device(id: "bedroom", name: "Bedroom", kind: .sonos),
+        Device(id: "study", name: "Study", kind: .sonos),
     ]
     static let phones: [Device] = [
         Device(id: "pixel", name: "Pixel 9", kind: .phone),

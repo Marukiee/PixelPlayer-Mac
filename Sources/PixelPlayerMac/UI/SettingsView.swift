@@ -7,10 +7,10 @@ struct SettingsView: View {
     var body: some View {
         @Bindable var model = model
         TabView(selection: $model.settingsTab) {
-            Tab("Algemeen", systemImage: "gearshape", value: SettingsTab.general) { GeneralPane() }
-            Tab("Bronnen", systemImage: "music.note.house", value: SettingsTab.sources) { SourcesPane() }
-            Tab("Afspelen", systemImage: "play.circle", value: SettingsTab.playback) { PlaybackPane() }
-            Tab("Uiterlijk", systemImage: "paintpalette", value: SettingsTab.appearance) { AppearancePane() }
+            Tab("General", systemImage: "gearshape", value: SettingsTab.general) { GeneralPane() }
+            Tab("Sources", systemImage: "music.note.house", value: SettingsTab.sources) { SourcesPane() }
+            Tab("Playback", systemImage: "play.circle", value: SettingsTab.playback) { PlaybackPane() }
+            Tab("Appearance", systemImage: "paintpalette", value: SettingsTab.appearance) { AppearancePane() }
         }
         .frame(width: 520)
     }
@@ -24,53 +24,53 @@ private struct GeneralPane: View {
     var body: some View {
         Form {
             Section {
-                Toggle("Openen bij inloggen", isOn: $launchAtLogin)
-                Toggle("Speler in de menubalk", isOn: $menuBar)
+                Toggle("Open at login", isOn: $launchAtLogin)
+                Toggle("Player in the menu bar", isOn: $menuBar)
             }
             Section("Updates") {
-                Toggle("Automatisch bijwerken", isOn: $autoUpdate)
-                LabeledContent("Versie", value: "0.1, ontwerpproef")
+                Toggle("Update automatically", isOn: $autoUpdate)
+                LabeledContent("Version", value: "0.1, design prototype")
             }
         }
         .formStyle(.grouped)
-        .frame(height: 300)
+        .frame(height: 262)
     }
 }
 
 private struct SourcesPane: View {
     @LocalState private var watch = true
-    @LocalState private var server = "http://muziek.local:4533"
-    @LocalState private var user = "luisteraar"
+    @LocalState private var server = "http://music.local:4533"
+    @LocalState private var user = "listener"
     @LocalState private var password = "geheim"
     @LocalState private var sonos = true
 
     var body: some View {
         Form {
-            Section("Muziek op deze Mac") {
-                LabeledContent("Map") {
+            Section("Music on this Mac") {
+                LabeledContent("Folder") {
                     HStack {
-                        Text("~/Muziek").foregroundStyle(.secondary)
-                        Button("Kies…") {}
+                        Text("~/Music").foregroundStyle(.secondary)
+                        Button("Choose…") {}
                     }
                 }
-                Toggle("Nieuwe nummers vanzelf toevoegen", isOn: $watch)
+                Toggle("Add new songs automatically", isOn: $watch)
             }
             Section {
                 TextField("Server", text: $server)
-                TextField("Gebruiker", text: $user)
-                SecureField("Wachtwoord", text: $password)
+                TextField("User", text: $user)
+                SecureField("Password", text: $password)
             } header: {
                 Text("Navidrome")
             } footer: {
-                Text("\(Text("Navidrome › Instellingen › Gebruikers").bold()). Het wachtwoord blijft in de sleutelhanger.")
+                Text("\(Text("Navidrome › Settings › Users").bold()). The password stays in your keychain.")
                     .foregroundStyle(.secondary)
             }
             Section("Sonos") {
-                Toggle("Speakers op dit netwerk zoeken", isOn: $sonos)
-                LabeledContent("Gevonden", value: "4 ruimtes")
+                Toggle("Find speakers on this network", isOn: $sonos)
+                LabeledContent("Found", value: "4 rooms")
             }
             Section("Spotify") {
-                LabeledContent("Account") { Button("Inloggen…") {} }
+                LabeledContent("Account") { Button("Sign In…") {} }
             }
         }
         .formStyle(.grouped)
@@ -82,24 +82,24 @@ private struct PlaybackPane: View {
     @LocalState private var crossfade = true
     @LocalState private var seconds = 4.0
     @LocalState private var normalize = false
-    @LocalState private var preset = "Uit"
+    @LocalState private var preset = "Off"
 
     var body: some View {
         Form {
             Section {
                 Toggle("Crossfade", isOn: $crossfade)
-                LabeledContent("Duur") {
+                LabeledContent("Length") {
                     HStack {
                         Slider(value: $seconds, in: 1...12, step: 1).frame(width: 180)
                         Text("\(Int(seconds)) s").monospacedDigit().frame(width: 32, alignment: .trailing)
                     }
                 }
                 .disabled(!crossfade)
-                Toggle("Volume gelijk trekken", isOn: $normalize)
+                Toggle("Normalise volume", isOn: $normalize)
             }
             Section("Equalizer") {
-                Picker("Voorkeur", selection: $preset) {
-                    ForEach(["Uit", "Akoestisch", "Bas versterken", "Elektronisch", "Spraak"], id: \.self) { Text($0) }
+                Picker("Preset", selection: $preset) {
+                    ForEach(["Off", "Acoustic", "Bass Booster", "Electronic", "Spoken Word"], id: \.self) { Text($0) }
                 }
             }
         }
@@ -109,21 +109,21 @@ private struct PlaybackPane: View {
 }
 
 private struct AppearancePane: View {
-    @LocalState private var theme = "Systeem"
-    @LocalState private var accent = "Blauw"
+    @LocalState private var theme = "System"
+    @LocalState private var accent = "Blue"
     @LocalState private var fromCover = false
 
     var body: some View {
         Form {
             Section {
-                Picker("Weergave", selection: $theme) {
-                    ForEach(["Systeem", "Licht", "Donker"], id: \.self) { Text($0) }
+                Picker("Mode", selection: $theme) {
+                    ForEach(["System", "Light", "Dark"], id: \.self) { Text($0) }
                 }
                 .pickerStyle(.segmented)
-                Picker("Accentkleur", selection: $accent) {
-                    ForEach(["Blauw", "Paars", "Roze", "Groen"], id: \.self) { Text($0) }
+                Picker("Accent colour", selection: $accent) {
+                    ForEach(["Blue", "Purple", "Pink", "Green"], id: \.self) { Text($0) }
                 }
-                Toggle("Kleur uit de hoes in Speelt nu", isOn: $fromCover)
+                Toggle("Colour from the cover in Now Playing", isOn: $fromCover)
             }
         }
         .formStyle(.grouped)

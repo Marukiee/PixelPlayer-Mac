@@ -12,15 +12,9 @@ struct PixelPlayerApp: App {
                 .environment(model)
                 .tint(PP.primary)
         }
+        // No toolbar band at the top: the content runs to the edge and the traffic lights sit in the sidebar.
+        .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 1180, height: 760)
-        .commands {
-            CommandMenu("Richting") {
-                ForEach(Array(Direction.allCases.enumerated()), id: \.element) { index, direction in
-                    Button(direction.title) { model.direction = direction }
-                        .keyboardShortcut(KeyEquivalent(Character("\(index + 1)")), modifiers: .command)
-                }
-            }
-        }
         Settings {
             SettingsView()
                 .environment(model)

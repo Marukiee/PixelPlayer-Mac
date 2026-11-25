@@ -1,44 +1,41 @@
 import SwiftUI
 import Observation
 
-/// Round 2: two ways to place the player at the bottom, both with the system's own controls.
-enum Direction: String, CaseIterable, Identifiable {
-    case bar = "a", floating = "b"
-    var id: String { rawValue }
-    var title: String {
-        switch self {
-        case .bar: "A · Balk onderin"
-        case .floating: "B · Zwevende speler"
+/// Where the window is. The sidebar is the library, as in Spotify: every playlist, album and artist
+/// is a place of its own, with Home and search above them.
+enum Route: Hashable {
+    case home, search, songs, liked
+    case playlist(Int), album(Int), artist(Int)
+
+    /// From a script step such as `page:album:2`.
+    init?(script: String) {
+        let parts = script.split(separator: ":").map(String.init)
+        let id = parts.count > 1 ? Int(parts[1]) : nil
+        switch parts.first ?? "" {
+        case "home": self = .home
+        case "search": self = .search
+        case "songs": self = .songs
+        case "liked": self = .liked
+        case "playlist": guard let id else { return nil }; self = .playlist(id)
+        case "album": guard let id else { return nil }; self = .album(id)
+        case "artist": guard let id else { return nil }; self = .artist(id)
+        default: return nil
         }
     }
 }
 
-enum Page: String, CaseIterable, Identifiable, Hashable {
-    case home, songs, albums, artists, playlists, liked, search
+/// What the library in the sidebar shows.
+enum LibraryFilter: String, CaseIterable, Identifiable {
+    case all, playlists, albums, artists
     var id: String { rawValue }
     var title: String {
         switch self {
-        case .home: "Home"
-        case .songs: "Nummers"
+        case .all: "All"
+        case .playlists: "Playlists"
         case .albums: "Albums"
-        case .artists: "Artiesten"
-        case .playlists: "Afspeellijsten"
-        case .liked: "Vind ik leuk"
-        case .search: "Zoeken"
+        case .artists: "Artists"
         }
     }
-    var symbol: String {
-        switch self {
-        case .home: "house"
-        case .songs: "music.note"
-        case .albums: "square.stack"
-        case .artists: "music.microphone"
-        case .playlists: "music.note.list"
-        case .liked: "heart"
-        case .search: "magnifyingglass"
-        }
-    }
-    static let library: [Page] = [.songs, .albums, .artists, .playlists, .liked]
 }
 
 enum SettingsTab: String, CaseIterable, Identifiable, Hashable {
@@ -51,8 +48,8 @@ enum SettingsTab: String, CaseIterable, Identifiable, Hashable {
 final class PlayerModel {
     static let shared = PlayerModel()
 
-    var direction: Direction = .bar
-    var page: Page = .home
+    var route: Route = .home
+    var filter: LibraryFilter = .all
     var current: Song = Sample.nowPlaying
     var isPlaying = true
     var position: Double = 104
@@ -81,7 +78,7 @@ final class PlayerModel {
 
     var groupName: String {
         let names = Sample.rooms.filter { group.contains($0.id) }.map(\.name)
-        if names.isEmpty { return "Deze Mac" }
+        if names.isEmpty { return "This Mac" }
         return names.count == 1 ? names[0] : names.joined(separator: " + ")
     }
 

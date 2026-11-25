@@ -6,9 +6,9 @@ import AppKit
 /// never of the screen. A popover is a window of its own: it is captured too and laid over the picture
 /// of the main window at its real place.
 ///
-/// - `PP_DIRECTION=a|b`, `PP_APPEARANCE=light|dark`, `PP_WINDOW=1180x760`, `PP_SLOW=6`, `PP_FREEZE=1`
-/// - `PP_SCRIPT=dir:a,page:home,wait:1,shot:a-home,devices:1,wait:1.5,shot:a-devices,quit`
-///   Steps: dir, page, search:<text>, queue (1|0), devices (1|0), full (1|0), indiv (1|0), play (1|0),
+/// - `PP_APPEARANCE=light|dark`, `PP_WINDOW=1180x760`, `PP_SLOW=6`, `PP_FREEZE=1`
+/// - `PP_SCRIPT=page:home,wait:1,shot:a-home,devices:1,wait:1.5,shot:a-devices,quit`
+///   Steps: page (home, search, songs, liked, playlist:<id>, album:<id>, artist:<id>), filter, search:<text>, queue (1|0), devices (1|0), full (1|0), indiv (1|0), play (1|0),
 ///   appearance, wait, slow, shot:<name>, settings:<tab>, settingsshot:<name>, closesettings,
 ///   stage:<name> (menu bar panel), frames:<name>:<seconds>, quit.
 @MainActor
@@ -24,7 +24,6 @@ enum Debug {
         guard let directory else { return }
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let model = PlayerModel.shared
-        if let d = env["PP_DIRECTION"].flatMap(Direction.init(rawValue:)) { model.direction = d }
         if let slow = env["PP_SLOW"].flatMap(Double.init) { Motion.slow = slow }
         freezeClock = env["PP_FREEZE"] != nil
         setAppearance(env["PP_APPEARANCE"])
@@ -76,10 +75,14 @@ enum Debug {
         let parts = step.split(separator: ":").map(String.init)
         let value = parts.count > 1 ? parts[1] : ""
         switch parts[0] {
-        case "dir":
-            if let d = Direction(rawValue: value) { model.direction = d }
         case "page":
-            if let p = Page(rawValue: value) { model.searchText = ""; model.page = p }
+            if let route = Route(script: parts.dropFirst().joined(separator: ":")) {
+                model.searchText = ""
+                if model.fullPlayer { model.fullPlayer = false }
+                model.route = route
+            }
+        case "filter":
+            if let f = LibraryFilter(rawValue: value) { model.filter = f }
         case "search":
             model.searchText = value
         case "queue":
@@ -149,25 +152,8 @@ enum Debug {
             await capture(window.windowNumber, to: url)
             if looksActive(url) { break }
         }
-        // A popover is a window of its own, drawn over this one. Take the window's own rectangle of the screen,
-        // with the popover in it, and keep only the window's shape from the clean capture above.
-        guard let window = pick(), NSApp.windows.contains(where: { $0.isVisible && isPopover($0) }),
-              let screen = NSScreen.screens.first else { return }
-        let f = window.frame
-        let region = file("\(name)-region.png")
-        let rect = "\(Int(f.minX)),\(Int(screen.frame.maxY - f.maxY)),\(Int(f.width)),\(Int(f.height))"
-        await withCheckedContinuation { (done: CheckedContinuation<Void, Never>) in
-            DispatchQueue.global(qos: .userInitiated).async {
-                let process = Process()
-                process.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
-                process.arguments = ["-x", "-R\(rect)", region.path]
-                try? process.run()
-                process.waitUntilExit()
-                done.resume()
-            }
-        }
-        maskRegion(region, toShapeOf: url)
-        try? FileManager.default.removeItem(at: region)
+        // An open popover is a child window of this one: screencapture -l takes it along, glass and all,
+        // also where it reaches past the window's edge.
     }
 
     private static func bringToFront() {
@@ -187,21 +173,6 @@ enum Debug {
             }
         }
         return false
-    }
-
-    /// Keeps the region capture only where the window itself is: its rounded corners come from the clean capture.
-    private static func maskRegion(_ region: URL, toShapeOf url: URL) {
-        guard let regionImage = NSImage(contentsOf: region)?.cgImage(forProposedRect: nil, context: nil, hints: nil),
-              let shapeImage = NSImage(contentsOf: url)?.cgImage(forProposedRect: nil, context: nil, hints: nil),
-              let context = CGContext(data: nil, width: shapeImage.width, height: shapeImage.height, bitsPerComponent: 8, bytesPerRow: 0,
-                                      space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
-        else { return }
-        let rect = CGRect(x: 0, y: 0, width: shapeImage.width, height: shapeImage.height)
-        context.draw(regionImage, in: rect)
-        context.setBlendMode(.destinationIn)
-        context.draw(shapeImage, in: rect)
-        guard let result = context.makeImage() else { return }
-        try? NSBitmapImageRep(cgImage: result).representation(using: .png, properties: [:])?.write(to: url)
     }
 
     private static func file(_ name: String) -> URL { directory!.appendingPathComponent(name) }

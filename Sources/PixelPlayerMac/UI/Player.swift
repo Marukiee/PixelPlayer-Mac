@@ -15,7 +15,7 @@ struct NowPlayingInfo: View {
                     .frame(width: cover, height: cover)
             }
             .buttonStyle(.plain)
-            .help(model.fullPlayer ? "Speelt nu sluiten" : "Speelt nu")
+            .help(model.fullPlayer ? "Close Now Playing" : "Now Playing")
             VStack(alignment: .leading, spacing: 2) {
                 Text(model.current.title).fontWeight(.semibold)
                 Text(model.current.artist).foregroundStyle(.secondary)
@@ -32,54 +32,30 @@ struct PlayerSideButtons: View {
     var body: some View {
         @Bindable var model = model
         HStack(spacing: 16) {
+            // Lyrics at a glance: opens Now Playing, where the lyrics sit beside the cover.
+            Button { model.setFullPlayer(!model.fullPlayer) } label: {
+                Image(systemName: "quote.bubble")
+                    .foregroundStyle(model.fullPlayer ? AnyShapeStyle(.tint) : AnyShapeStyle(.primary))
+            }
+            .help("Lyrics")
             Button { model.showDevices.toggle() } label: {
-                Image(systemName: "hifispeaker.fill")
+                Image(systemName: "hifispeaker")
                     .foregroundStyle(model.group.isEmpty ? AnyShapeStyle(.primary) : AnyShapeStyle(.tint))
             }
-            .help("Verbinden · \(model.groupName)")
+            .help("Connect · \(model.groupName)")
             .popover(isPresented: $model.showDevices, arrowEdge: .top) { DevicesPopover() }
             Button { withAnimation(Motion.panel) { model.showQueue.toggle() } } label: {
                 Image(systemName: "list.bullet")
                     .foregroundStyle(model.showQueue ? AnyShapeStyle(.tint) : AnyShapeStyle(.primary))
             }
-            .help("Hierna")
+            .help("Up Next")
         }
         .font(.title3)
         .buttonStyle(.borderless)
     }
 }
 
-/// A: one bar across the whole window, under the sidebar and the content, as in most Mac players.
-struct PlayerBar: View {
-    var body: some View {
-        VStack(spacing: 0) {
-            Divider()
-            HStack(spacing: 0) {
-                HStack(spacing: 10) {
-                    NowPlayingInfo()
-                    LikeButton()
-                }
-                .frame(width: 270, alignment: .leading)
-                Spacer(minLength: 16)
-                VStack(spacing: 4) {
-                    TransportButtons()
-                    InlinePosition().frame(maxWidth: 440)
-                }
-                Spacer(minLength: 16)
-                HStack(spacing: 16) {
-                    PlayerSideButtons()
-                    VolumeSlider(width: 84)
-                }
-                .frame(width: 270, alignment: .trailing)
-            }
-            .padding(.horizontal, 16)
-            .frame(height: 76)
-        }
-        .background(.bar)
-    }
-}
-
-/// B: a glass capsule floating at the bottom of the content. The cover is round so it sits concentric
+/// The player: a glass capsule floating at the bottom of the content. The cover is round so it sits concentric
 /// in the capsule: 56 high, 8 in, so a circle of 40.
 struct FloatingPlayer: View {
     @Environment(PlayerModel.self) private var model
@@ -87,10 +63,10 @@ struct FloatingPlayer: View {
     var body: some View {
         HStack(spacing: 16) {
             NowPlayingInfo(cover: 40, round: true)
-                .frame(width: 190, alignment: .leading)
+                .frame(minWidth: 120, maxWidth: 190, alignment: .leading)
             TransportButtons(modes: false)
             InlinePosition()
-                .frame(minWidth: 140, maxWidth: 300)
+                .frame(minWidth: 90, maxWidth: 300)
             PlayerSideButtons()
         }
         .padding(.leading, 8)
@@ -134,7 +110,7 @@ struct NowPlayingView: View {
                         Text(model.current.artist).font(.title2).foregroundStyle(.secondary)
                     }
                     Divider()
-                    Text("Songtekst").font(.headline)
+                    Text("Lyrics").font(.headline)
                     VStack(alignment: .leading, spacing: 10) {
                         ForEach(lyrics.indices, id: \.self) { i in
                             Text(lyrics[i])
@@ -143,13 +119,23 @@ struct NowPlayingView: View {
                         }
                     }
                     Spacer(minLength: 0)
-                    Text("44,1 kHz · 192 kbps · MP3").font(.caption).foregroundStyle(.tertiary)
+                    Text("44.1 kHz · 192 kbps · MP3").font(.caption).foregroundStyle(.tertiary)
                 }
                 .frame(maxWidth: 400, maxHeight: cover, alignment: .topLeading)
             }
             .frame(width: geo.size.width, height: geo.size.height)
         }
         .padding(24)
+        .overlay(alignment: .topLeading) {
+            Button { model.setFullPlayer(false) } label: {
+                Image(systemName: "chevron.down").font(.system(size: 16, weight: .semibold)).foregroundStyle(.primary)
+                    .frame(width: 40, height: 40).contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .glassEffect(.regular.interactive(), in: Circle())
+            .help("Close Now Playing")
+            .padding(.leading, 28).padding(.top, 28)
+        }
         .background {
             ZStack {
                 CoverArt(album: model.current.album, radius: 0)
@@ -172,35 +158,41 @@ struct QueueInspector: View {
 
     var body: some View {
         @Bindable var model = model
-        List {
-            Section {
-                SongLine(song: model.current, playing: true, cover: 36)
-            } header: {
-                HStack(alignment: .firstTextBaseline) {
-                    Text("Hierna").font(.title3.weight(.semibold)).foregroundStyle(.primary)
-                    Text("\(model.userQueue.count + model.upNext.count) nummers").foregroundStyle(.secondary)
-                    Spacer()
-                    Menu {
-                        Button("Willekeurig", systemImage: "shuffle") {}
-                        Button("Wachtrij wissen", systemImage: "trash") {}
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
-                    }
-                    .menuStyle(.borderlessButton)
-                    .menuIndicator(.hidden)
-                    .fixedSize()
+        VStack(spacing: 0) {
+            // The title on the same line as the top of the page beside it: 28 points down, like the side margins.
+            HStack(alignment: .firstTextBaseline) {
+                Text("Up Next").font(.title3.weight(.semibold))
+                Text("\(model.userQueue.count + model.upNext.count) songs").foregroundStyle(.secondary)
+                Spacer()
+                Menu {
+                    Button("Shuffle", systemImage: "shuffle") {}
+                    Button("Clear queue", systemImage: "trash") {}
+                } label: {
+                    Image(systemName: "ellipsis.circle")
                 }
-                .padding(.bottom, 4)
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .fixedSize()
             }
-            Section("Zelf toegevoegd") {
-                ForEach(model.userQueue) { SongLine(song: $0, queued: true) }
-                    .onMove { model.userQueue.move(fromOffsets: $0, toOffset: $1) }
+            .padding(.horizontal, 20)
+            .padding(.top, 28)
+            .padding(.bottom, 4)
+            List {
+                Section("Now playing") {
+                    SongLine(song: model.current, playing: true, cover: 48).padding(.vertical, 3)
+                }
+                Section("Added by you") {
+                    ForEach(model.userQueue) { SongLine(song: $0, queued: true, cover: 40).padding(.vertical, 3) }
+                        .onMove { model.userQueue.move(fromOffsets: $0, toOffset: $1) }
+                }
+                Section("Then from your library") {
+                    ForEach(model.upNext) { SongLine(song: $0, cover: 40).padding(.vertical, 3) }
+                        .onMove { model.upNext.move(fromOffsets: $0, toOffset: $1) }
+                }
             }
-            Section("Daarna uit je bibliotheek") {
-                ForEach(model.upNext) { SongLine(song: $0) }
-                    .onMove { model.upNext.move(fromOffsets: $0, toOffset: $1) }
-            }
+            .scrollContentBackground(.hidden)
         }
+        .ignoresSafeArea(.container, edges: .top)
     }
 }
 
@@ -214,14 +206,14 @@ struct DevicesPopover: View {
     var body: some View {
         @Bindable var model = model
         Form {
-            Section("Speelt op") {
+            Section("Playing on") {
                 LabeledContent {
-                    Button("Loskoppelen") { model.group = [] }.controlSize(.small)
+                    Button("Disconnect") { model.group = [] }.controlSize(.small)
                 } label: {
                     Label {
                         VStack(alignment: .leading, spacing: 1) {
                             Text(model.groupName)
-                            Text(model.group.isEmpty ? "Luidsprekers van de Mac" : "Sonos").font(.caption).foregroundStyle(.secondary)
+                            Text(model.group.isEmpty ? "Mac speakers" : "Sonos").font(.caption).foregroundStyle(.secondary)
                         }
                     } icon: {
                         Image(systemName: model.group.count > 1 ? "hifispeaker.2.fill" : "hifispeaker.fill").foregroundStyle(.tint)
@@ -235,7 +227,7 @@ struct DevicesPopover: View {
                     Image(systemName: "speaker.wave.3.fill")
                 }
                 if model.group.count > 1 {
-                    DisclosureGroup("Individueel volume", isExpanded: $model.individualVolume) {
+                    DisclosureGroup("Individual volume", isExpanded: $model.individualVolume) {
                         ForEach(Sample.rooms.filter { model.group.contains($0.id) }) { room in
                             Slider(value: Binding(get: { model.volumes[room.id] ?? 0 }, set: { model.volumes[room.id] = $0 }), in: 0...100) {
                                 Text(room.name)
@@ -244,9 +236,9 @@ struct DevicesPopover: View {
                     }
                 }
             }
-            Section("Deze Mac") {
+            Section("This Mac") {
                 Toggle(isOn: Binding(get: { model.group.isEmpty }, set: { if $0 { model.group = [] } })) {
-                    Label("Luidsprekers van de Mac", systemImage: "laptopcomputer")
+                    Label("Mac speakers", systemImage: "laptopcomputer")
                 }
             }
             Section("Sonos") {
@@ -267,11 +259,11 @@ struct DevicesPopover: View {
                     .foregroundStyle(.secondary)
                 }
             } header: {
-                Text("Telefoons")
+                Text("Phones")
             }
         }
         .formStyle(.grouped)
         .toggleStyle(.checkbox)
-        .frame(width: 340, height: 600)
+        .frame(width: 280, height: 600)
     }
 }

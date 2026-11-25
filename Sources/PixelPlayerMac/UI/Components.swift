@@ -7,7 +7,7 @@ struct QueuedMark: View {
     var body: some View {
         Image(systemName: "text.line.first.and.arrowtriangle.forward")
             .foregroundStyle(.tint)
-            .help("Zelf toegevoegd, speelt eerst")
+            .help("Added by you, plays first")
     }
 }
 
@@ -56,7 +56,7 @@ struct PositionSlider: View {
             HStack {
                 Text(timeString(model.position))
                 Spacer()
-                if showQuality { Text("44,1 kHz · 192 kbps · MP3") }
+                if showQuality { Text("44.1 kHz · 192 kbps · MP3") }
                 Spacer()
                 Text("-" + timeString(model.duration - model.position))
             }
@@ -91,17 +91,17 @@ struct TransportButtons: View {
 
     var body: some View {
         HStack(spacing: large ? 28 : 20) {
-            if modes { toggle("shuffle", "Willekeurig", on: model.shuffle) { model.shuffle.toggle() } }
-            Button {} label: { Image(systemName: "backward.fill") }.help("Vorige")
+            if modes { toggle("shuffle", "Shuffle", on: model.shuffle) { model.shuffle.toggle() } }
+            Button {} label: { Image(systemName: "backward.fill") }.help("Previous")
             Button { withAnimation(Motion.bouncy) { model.isPlaying.toggle() } } label: {
                 Image(systemName: model.isPlaying ? "pause.fill" : "play.fill")
                     .font(.system(size: large ? 34 : 24))
                     .contentTransition(.symbolEffect(.replace))
                     .frame(width: large ? 40 : 28)
             }
-            .help(model.isPlaying ? "Pauze" : "Afspelen")
-            Button {} label: { Image(systemName: "forward.fill") }.help("Volgende")
-            if modes { toggle("repeat", "Herhalen", on: model.repeatAll) { model.repeatAll.toggle() } }
+            .help(model.isPlaying ? "Pause" : "Play")
+            Button {} label: { Image(systemName: "forward.fill") }.help("Next")
+            if modes { toggle("repeat", "Repeat", on: model.repeatAll) { model.repeatAll.toggle() } }
         }
         .font(large ? .title2 : .title3)
         .buttonStyle(.borderless)
@@ -128,7 +128,7 @@ struct LikeButton: View {
                 .contentTransition(.symbolEffect(.replace))
         }
         .buttonStyle(.borderless)
-        .help(model.liked ? "Niet meer leuk" : "Vind ik leuk")
+        .help(model.liked ? "Remove from Liked Songs" : "Liked Songs")
     }
 }
 

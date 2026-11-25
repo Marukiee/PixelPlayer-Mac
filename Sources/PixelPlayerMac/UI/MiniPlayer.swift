@@ -25,10 +25,10 @@ struct MenuBarPanel: View {
             }
             Divider()
             HStack(spacing: 8) {
-                Image(systemName: model.group.count > 1 ? "hifispeaker.2.fill" : "hifispeaker.fill").foregroundStyle(.tint)
+                Image(systemName: "hifispeaker").foregroundStyle(.tint)
                 Text(model.groupName).lineLimit(1)
                 Spacer()
-                Menu("Wijzig") {
+                Menu("Change") {
                     ForEach(Sample.rooms) { room in
                         Toggle(room.name, isOn: Binding(get: { model.group.contains(room.id) },
                                                         set: { on in if on { model.group.insert(room.id) } else { model.group.remove(room.id) } }))
@@ -41,18 +41,18 @@ struct MenuBarPanel: View {
             Divider()
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
-                    Text("Hierna").font(.headline)
+                    Text("Up Next").font(.headline)
                     Spacer()
-                    Text("\(model.userQueue.count + model.upNext.count) nummers").font(.caption).foregroundStyle(.secondary)
+                    Text("\(model.userQueue.count + model.upNext.count) songs").font(.caption).foregroundStyle(.secondary)
                 }
                 ForEach(model.userQueue.prefix(2)) { SongLine(song: $0, queued: true, cover: 28) }
                 SongLine(song: model.upNext[0], cover: 28)
             }
             Divider()
             HStack {
-                Button("PixelPlayer openen") {}
+                Button("Open PixelPlayer") {}
                 Spacer()
-                SettingsLink { Image(systemName: "gearshape") }.help("Instellingen")
+                SettingsLink { Image(systemName: "gearshape") }.help("Settings")
             }
             .buttonStyle(.borderless)
         }
@@ -76,7 +76,7 @@ struct MenuBarStage: View {
                     .frame(width: 26, height: 20).background(RoundedRectangle(cornerRadius: 5).fill(.primary.opacity(0.15)))
                 Image(systemName: "wifi").font(.system(size: 12, weight: .semibold))
                 Image(systemName: "battery.100").font(.system(size: 13, weight: .semibold))
-                Text("di 24 nov  21:41").font(.system(size: 13, weight: .medium))
+                Text("Tue 24 Nov  21:41").font(.system(size: 13, weight: .medium))
             }
             .padding(.horizontal, 14).frame(height: 28)
             .background(.ultraThinMaterial)
