@@ -18,8 +18,8 @@ struct NowPlayingInfo: View {
             .hoverLift(scale: 1.06)
             .help(model.fullPlayer ? "Close lyrics" : "Lyrics")
             VStack(alignment: .leading, spacing: 2) {
-                Text(model.current.title).fontWeight(.semibold)
-                Text(model.current.artist).foregroundStyle(.secondary)
+                LinkText(model.current.title) { model.go(.album(model.current.album.id)) }.fontWeight(.semibold)
+                LinkText(model.current.artist) { model.go(.artist(model.current.artist)) }.foregroundStyle(.secondary)
             }
             .lineLimit(1)
         }
@@ -320,7 +320,7 @@ struct QueueRow: View {
             CoverArt(album: song.album, radius: 4).frame(width: 44, height: 44)
             VStack(alignment: .leading, spacing: 2) {
                 Text(song.title).foregroundStyle(playing ? AnyShapeStyle(.tint) : AnyShapeStyle(.primary))
-                Text(song.artist).font(.callout).foregroundStyle(.secondary)
+                LinkText(song.artist) { PlayerModel.shared.go(.artist(song.artist)) }.font(.callout).foregroundStyle(.secondary)
             }
             .lineLimit(1)
             Spacer(minLength: 4)

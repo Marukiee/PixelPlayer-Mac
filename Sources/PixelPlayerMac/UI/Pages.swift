@@ -445,13 +445,13 @@ struct TrackRow: View {
                 if showCover { CoverArt(album: song.album, radius: 4).frame(width: 40, height: 40) }
                 VStack(alignment: .leading, spacing: 2) {
                     Text(song.title).foregroundStyle(playing ? AnyShapeStyle(.tint) : AnyShapeStyle(.primary))
-                    Text(song.artist).font(.callout).foregroundStyle(.secondary)
+                    LinkText(song.artist) { model.go(.artist(song.artist)) }.font(.callout).foregroundStyle(.secondary)
                 }
                 .lineLimit(1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             if showAlbum {
-                Text(song.album.title).foregroundStyle(.secondary).lineLimit(1)
+                LinkText(song.album.title) { model.go(.album(song.album.id)) }.foregroundStyle(.secondary).lineLimit(1)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             if showAdded {

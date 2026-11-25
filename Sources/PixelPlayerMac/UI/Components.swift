@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 // Round 2: everything here is a thin wrapper around the system's own controls.
 
@@ -146,5 +147,27 @@ struct VolumeSlider: View {
             Image(systemName: "speaker.wave.3.fill").font(.caption).foregroundStyle(.secondary)
         }
         .help("Volume")
+    }
+}
+
+/// Text that leads somewhere, like a link on the web: underlined and a pointing hand under the pointer.
+struct LinkText: View {
+    let text: String
+    let action: () -> Void
+    @LocalState private var hovering = false
+
+    init(_ text: String, action: @escaping () -> Void) {
+        self.text = text
+        self.action = action
+    }
+
+    var body: some View {
+        Text(text)
+            .underline(hovering)
+            .onHover { inside in
+                hovering = inside && !Debug.active
+                if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+            }
+            .onTapGesture(perform: action)
     }
 }

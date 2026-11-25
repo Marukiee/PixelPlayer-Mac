@@ -1,4 +1,5 @@
 import SwiftUI
+import PixelPlayerKit
 
 /// Album art drawn in code, so the prototype needs no images. Drawn on a 1000 by 1000 grid
 /// that is scaled to whatever size the cover gets.
@@ -199,7 +200,15 @@ actor CoverCache {
         if let image = memory[key] { return image }
         let file = folder.appendingPathComponent(key.replacingOccurrences(of: "/", with: "_") + ".img")
         if let image = NSImage(contentsOf: file) { memory[key] = image; return image }
-        if let local = album.localCover, let image = NSImage(contentsOf: local) { memory[key] = image; return image }
+        // A local album uses the cover inside its music file, unless the server has one.
+        if album.coverArtID == nil, let local = album.localCover {
+            if let data = await LocalScanner.artwork(of: local.path), let image = NSImage(data: data) {
+                try? data.write(to: file)
+                memory[key] = image
+                return image
+            }
+            return nil
+        }
         guard let url = await MainActor.run(body: { Library.shared.coverURL(for: album) }),
               let (data, _) = try? await URLSession.shared.data(from: url), let image = NSImage(data: data) else { return nil }
         try? data.write(to: file)
