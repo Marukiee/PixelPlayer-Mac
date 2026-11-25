@@ -145,7 +145,11 @@ final class PlayerModel {
     }
 
     /// Plays a song, with the list it was picked from as what follows it.
+    /// The list the music plays from, for "Next from …" in the queue; empty when it is not one of the library's lists.
+    var playingFrom = ""
+
     func play(_ song: Song, in context: [Song] = []) {
+        if !context.isEmpty { playingFrom = Self.source(of: context) }
         if Library.shared.isSample {
             current = song
             position = 0
@@ -153,6 +157,16 @@ final class PlayerModel {
         } else {
             Playback.shared.play(song, in: context)
         }
+    }
+
+    /// Which list of the library a set of songs is, in any order (sorted or shuffled).
+    static func source(of context: [Song]) -> String {
+        let ids = Set(context.map(\.id))
+        let library = Library.shared
+        if Set(library.yourMix.map(\.id)) == ids { return "Your Mix" }
+        for item in LibraryItem.all where Set(library.songs(for: item.route).map(\.id)) == ids { return item.title }
+        for mix in library.mixes where Set(library.songs(for: mix).map(\.id)) == ids { return mix.title }
+        return ""
     }
 
     /// Plays a whole list from the top, or in a shuffled order.
@@ -172,7 +186,7 @@ final class PlayerModel {
             if let first = songs.first { play(first, in: songs) }
             return
         }
-        withAnimation(Motion.bouncy) { isPlaying = playing }
+        withAnimation(.easeOut(duration: 0.12)) { isPlaying = playing }
         Playback.shared.setPlaying(playing)
     }
 

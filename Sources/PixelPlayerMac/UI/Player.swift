@@ -23,6 +23,10 @@ struct NowPlayingInfo: View {
             }
             .lineLimit(1)
         }
+        // Another song slides in from the side and the old one fades, instead of everything changing at once.
+        .id(model.current.id)
+        .transition(.asymmetric(insertion: .move(edge: .trailing).combined(with: .opacity), removal: .opacity))
+        .animation(Motion.panel, value: model.current.id)
         .contextMenu { SongMenu(song: model.current) }
     }
 }
@@ -106,6 +110,8 @@ struct FloatingPlayer: View {
         .frame(height: 56)
         .glassEffect(.regular, in: .capsule)
         .fixedSize(horizontal: true, vertical: false)
+        // A longer or shorter title makes the capsule grow or shrink smoothly, never in a jump.
+        .animation(Motion.panel, value: PlayerModel.shared.current.id)
     }
 }
 
@@ -233,23 +239,48 @@ struct FullScreenPlayer: View {
 // MARK: Queue
 
 /// What plays next, as a column on the right: a title with a close button, then roomy rows without lines.
+/// The queue, as a column beside the page in the colour of the sidebar. Up Next shows the song that plays, the songs you
+/// added and the rest of the list it came from; History the songs played before. Rows can be played, removed and dragged
+/// into another order, and every change moves the rows around instead of jumping.
 struct QueueInspector: View {
     @Environment(PlayerModel.self) private var model
+    @LocalState private var tab: Tab = .upNext
+
+    enum Tab: String, CaseIterable, Identifiable {
+        case upNext = "Up Next", history = "History"
+        var id: String { rawValue }
+    }
 
     var body: some View {
-        @Bindable var model = model
-        VStack(spacing: 0) {
-            // The title on the same line as the top of the page beside it: 28 points down, like the side margins.
-            HStack(alignment: .center, spacing: 6) {
-                Text("Up Next").font(.title2.weight(.bold))
+        VStack(alignment: .leading, spacing: 0) {
+            header
+            Group {
+                switch tab {
+                case .upNext: upNext
+                case .history: history
+                }
+            }
+            .transition(.opacity)
+        }
+        .background(PP.panel.ignoresSafeArea())
+        .ignoresSafeArea(.container, edges: .top)
+        .animation(Motion.fade, value: tab)
+    }
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 4) {
+                Text("Queue").font(.title2.weight(.bold))
                 Spacer()
                 Menu {
-                    Button("Shuffle", systemImage: "shuffle") { model.upNext.shuffle() }
+                    Button("Shuffle Up Next", systemImage: "shuffle") { withAnimation(Motion.panel) { model.upNext.shuffle() } }
                         .disabled(model.upNext.count < 2)
-                    Button("Clear queue", systemImage: "trash") { model.userQueue = []; model.upNext = [] }
-                        .disabled(model.userQueue.isEmpty && model.upNext.isEmpty)
+                    Button("Clear Queue", systemImage: "xmark.circle") {
+                        withAnimation(Motion.panel) { model.userQueue = []; model.upNext = [] }
+                    }
+                    .disabled(model.userQueue.isEmpty && model.upNext.isEmpty)
                 } label: {
-                    Image(systemName: "ellipsis").font(.system(size: 14, weight: .semibold)).frame(width: 28, height: 28)
+                    Image(systemName: "ellipsis").font(.system(size: 15, weight: .medium)).frame(width: 32, height: 32).contentShape(Circle())
                 }
                 .menuStyle(.button)
                 .buttonStyle(.plain)
@@ -258,64 +289,230 @@ struct QueueInspector: View {
                 .help("More")
                 BarIcon(symbol: "xmark", label: "Close") { withAnimation(Motion.panel) { model.showQueue = false } }
             }
-            .padding(.leading, 20).padding(.trailing, 14)
-            .padding(.top, 24)
-            .padding(.bottom, 8)
-            List {
-                Section {
-                    QueueRow(song: model.current, playing: true)
-                } header: { QueueHeader(text: "Now playing") }
-                Section {
-                    ForEach(model.userQueue) { QueueRow(song: $0, queued: true) }
-                        .onMove { model.userQueue.move(fromOffsets: $0, toOffset: $1) }
-                } header: { QueueHeader(text: "Added by you") }
-                Section {
-                    ForEach(model.upNext) { QueueRow(song: $0) }
-                        .onMove { model.upNext.move(fromOffsets: $0, toOffset: $1) }
-                } header: { QueueHeader(text: "Next from Your Mix") }
+            Picker("Show", selection: $tab) {
+                ForEach(Tab.allCases) { Text($0.rawValue).tag($0) }
             }
-            .listStyle(.plain)
-            .listSectionSeparator(.hidden)
-            .scrollContentBackground(.hidden)
+            .pickerStyle(.segmented)
+            .labelsHidden()
         }
-        .ignoresSafeArea(.container, edges: .top)
+        .padding(.leading, 20).padding(.trailing, 12)
+        .padding(.top, 24)
+        .padding(.bottom, 10)
+    }
+
+    // MARK: Up Next
+
+    private var upNext: some View {
+        List {
+            QueueHeading(text: "Now playing")
+            NowPlayingCard()
+            if !model.userQueue.isEmpty {
+                QueueHeading(text: "Next in queue") {
+                    Button("Clear") { withAnimation(Motion.panel) { model.userQueue = [] } }
+                        .buttonStyle(.link)
+                        .help("Remove the songs you added")
+                }
+                ForEach(model.userQueue) { song in
+                    QueueRow(song: song) { remove(song, from: \.userQueue) }
+                }
+                .onMove { from, to in withAnimation(Motion.panel) { model.userQueue.move(fromOffsets: from, toOffset: to) } }
+            }
+            if !model.upNext.isEmpty {
+                QueueHeading(text: model.playingFrom.isEmpty ? "Next up" : "Next from \(model.playingFrom)")
+                ForEach(model.upNext) { song in
+                    QueueRow(song: song) { remove(song, from: \.upNext) }
+                }
+                .onMove { from, to in withAnimation(Motion.panel) { model.upNext.move(fromOffsets: from, toOffset: to) } }
+            }
+            if model.userQueue.isEmpty && model.upNext.isEmpty {
+                QueueEmpty(symbol: "text.line.last.and.arrowtriangle.forward", title: "Nothing up next",
+                           text: "Songs you add with Add to Queue or Play Next show up here.")
+            }
+        }
+        .queueListStyle()
+        .animation(Motion.panel, value: model.userQueue)
+        .animation(Motion.panel, value: model.upNext)
+    }
+
+    private func remove(_ song: Song, from list: ReferenceWritableKeyPath<PlayerModel, [Song]>) {
+        withAnimation(Motion.panel) { model[keyPath: list].removeAll { $0.id == song.id } }
+    }
+
+    // MARK: History
+
+    private var history: some View {
+        let played = Array(Playback.shared.history.reversed().prefix(50))
+        return List {
+            if played.isEmpty {
+                QueueEmpty(symbol: "clock.arrow.circlepath", title: "Nothing played yet", text: "Songs you played show up here.")
+            } else {
+                QueueHeading(text: "Played before")
+                ForEach(Array(played.enumerated()), id: \.offset) { _, song in
+                    QueueRow(song: song, play: { model.play(song) })
+                }
+            }
+        }
+        .queueListStyle()
     }
 }
 
-struct QueueHeader: View {
+private extension View {
+    /// The queue's lists: no separators, no backgrounds of their own, rows close to the edges of the column.
+    func queueListStyle() -> some View {
+        self.listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .listSectionSeparator(.hidden)
+            .environment(\.defaultMinListRowHeight, 1)
+    }
+}
+
+/// A heading between the parts of the queue. A list row, not a section header: those stay on top with a band of their own.
+struct QueueHeading<Trailing: View>: View {
     let text: String
+    var trailing: Trailing
+
+    init(text: String, @ViewBuilder trailing: () -> Trailing) {
+        self.text = text
+        self.trailing = trailing()
+    }
+
     var body: some View {
-        Text(text).font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
-            .padding(.top, 10).padding(.bottom, 2)
+        HStack(alignment: .firstTextBaseline) {
+            Text(text).font(.subheadline.weight(.semibold)).foregroundStyle(.secondary).lineLimit(1)
+            Spacer(minLength: 8)
+            trailing.font(.subheadline)
+        }
+        .padding(.top, 14).padding(.bottom, 4).padding(.horizontal, 8)
+        .listRowSeparator(.hidden)
+        .listRowBackground(Color.clear)
+        .listRowInsets(EdgeInsets(top: 0, leading: 12, bottom: 0, trailing: 12))
+        .moveDisabled(true)
     }
 }
 
+extension QueueHeading where Trailing == EmptyView {
+    init(text: String) { self.init(text: text) { EmptyView() } }
+}
+
+/// The song that plays now, a little larger than the rows under it, on a soft card.
+struct NowPlayingCard: View {
+    @Environment(PlayerModel.self) private var model
+
+    var body: some View {
+        let song = model.current
+        HStack(spacing: 12) {
+            CoverArt(album: song.album, radius: 6).frame(width: 52, height: 52)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(song.title).fontWeight(.semibold).foregroundStyle(.tint)
+                LinkText(song.artist) { model.go(.artist(song.artist)) }.font(.callout).foregroundStyle(.secondary)
+            }
+            .lineLimit(1)
+            Spacer(minLength: 4)
+            if !song.id.isEmpty { NowPlayingMark() }
+        }
+        .id(song.id)
+        .transition(.opacity)
+        .padding(10)
+        .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color.primary.opacity(0.06)))
+        .contextMenu { if !song.id.isEmpty { SongMenu(song: song) } }
+        .animation(Motion.fade, value: song.id)
+        .listRowSeparator(.hidden)
+        .listRowBackground(Color.clear)
+        .listRowInsets(EdgeInsets(top: 2, leading: 12, bottom: 2, trailing: 12))
+        .moveDisabled(true)
+    }
+}
+
+/// One song in the queue. Under the pointer: a play button on the cover, and a button to take it out of the queue.
+/// A double click plays it too; drag it to put it somewhere else.
 struct QueueRow: View {
     let song: Song
-    var playing = false
-    var queued = false
+    var remove: (() -> Void)? = nil
+    var play: (() -> Void)? = nil
+    @Environment(PlayerModel.self) private var model
     @LocalState private var hovering = false
 
     var body: some View {
         HStack(spacing: 12) {
-            CoverArt(album: song.album, radius: 4).frame(width: 44, height: 44)
+            Button(action: playIt) {
+                CoverArt(album: song.album, radius: 4).frame(width: 40, height: 40)
+                    .overlay {
+                        if hovering {
+                            ZStack {
+                                Color.black.opacity(0.4)
+                                Image(systemName: "play.fill").font(.system(size: 14, weight: .bold)).foregroundStyle(.white)
+                            }
+                            .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                            .transition(.opacity)
+                        }
+                    }
+            }
+            .buttonStyle(PressStyle())
+            .help("Play \(song.title)")
             VStack(alignment: .leading, spacing: 2) {
-                Text(song.title).foregroundStyle(playing ? AnyShapeStyle(.tint) : AnyShapeStyle(.primary))
-                LinkText(song.artist) { PlayerModel.shared.go(.artist(song.artist)) }.font(.callout).foregroundStyle(.secondary)
+                Text(song.title)
+                LinkText(song.artist) { model.go(.artist(song.artist)) }.font(.callout).foregroundStyle(.secondary)
             }
             .lineLimit(1)
             Spacer(minLength: 4)
-            if playing { NowPlayingMark() } else if hovering { Image(systemName: "line.3.horizontal").foregroundStyle(.tertiary) }
-            else if queued { QueuedMark() }
+            ZStack(alignment: .trailing) {
+                Text(song.duration).font(.callout).monospacedDigit().foregroundStyle(.secondary)
+                    .opacity(hovering && remove != nil ? 0 : 1)
+                if let remove, hovering {
+                    Button(action: remove) {
+                        Image(systemName: "xmark").font(.system(size: 11, weight: .bold)).foregroundStyle(.secondary)
+                            .frame(width: 26, height: 26)
+                            .background(Circle().fill(Color.primary.opacity(0.08)))
+                    }
+                    .buttonStyle(PressStyle())
+                    .help("Remove from queue")
+                    .transition(.opacity)
+                }
+            }
         }
         .padding(.horizontal, 8).padding(.vertical, 5)
-        .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Color.primary.opacity(hovering ? 0.07 : 0)))
+        .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.primary.opacity(hovering ? 0.07 : 0)))
         .contentShape(Rectangle())
+        .onTapGesture(count: 2, perform: playIt)
         .onHover { hovering = $0 && !Debug.active }
+        .onAppear { if Debug.hovered(song.title) { hovering = true } }
         .animation(Motion.fade, value: hovering)
-        .contextMenu { SongMenu(song: song) }
+        .contextMenu {
+            SongMenu(song: song)
+            if let remove {
+                Divider()
+                Button("Remove from Queue", systemImage: "minus.circle", action: remove)
+            }
+        }
+        .transition(.move(edge: .trailing).combined(with: .opacity))
         .listRowSeparator(.hidden)
+        .listRowBackground(Color.clear)
         .listRowInsets(EdgeInsets(top: 1, leading: 12, bottom: 1, trailing: 12))
+    }
+
+    /// A song in the queue plays from its place in the queue, so what lies before it counts as passed.
+    private func playIt() {
+        if let play { play() } else { Playback.shared.jump(to: song.id) }
+    }
+}
+
+/// What an empty part of the queue says, calmly, in the middle of the column.
+struct QueueEmpty: View {
+    let symbol: String
+    let title: String
+    let text: String
+
+    var body: some View {
+        VStack(spacing: 8) {
+            Image(systemName: symbol).font(.system(size: 26, weight: .medium)).foregroundStyle(.tertiary)
+            Text(title).font(.headline)
+            Text(text).font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 40).padding(.horizontal, 16)
+        .listRowSeparator(.hidden)
+        .listRowBackground(Color.clear)
+        .moveDisabled(true)
     }
 }
 

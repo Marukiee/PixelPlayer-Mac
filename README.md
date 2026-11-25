@@ -38,7 +38,7 @@ Needs macOS 26 and the Command Line Tools.
 ```bash
 swift run PixelPlayerChecks
 ./scripts/build-app.sh
-open "dist/PixelPlayer Dev.app"
+open "dist.noindex/PixelPlayer Dev.app"
 ```
 
 The development build never updates itself. Test tools for the Sonos and phone parts are in `tools/`.

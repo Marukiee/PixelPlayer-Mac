@@ -49,11 +49,9 @@ struct RootView: View {
                     NowPlayingView()
                         .transition(.opacity)
                 } else {
-                    // The update card pushes the page down rather than lying over it.
-                    VStack(spacing: 0) {
-                        UpdateCard()
-                        RouteContent().frame(maxHeight: .infinity)
-                    }
+                    RouteContent()
+                        // A new version shows as a small popup over the top right of the page.
+                        .overlay(alignment: .topTrailing) { UpdateCard() }
                     .transition(.opacity)
                 }
             }
@@ -68,10 +66,9 @@ struct RootView: View {
             }
             if model.showQueue {
                 QueueInspector()
-                    .frame(width: 300)
-                    .background(.background)
-                    .overlay(alignment: .leading) { Divider() }
-                    .transition(.move(edge: .trailing))
+                    .frame(width: 320)
+                    .overlay(alignment: .leading) { Rectangle().fill(PP.hairline).frame(width: 1).ignoresSafeArea() }
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
             }
         }
         .navigationTitle(model.fullPlayer ? "Now Playing" : "PixelPlayer")
@@ -168,8 +165,8 @@ struct Sidebar: View {
                                     model.route = route
                                     if model.fullPlayer { model.setFullPlayer(false) }
                                 })) {
-            NavRow(symbol: "house.fill", title: "Home").tag(Route.home)
-            NavRow(symbol: "square.grid.2x2.fill", title: "Browse").tag(Route.search)
+            NavRow(symbol: "house.fill", title: "Home", route: .home).tag(Route.home)
+            NavRow(symbol: "square.grid.2x2.fill", title: "Browse", route: .search).tag(Route.search)
             Section {
                 ForEach(items) { item in
                     LibraryRow(item: item).tag(item.route)
@@ -214,6 +211,8 @@ struct LibraryRow: View {
         return false
     }
 
+    private var selected: Bool { model.searchText.isEmpty && model.route == item.route }
+
     var body: some View {
         HStack(spacing: 10) {
             ArtworkView(art: item.art, radius: 4).frame(width: 40, height: 40)
@@ -238,9 +237,8 @@ struct LibraryRow: View {
         }
         .padding(.vertical, 3)
         .padding(.horizontal, 6)
-        .background {
-            RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Color.primary.opacity(hovering ? 0.06 : 0))
-        }
+        // The hover box is the system's selection box, same size and corners, so moving over the open item shows one box.
+        .listRowBackground(SidebarHover(on: hovering && !selected))
         .contentShape(Rectangle())
         .onHover { hovering = $0 && !Debug.active }
         .onAppear { if Debug.hovered(item.title) { hovering = true } }
@@ -265,12 +263,19 @@ struct LibraryRow: View {
 struct NavRow: View {
     let symbol: String
     let title: String
+    let route: Route
+    @Environment(PlayerModel.self) private var model
+    @LocalState private var hovering = false
+
+    /// Browse is open while searching too.
+    private var selected: Bool { route == .search ? (model.route == .search || !model.searchText.isEmpty) : (model.searchText.isEmpty && model.route == route) }
 
     var body: some View {
         HStack(spacing: 10) {
             Image(systemName: symbol)
                 .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(.tint)
+                // White in dark mode, as in Spotify; the accent in light.
+                .foregroundStyle(PP.adaptive(0x0058CA, 0xFFFFFF))
                 .frame(width: 40, height: 40)
                 .background(RoundedRectangle(cornerRadius: 4, style: .continuous).fill(Color.primary.opacity(0.07)))
             Text(title).fontWeight(.medium)
@@ -278,6 +283,22 @@ struct NavRow: View {
         }
         .padding(.vertical, 3)
         .padding(.horizontal, 6)
-        .modifier(HoverHighlight(radius: 6, selected: false, selectedFill: .clear))
+        .listRowBackground(SidebarHover(on: hovering && !selected))
+        .contentShape(Rectangle())
+        .onHover { hovering = $0 && !Debug.active }
+        .animation(Motion.fade, value: hovering)
+    }
+}
+
+/// The hover in the sidebar, drawn where the system draws its selection: inset from the sidebar's sides, round corners.
+struct SidebarHover: View {
+    let on: Bool
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: 10, style: .continuous)
+            .fill(Color.primary.opacity(on ? 0.07 : 0))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 1)
+            .animation(Motion.fade, value: on)
     }
 }

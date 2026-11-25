@@ -5,3 +5,4 @@ dist/
 .DS_Store
 design/*/los/run.log
 .claude/
+dist.noindex/

@@ -38,7 +38,7 @@ Nodig: macOS 26 en de Command Line Tools.
 ```bash
 swift run PixelPlayerChecks
 ./scripts/build-app.sh
-open "dist/PixelPlayer Dev.app"
+open "dist.noindex/PixelPlayer Dev.app"
 ```
 
 De ontwikkelversie werkt zichzelf nooit bij. Testhulpmiddelen voor Sonos en de telefoon staan in `tools/`.

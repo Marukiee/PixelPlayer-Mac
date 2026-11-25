@@ -18,11 +18,13 @@ final class Playback {
     private var listenedMs = 0
     private var lastTick: Double?
     private var lastReport = Date.distantPast
+    /// Seeks on their way; the clock's reports are stale until they land.
+    private var seeking = 0
     private var model: PlayerModel { PlayerModel.shared }
 
     private init() {
         player.automaticallyWaitsToMinimizeStalling = true
-        timeObserver = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.5, preferredTimescale: 600), queue: .main) { [weak self] time in
+        timeObserver = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.1, preferredTimescale: 600), queue: .main) { [weak self] time in
             MainActor.assumeIsolated { self?.tick(time.seconds) }
         }
         endObserver = NotificationCenter.default.addObserver(forName: AVPlayerItem.didPlayToEndTimeNotification, object: nil, queue: .main) { [weak self] note in
@@ -91,7 +93,13 @@ final class Playback {
         guard !Library.shared.isSample else { return }
         if RemoteController.shared.controlsPlayback { RemoteController.shared.seek(to: seconds); return }
         if SonosOutput.shared.controlsPlayback { SonosOutput.shared.seek(toMs: Int(seconds * 1000)); return }
-        player.seek(to: CMTime(seconds: seconds, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
+        // While the seek is on its way the clock still reports the old place; those reports are ignored, so the lyrics and
+        // the bar go straight to the new place instead of back and forth.
+        seeking += 1
+        let tolerance = CMTime(seconds: 0.05, preferredTimescale: 600)
+        player.seek(to: CMTime(seconds: seconds, preferredTimescale: 600), toleranceBefore: tolerance, toleranceAfter: tolerance) { [weak self] _ in
+            DispatchQueue.main.async { MainActor.assumeIsolated { self?.seeking -= 1; self?.lastTick = nil } }
+        }
         updateNowPlaying()
     }
 
@@ -151,6 +159,13 @@ final class Playback {
         updateNowPlaying()
     }
 
+    /// The listener picked a song further on in the queue: it plays now, and the songs before it count as passed.
+    func jump(to id: String) {
+        endListen()
+        follow(to: id)
+        start(model.current)
+    }
+
     /// Back to the start of the song, or to the one before when it has only just begun.
     func previous() {
         if model.position > 3 || history.isEmpty {
@@ -165,7 +180,7 @@ final class Playback {
     }
 
     private func tick(_ seconds: Double) {
-        guard !Library.shared.isSample, seconds.isFinite else { return }
+        guard !Library.shared.isSample, seconds.isFinite, seeking == 0 else { return }
         model.position = seconds
         // Only time that really played counts: a seek is not listening.
         if player.rate > 0 {

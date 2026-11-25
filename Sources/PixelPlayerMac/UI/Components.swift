@@ -97,7 +97,8 @@ struct TransportButtons: View {
             Button { model.setPlaying(!model.isPlaying) } label: {
                 Image(systemName: model.isPlaying ? "pause.fill" : "play.fill")
                     .font(.system(size: large ? 34 : 24))
-                    .contentTransition(.symbolEffect(.replace))
+                    // A quick swap, no bounce: the button answers at once.
+                    .contentTransition(.opacity)
                     .frame(width: large ? 40 : 28)
             }
             .help(model.isPlaying ? "Pause" : "Play")

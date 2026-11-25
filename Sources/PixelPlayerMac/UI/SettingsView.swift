@@ -159,7 +159,9 @@ private struct SourcesPane: View {
         case .sample: Text("Connected · 1,284 songs").foregroundStyle(.secondary)
         case .notConnected: Text("Not connected").foregroundStyle(.secondary)
         case .loading(let what): HStack(spacing: 6) { ProgressView().controlSize(.small); Text(what).foregroundStyle(.secondary) }
-        case .ready: Text("Connected · \(library.songs.count.formatted()) songs").foregroundStyle(.secondary)
+        case .ready:
+            Text(library.client == nil ? "\(library.songs.count.formatted()) songs on this Mac"
+                 : "Connected · \(library.serverSongCount.formatted()) songs on the server").foregroundStyle(.secondary)
         case .failed(let message): Text(message).foregroundStyle(.red).lineLimit(2)
         }
     }

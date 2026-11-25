@@ -67,7 +67,7 @@ struct LyricsLines: View {
                 empty
             } else if let loaded, loaded.songID == song.id {
                 if let lyrics = loaded.lyrics {
-                    lines(lyrics, current: lyrics.index(at: model.position), follow: lyrics.isSynced)
+                    lines(lyrics, current: lyrics.index(at: model.position + 0.1), follow: lyrics.isSynced)
                 } else {
                     empty
                 }
@@ -95,6 +95,13 @@ struct LyricsLines: View {
         let plain = !lyrics.isSynced && current == nil
         return ScrollViewReader { proxy in
             VStack(alignment: .leading, spacing: size * 0.55) {
+                if follow {
+                    // Room above the first line, so before the singing starts it waits where the sung line will be,
+                    // not at the very top.
+                    Color.clear
+                        .containerRelativeFrame(.vertical) { height, _ in max(0, height * 0.35 - size * 0.55) }
+                        .id(-1)
+                }
                 ForEach(lyrics.lines.indices, id: \.self) { i in
                     LyricLine(line: lyrics.lines[i], size: size,
                               state: plain || i == current ? .now : i < (current ?? -1) ? .sung : .coming)
@@ -104,13 +111,15 @@ struct LyricsLines: View {
             .opacity(follow && !placed ? 0 : 1)
             .onAppear {
                 guard follow else { placed = true; return }
-                if let current { proxy.scrollTo(current, anchor: UnitPoint(x: 0, y: 0.35)) }
+                if let current { proxy.scrollTo(current, anchor: UnitPoint(x: 0, y: 0.35)) } else { proxy.scrollTo(-1, anchor: .top) }
                 // One turn later the scroll has landed; then the lines fade in where they belong.
                 DispatchQueue.main.async { withAnimation(Motion.fade) { placed = true } }
             }
             .onChange(of: current) { _, line in
                 guard follow else { return }
-                withAnimation(Motion.panel) { proxy.scrollTo(line ?? 0, anchor: line == nil ? .top : UnitPoint(x: 0, y: 0.35)) }
+                withAnimation(Motion.panel) {
+                    if let line { proxy.scrollTo(line, anchor: UnitPoint(x: 0, y: 0.35)) } else { proxy.scrollTo(-1, anchor: .top) }
+                }
             }
         }
     }

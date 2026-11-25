@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Builds the app from the Swift package.
-#   scripts/build-app.sh            dist/PixelPlayer Dev.app, a debug build that never updates itself
-#   scripts/build-app.sh release    dist/PixelPlayer.app, version from $VERSION and $BUILD (the release workflow sets them)
+#   scripts/build-app.sh            dist.noindex/PixelPlayer Dev.app, a debug build that never updates itself
+#   scripts/build-app.sh release    dist.noindex/PixelPlayer.app, version from $VERSION and $BUILD (the release workflow sets them)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 MODE="${1:-debug}"
-if [ "$MODE" = release ]; then CONFIG=release; APP="dist/PixelPlayer.app"; else CONFIG=debug; APP="dist/PixelPlayer Dev.app"; fi
+if [ "$MODE" = release ]; then CONFIG=release; APP="dist.noindex/PixelPlayer.app"; else CONFIG=debug; APP="dist.noindex/PixelPlayer Dev.app"; fi
 swift build -c $CONFIG --arch arm64 --product PixelPlayerMac 2>&1 | grep -E "error|warning: unre|Compiling|Build complete" | grep -v "^$" | tail -30 || true
 BIN="$(swift build -c $CONFIG --arch arm64 --show-bin-path 2>/dev/null)/PixelPlayerMac"
 [ -x "$BIN" ] || { echo "build failed"; exit 1; }

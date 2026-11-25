@@ -14,6 +14,7 @@ struct PixelPlayerApp: App {
         }
         // No toolbar band at the top: the content runs to the edge and the traffic lights sit in the sidebar.
         .windowStyle(.hiddenTitleBar)
+        .commands { PlaybackCommands(model: model) }
         .defaultSize(width: 1280, height: 800)
         Settings {
             SettingsView()
@@ -86,5 +87,45 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidBecomeActive(_ notification: Notification) {
         Updater.shared.checkIfDue()
+    }
+}
+
+/// The Controls menu, with the shortcuts of Spotify on the Mac, so hands that know Spotify feel at home.
+struct PlaybackCommands: Commands {
+    let model: PlayerModel
+
+    var body: some Commands {
+        CommandMenu("Controls") {
+            Button(model.isPlaying ? "Pause" : "Play") { model.setPlaying(!model.isPlaying) }
+            Button("Next") { Playback.shared.next() }
+                .keyboardShortcut(.rightArrow, modifiers: .command)
+            Button("Previous") { Playback.shared.previous() }
+                .keyboardShortcut(.leftArrow, modifiers: .command)
+            Divider()
+            Button("Seek Forward") { model.seek(to: min(model.duration, model.position + 5)) }
+                .keyboardShortcut(.rightArrow, modifiers: [.command, .shift])
+            Button("Seek Backward") { model.seek(to: max(0, model.position - 5)) }
+                .keyboardShortcut(.leftArrow, modifiers: [.command, .shift])
+            Divider()
+            Button("Volume Up") { model.groupVolume = min(100, model.groupVolume + 10) }
+                .keyboardShortcut(.upArrow, modifiers: .command)
+            Button("Volume Down") { model.groupVolume = max(0, model.groupVolume - 10) }
+                .keyboardShortcut(.downArrow, modifiers: .command)
+            Divider()
+            Toggle("Shuffle", isOn: Binding(get: { model.shuffle }, set: { model.shuffle = $0 }))
+                .keyboardShortcut("s", modifiers: .command)
+            Toggle("Repeat", isOn: Binding(get: { model.repeatAll }, set: { model.repeatAll = $0 }))
+                .keyboardShortcut("r", modifiers: .command)
+            Button(model.liked ? "Remove from Liked Songs" : "Save to Liked Songs") { model.liked.toggle() }
+                .keyboardShortcut("b", modifiers: [.option, .shift])
+                .disabled(model.current.id.isEmpty)
+            Divider()
+            Button("Search") { model.go(.search) }
+                .keyboardShortcut("l", modifiers: .command)
+            Button(model.showQueue ? "Hide Queue" : "Show Queue") { withAnimation(Motion.panel) { model.showQueue.toggle() } }
+                .keyboardShortcut("q", modifiers: [.option, .shift])
+            Button(model.fullPlayer ? "Hide Lyrics" : "Show Lyrics") { model.setFullPlayer(!model.fullPlayer) }
+                .keyboardShortcut("l", modifiers: [.option, .shift])
+        }
     }
 }

@@ -1,5 +1,39 @@
 [
   {
+    "version": "0.2.1",
+    "date": "2026-11-25",
+    "en": {
+      "title": "A new queue",
+      "new": [
+        "A new queue with Up Next and History: play, remove and drag songs",
+        "Spotify's keyboard shortcuts, in the Controls menu"
+      ],
+      "better": [
+        "Updates show as a small popup",
+        "Lyrics stay in time with the song, and the player moves smoothly to the next song",
+        "Tiles on Home open with a click"
+      ],
+      "fixed": [
+        "Sonos no longer skips songs that are on your server"
+      ]
+    },
+    "nl": {
+      "title": "Een nieuwe wachtrij",
+      "new": [
+        "Een nieuwe wachtrij met Up Next en History: nummers afspelen, weghalen en slepen",
+        "De sneltoetsen van Spotify, in het menu Controls"
+      ],
+      "better": [
+        "Updates verschijnen als kleine popup",
+        "Songteksten lopen gelijk met het nummer, en de speler gaat soepel naar het volgende nummer",
+        "Tegels op Home openen met een klik"
+      ],
+      "fixed": [
+        "Sonos slaat geen nummers meer over die op je server staan"
+      ]
+    }
+  },
+  {
     "version": "0.2.0",
     "date": "2026-11-25",
     "en": {

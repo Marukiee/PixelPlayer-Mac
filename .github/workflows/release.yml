@@ -82,7 +82,7 @@ jobs:
       - name: Check the bundle
         run: |
           set -euo pipefail
-          app=dist/PixelPlayer.app
+          app=dist.noindex/PixelPlayer.app
           plist="$app/Contents/Info.plist"
           codesign --verify --deep --strict "$app"
           [ "$(plutil -extract CFBundleShortVersionString raw "$plist")" = "$VERSION" ] \
@@ -101,7 +101,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir release
-          ditto -c -k --keepParent dist/PixelPlayer.app release/PixelPlayer-macOS.zip
+          ditto -c -k --keepParent dist.noindex/PixelPlayer.app release/PixelPlayer-macOS.zip
           (cd release && shasum -a 256 PixelPlayer-macOS.zip > PixelPlayer-macOS.zip.sha256)
           swift scripts/sign-update.swift release/PixelPlayer-macOS.zip > release/PixelPlayer-macOS.zip.sig
           cp release/PixelPlayer-macOS.zip "release/PixelPlayer-v$VERSION-macOS.zip"

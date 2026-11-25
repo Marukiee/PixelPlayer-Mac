@@ -102,6 +102,8 @@ final class Library {
     var isSample: Bool { status == .sample }
     /// True once there is music to show.
     var hasMusic: Bool { !songs.isEmpty }
+    /// How many songs the server gave, for the status line in Settings.
+    var serverSongCount: Int { serverSongs.count }
 
     /// An album by position that is always there, for places that show a few covers.
     func album(at index: Int) -> Album {
@@ -186,11 +188,32 @@ final class Library {
                 serverAlbums += page
                 if page.count < 500 { break }
             }
+            // Album by album, as the Android app does: that works on every Navidrome, where a search with an empty query
+            // returns nothing on some versions. Six at a time.
             var serverSongs: [SubsonicSong] = []
-            while true {
-                let page = try await client.search("", songCount: 500, songOffset: serverSongs.count).song ?? []
-                serverSongs += page
-                if page.count < 500 { break }
+            var failedAlbums = 0
+            await withTaskGroup(of: [SubsonicSong]?.self) { group in
+                var albums = serverAlbums.makeIterator()
+                for _ in 0..<6 {
+                    guard let album = albums.next() else { break }
+                    group.addTask { try? await client.album(id: album.id).song ?? [] }
+                }
+                for await songs in group {
+                    if let songs { serverSongs += songs } else { failedAlbums += 1 }
+                    if let album = albums.next() { group.addTask { try? await client.album(id: album.id).song ?? [] } }
+                }
+            }
+            // A server that answered for too few albums gives a partial library; the one we have stays.
+            if failedAlbums * 10 > serverAlbums.count { status = .failed("The server did not answer for every album."); return }
+            if serverSongs.isEmpty {
+                // No albums: the old way, page by page, stopping when a page repeats.
+                var seen = Set<String>()
+                while true {
+                    let page = try await client.search("", songCount: 500, songOffset: serverSongs.count).song ?? []
+                    let fresh = page.filter { seen.insert($0.id).inserted }
+                    serverSongs += fresh
+                    if page.count < 500 || fresh.isEmpty { break }
+                }
             }
             let starred = try await client.starred()
             var lists: [SubsonicPlaylist] = []

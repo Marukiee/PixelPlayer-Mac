@@ -190,6 +190,7 @@ struct RoundMenu: View {
 /// A small tile with the cover flush left, so its corners follow the tile.
 struct QuickTile: View {
     let item: LibraryItem
+    @Environment(PlayerModel.self) private var model
     @LocalState private var hovering = false
 
     var body: some View {
@@ -202,16 +203,24 @@ struct QuickTile: View {
         }
         // The play button lies over the end of the tile, so the title has the whole width when it is not shown.
         .overlay(alignment: .trailing) {
-            Image(systemName: "play.fill").font(.system(size: 13, weight: .bold)).foregroundStyle(PP.onPrimary)
-                .frame(width: 34, height: 34)
-                .glassEffect(.regular.tint(PP.primary).interactive(), in: Circle())
-                .padding(.trailing, 11)
-                .opacity(hovering ? 1 : 0)
+            Button { model.play(Library.shared.songs(for: item.route)) } label: {
+                Image(systemName: "play.fill").font(.system(size: 13, weight: .bold)).foregroundStyle(PP.onPrimary)
+                    .frame(width: 34, height: 34)
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .glassEffect(.regular.tint(PP.primary).interactive(), in: Circle())
+            .help("Play \(item.title)")
+            .padding(.trailing, 11)
+            .opacity(hovering ? 1 : 0)
         }
         .frame(minWidth: 0, maxWidth: .infinity)
         .frame(height: 56)
         .background(Color.primary.opacity(hovering ? 0.1 : 0.06))
         .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        // A click on the tile opens it; the play button plays it.
+        .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .onTapGesture { model.go(item.route) }
         .onHover { hovering = $0 && !Debug.active }
         .onAppear { if Debug.hovered(item.title) { hovering = true } }
         .animation(Motion.fade, value: hovering)

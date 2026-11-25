@@ -1,12 +1,12 @@
 import SwiftUI
 
-/// The update card of all of Mark's apps (chosen in November 2026), in the Mac's own controls: a tonal card at the top of the
-/// page with the new version and two lines of what is new, Later and Update together across the width. After Update, Later
-/// shrinks away and Update grows into a progress bar over the whole card; once downloaded and checked it installs and
-/// restarts by itself, without a second click.
+/// A new version, as a small glass popup at the top right of the page, over it rather than pushing it down. One line says
+/// which version, What's new opens the changes, and Update turns into a small progress bar in place; once downloaded and
+/// checked it installs and restarts by itself, without a second click.
 struct UpdateCard: View {
     @LocalState private var updater = Updater.shared
     @LocalState private var release: Updater.Release?
+    @LocalState private var showNotes = false
     @AppStorage("updateDismissedVersion") private var dismissedVersion = ""
 
     private enum Phase: Equatable { case available, downloading(Double), installing, failed(String) }
@@ -24,7 +24,7 @@ struct UpdateCard: View {
     var body: some View {
         Group {
             if let phase, let release = shown {
-                card(phase, release)
+                popup(phase, release)
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
@@ -41,56 +41,40 @@ struct UpdateCard: View {
         return release
     }
 
-    private func card(_ phase: Phase, _ release: Updater.Release) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 12) {
-                icon(phase)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("New version \(release.version)")
-                        .font(.headline)
+    private func popup(_ phase: Phase, _ release: Updater.Release) -> some View {
+        HStack(spacing: 12) {
+            icon(phase)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title(phase, release)).font(.headline).lineLimit(1)
+                HStack(spacing: 6) {
                     Text(subtitle(phase, release))
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
                         .monospacedDigit()
+                        .lineLimit(1)
                         .id(subtitleKey(phase))
                         .transition(.push(from: .bottom))
+                    if phase == .available, !Updater.highlights(release.notes).isEmpty {
+                        Button("What's new") { showNotes.toggle() }
+                            .buttonStyle(.link)
+                            .popover(isPresented: $showNotes, arrowEdge: .bottom) { notes(release) }
+                    }
                 }
+                .font(.callout)
+                .foregroundStyle(.secondary)
                 .clipped()
-                Spacer(minLength: 0)
             }
-            if phase == .available {
-                let lines = Updater.highlights(release.notes)
-                if !lines.isEmpty {
-                    VStack(alignment: .leading, spacing: 3) {
-                        ForEach(lines, id: \.self) { Text($0).lineLimit(1) }
-                    }
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .padding(.leading, 58)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
-                }
-            }
-            if case .failed = phase {
-                wideButton("Try again") {
-                    Task {
-                        // The release is forgotten once it failed, so look again, then install what is there.
-                        await updater.check(manual: true)
-                        await updater.install()
-                    }
-                }
-            } else {
-                buttons(phase)
-            }
+            Spacer(minLength: 8)
+            actions(phase)
         }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background {
-            RoundedRectangle(cornerRadius: 22, style: .continuous).fill(PP.window)
-            RoundedRectangle(cornerRadius: 22, style: .continuous).fill(PP.primaryContainer.opacity(0.6))
-        }
-        .padding(.horizontal, 28)
-        .padding(.top, 20)
-        .padding(.bottom, 4)
+        .padding(.leading, 12).padding(.trailing, 14).padding(.vertical, 10)
+        .frame(width: 420)
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .padding(.top, 16)
+        .padding(.trailing, 20)
+    }
+
+    private func title(_ phase: Phase, _ release: Updater.Release) -> String {
+        if case .failed = phase { return "The update did not work" }
+        return "PixelPlayer \(release.version)"
     }
 
     private func subtitle(_ phase: Phase, _ release: Updater.Release) -> String {
@@ -98,7 +82,7 @@ struct UpdateCard: View {
         case .available: "You have \(updater.currentVersion)"
         case .downloading(let fraction):
             release.size > 0 ? "\(Self.megabytes(Double(release.size) * fraction)) of \(Self.megabytes(Double(release.size))) MB" : "Downloading"
-        case .installing: "PixelPlayer restarts in a moment"
+        case .installing: "Restarts in a moment"
         case .failed(let message): message
         }
     }
@@ -115,89 +99,84 @@ struct UpdateCard: View {
 
     private func icon(_ phase: Phase) -> some View {
         ZStack {
-            if phase == .installing {
+            switch phase {
+            case .installing:
                 Circle().fill(Color.green)
-                Image(systemName: "checkmark").font(.system(size: 18, weight: .bold)).foregroundStyle(.white)
-            } else if case .failed = phase {
-                RoundedRectangle(cornerRadius: 15, style: .continuous).fill(Color.orange)
-                Image(systemName: "exclamationmark").font(.system(size: 20, weight: .bold)).foregroundStyle(.white)
-            } else {
-                RoundedRectangle(cornerRadius: 15, style: .continuous).fill(PP.primary)
-                Image(systemName: "sparkles").font(.system(size: 20, weight: .semibold)).foregroundStyle(PP.onPrimary)
+                Image(systemName: "checkmark").font(.system(size: 14, weight: .bold)).foregroundStyle(.white)
+            case .failed:
+                Circle().fill(Color.orange)
+                Image(systemName: "exclamationmark").font(.system(size: 14, weight: .bold)).foregroundStyle(.white)
+            default:
+                Circle().fill(PP.primary)
+                Image(systemName: "arrow.down").font(.system(size: 14, weight: .bold)).foregroundStyle(PP.onPrimary)
             }
         }
-        .frame(width: 46, height: 46)
+        .frame(width: 32, height: 32)
         .transition(.scale.combined(with: .opacity))
     }
 
-    /// Later and Update across the width; after Update, Later shrinks to nothing and Update becomes the progress bar.
-    private func buttons(_ phase: Phase) -> some View {
-        GeometryReader { geo in
-            let gap: CGFloat = 8
-            let laterWidth = phase == .available ? (geo.size.width - gap) / 3 : 0
-            HStack(spacing: laterWidth > 0 ? gap : 0) {
-                Button { dismissedVersion = shown?.version ?? "" } label: {
-                    Text("Later").frame(width: laterWidth, height: 34).contentShape(Capsule())
-                }
-                .buttonStyle(.plain)
-                .background(Color.primary.opacity(0.08), in: Capsule())
-                .opacity(laterWidth > 0 ? 1 : 0)
-                .frame(width: laterWidth)
-                .clipped()
-                progressButton(phase)
+    @ViewBuilder private func actions(_ phase: Phase) -> some View {
+        switch phase {
+        case .available:
+            HStack(spacing: 6) {
+                Button("Later") { dismissedVersion = shown?.version ?? "" }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 8)
+                Button { Task { await updater.install() } } label: { pill(Text("Update")) }
+                    .buttonStyle(PressStyle())
+                    .help("Download, install and restart")
             }
+        case .downloading(let fraction):
+            progress(fraction, Text("\(Int((fraction * 100).rounded()))%").monospacedDigit())
+        case .installing:
+            progress(1, Text("Installing")).overlay { Shimmer().clipShape(Capsule()) }
+        case .failed:
+            Button {
+                Task {
+                    // The release is forgotten once it failed, so look again, then install what is there.
+                    await updater.check(manual: true)
+                    await updater.install()
+                }
+            } label: { pill(Text("Try again")) }
+            .buttonStyle(PressStyle())
         }
-        .frame(height: 34)
     }
 
-    private func progressButton(_ phase: Phase) -> some View {
-        let fraction: Double = switch phase {
-        case .available: 1
-        case .downloading(let value): value
-        default: 1
-        }
-        return Button { if phase == .available { Task { await updater.install() } } } label: {
-            ZStack {
-                Capsule().fill(phase == .available ? PP.primary : PP.primary.opacity(0.25))
-                GeometryReader { geo in
-                    Capsule().fill(PP.primary).frame(width: max(34, geo.size.width * fraction))
-                }
-                .opacity(phase == .available ? 0 : 1)
-                if phase == .installing { Shimmer().clipShape(Capsule()) }
-                // The label in the bar's own colour over the empty part and in white over the filled part, so it reads at any point.
-                label(phase).foregroundStyle(PP.primary).frame(maxWidth: .infinity, maxHeight: .infinity)
-                label(phase).foregroundStyle(PP.onPrimary).frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .mask(alignment: .leading) {
-                        GeometryReader { geo in Rectangle().frame(width: geo.size.width * fraction) }
-                    }
-            }
-            .frame(maxWidth: .infinity)
-            .frame(height: 34)
+    /// The accent capsule; Update and the progress bar have one size, so the one turns into the other in place.
+    private func pill(_ label: Text) -> some View {
+        label
+            .font(.callout.weight(.semibold))
+            .foregroundStyle(PP.onPrimary)
+            .frame(width: 96, height: 30)
+            .background(PP.primary, in: Capsule())
             .contentShape(Capsule())
+    }
+
+    private func progress(_ fraction: Double, _ label: Text) -> some View {
+        ZStack {
+            Capsule().fill(PP.primary.opacity(0.25))
+            Capsule().fill(PP.primary)
+                .frame(width: max(30, 96 * fraction))
+                .frame(maxWidth: .infinity, alignment: .leading)
+            label.font(.callout.weight(.semibold)).foregroundStyle(PP.onPrimary)
         }
-        .buttonStyle(.plain)
+        .frame(width: 96, height: 30)
         .animation(.easeOut(duration: 0.25), value: fraction)
     }
 
-    private func label(_ phase: Phase) -> some View {
-        Group {
-            switch phase {
-            case .available: Text("Update")
-            case .downloading(let value): Text("\(Int((value * 100).rounded()))%").monospacedDigit().contentTransition(.numericText())
-            default: Text("Installing…")
+    private func notes(_ release: Updater.Release) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("What's new in \(release.version)").font(.headline)
+            ForEach(release.notes.components(separatedBy: .newlines).filter { $0.hasPrefix("\u{2022} ") }, id: \.self) { line in
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Image(systemName: "checkmark").font(.caption.weight(.bold)).foregroundStyle(.tint)
+                    Text(String(line.dropFirst(2))).font(.callout).fixedSize(horizontal: false, vertical: true)
+                }
             }
         }
-        .font(.body.weight(.semibold))
-    }
-
-    private func wideButton(_ title: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(title).font(.body.weight(.semibold)).foregroundStyle(PP.onPrimary)
-                .frame(maxWidth: .infinity).frame(height: 34)
-                .background(PP.primary, in: Capsule())
-                .contentShape(Capsule())
-        }
-        .buttonStyle(.plain)
+        .padding(16)
+        .frame(width: 320, alignment: .leading)
     }
 
     private static func megabytes(_ bytes: Double) -> String {
