@@ -270,9 +270,7 @@ struct PlainIcon: View {
         Group {
             if symbol == "shuffle" {
                 // The same drawn shuffle as in the player: square, with a fine line, like Spotify's.
-                ShuffleGlyph()
-                    .stroke(style, style: StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
-                    .frame(width: 28, height: 24.5)
+                Glyph(kind: .shuffle).sized(height: 24).foregroundStyle(style)
             } else {
                 Image(systemName: symbol)
                     .font(.system(size: 26, weight: .semibold))

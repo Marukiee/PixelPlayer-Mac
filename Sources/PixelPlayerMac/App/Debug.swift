@@ -265,29 +265,33 @@ enum Debug {
             } else {
                 try? line.write(to: url, atomically: true, encoding: .utf8)
             }
-        case "glyphs":
-            // The drawn player icons on the canvases of Mark's Spotify screenshots, white on clear, to lay over them.
-            func save<V: View>(_ name: String, _ size: CGSize, _ view: V) {
-                let renderer = ImageRenderer(content: view.frame(width: size.width, height: size.height))
-                renderer.scale = 1
-                if let image = renderer.nsImage, let tiff = image.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff) {
-                    try? rep.representation(using: .png, properties: [:])?.write(to: file("\(name).png"))
-                }
+        case "glyphref":
+            // `glyphref:<name>:<W>x<H>:<x>/<y>/<w>/<h>:<line>` draws one icon in that box on a canvas the size of Mark's
+            // screenshot of it, white on clear, to lay over it. A line of 0 fills the shape.
+            guard parts.count >= 5 else { break }
+            let canvas = parts[2].split(separator: "x").compactMap { Double($0) }
+            let box = parts[3].split(separator: "/").compactMap { Double($0) }
+            guard canvas.count == 2, box.count == 4 else { break }
+            let glyph: AnyView
+            switch value {
+            case "shuffle": glyph = AnyView(Glyph(kind: .shuffle))
+            case "loop": glyph = AnyView(Glyph(kind: .loop))
+            case "next": glyph = AnyView(Glyph(kind: .next))
+            case "previous": glyph = AnyView(Glyph(kind: .previous))
+            case "mic": glyph = AnyView(Glyph(kind: .mic))
+            case "queue": glyph = AnyView(Glyph(kind: .queue))
+            case "addqueue": glyph = AnyView(Glyph(kind: .addQueue))
+            case "connect": glyph = AnyView(Glyph(kind: .connect))
+            case "play": glyph = AnyView(ZStack { Circle().fill(Color.white); PlayGlyph().fill(Color.black).frame(width: box[2] * 0.39, height: box[3] * 0.44).offset(x: box[2] * 0.035) })
+            default: glyph = AnyView(EmptyView())
             }
-            func stroke<S: Shape>(_ shape: S, _ width: CGFloat) -> some View {
-                shape.stroke(Color.white, style: StrokeStyle(lineWidth: width, lineCap: .round, lineJoin: .round))
+            let view = ZStack(alignment: .topLeading) { glyph.foregroundStyle(Color.white).frame(width: box[2], height: box[3]).offset(x: box[0], y: box[1]) }
+                .frame(width: canvas[0], height: canvas[1], alignment: .topLeading)
+            let renderer = ImageRenderer(content: view)
+            renderer.scale = 1
+            if let image = renderer.nsImage, let tiff = image.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff) {
+                try? rep.representation(using: .png, properties: [:])?.write(to: file("ref-\(value).png"))
             }
-            save("glyph-shuffle", CGSize(width: 76, height: 60),
-                 ZStack(alignment: .topLeading) { stroke(ShuffleGlyph(), 52 * 0.091).frame(width: 52, height: 45.6).offset(x: 14.4, y: 5.6) }
-                    .frame(width: 76, height: 60, alignment: .topLeading))
-            save("glyph-mic", CGSize(width: 96, height: 54),
-                 ZStack(alignment: .topLeading) {
-                     stroke(MicGlyph(), 26 * 0.062).frame(width: 26, height: 26).offset(x: 9.2, y: 13)
-                     stroke(QueueGlyph(), 23.7 * 0.075).frame(width: 23.7, height: 23.7).offset(x: 64.4, y: 14.4)
-                 }.frame(width: 96, height: 54, alignment: .topLeading))
-            save("glyph-addqueue", CGSize(width: 40, height: 44),
-                 ZStack(alignment: .topLeading) { stroke(AddQueueGlyph(), 27 * 0.075).frame(width: 27, height: 25).offset(x: 8, y: 8) }
-                    .frame(width: 40, height: 44, alignment: .topLeading))
         case "quit":
             try? await Task.sleep(for: .seconds(0.5))
             NSApp.terminate(nil)

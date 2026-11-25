@@ -188,10 +188,14 @@ struct TransportButtons: View {
             TransportIcon(glyph: .back, label: "Previous", size: size) { Playback.shared.previous() }
             Button { model.setPlaying(!model.isPlaying) } label: {
                 if roundPlay {
-                    Image(systemName: model.isPlaying ? "pause.fill" : "play.fill")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(PP.page)
-                        .contentTransition(.opacity)
+                    // Spotify's proportions: the triangle 0.44 of the round high, a little right of the middle.
+                    ZStack {
+                        if model.isPlaying {
+                            PauseGlyph().fill(PP.page).frame(width: 10.5, height: 12.5)
+                        } else {
+                            PlayGlyph().fill(PP.page).frame(width: 12.5, height: 14).offset(x: 1.1)
+                        }
+                    }
                         .frame(width: 32, height: 32)
                         // A solid colour: the text colour on glass is blended with what lies under it and came out grey.
                         .background(Circle().fill(PP.adaptive(0x000000, 0xFFFFFF)))
@@ -214,50 +218,20 @@ struct TransportButtons: View {
 
 enum TransportGlyph { case back, forward, loop, shuffle }
 
-/// Lyrics, after Spotify's: a round head in outline and, joined to it on a slant, a slim handle in outline with a round end.
-struct MicGlyph: Shape {
-    func path(in rect: CGRect) -> Path {
-        func p(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: rect.minX + x * rect.width, y: rect.minY + y * rect.height) }
-        let side = min(rect.width, rect.height)
-        let head = p(0.71, 0.29)
-        let radius = side * 0.24
-        let end = p(0.16, 0.84)
-        let half = side * 0.125
-        var path = Path()
-        path.addEllipse(in: CGRect(x: head.x - radius, y: head.y - radius, width: radius * 2, height: radius * 2))
-        // The handle's two sides start where they meet the head's outline and run to the round end.
-        let dx = end.x - head.x, dy = end.y - head.y
-        let length = sqrt(dx * dx + dy * dy)
-        let ux = dx / length, uy = dy / length
-        let nx = -uy, ny = ux
-        let along = sqrt(max(0, radius * radius - half * half))
-        for side in [1, -1] as [CGFloat] {
-            path.move(to: CGPoint(x: head.x + ux * along + nx * half * side, y: head.y + uy * along + ny * half * side))
-            path.addLine(to: CGPoint(x: end.x + nx * half * side, y: end.y + ny * half * side))
-        }
-        let angle = atan2(uy, ux)
-        path.addArc(center: end, radius: half, startAngle: .radians(angle - .pi / 2), endAngle: .radians(angle + .pi / 2), clockwise: false)
-        return path
-    }
-}
-
 /// The drawn icons as template images, for menus, which only take pictures.
 @MainActor
 enum GlyphImage {
-    static func make<S: Shape>(_ shape: S, size: CGSize, line: CGFloat) -> NSImage {
-        let view = shape.stroke(Color.black, style: StrokeStyle(lineWidth: line, lineCap: .round, lineJoin: .round))
-            .frame(width: size.width, height: size.height)
-            .padding(1)
-        let renderer = ImageRenderer(content: view)
+    static func make<V: View>(_ view: V, size: CGSize) -> NSImage {
+        let renderer = ImageRenderer(content: view.foregroundStyle(Color.black).frame(width: size.width, height: size.height).padding(1))
         renderer.scale = 2
         let image = renderer.nsImage ?? NSImage(size: size)
         image.isTemplate = true
         return image
     }
 
-    static let addToQueue = make(AddQueueGlyph(), size: CGSize(width: 15, height: 14), line: 1.3)
-    static let listView = make(ViewModeGlyph(compact: false), size: CGSize(width: 15, height: 12), line: 1.5)
-    static let compactView = make(ViewModeGlyph(compact: true), size: CGSize(width: 15, height: 12), line: 1.5)
+    static let addToQueue = make(Glyph(kind: .addQueue), size: CGSize(width: 15, height: 14))
+    static let listView = make(ViewModeGlyph(compact: false).stroke(style: StrokeStyle(lineWidth: 1.5, lineCap: .butt)), size: CGSize(width: 15, height: 12))
+    static let compactView = make(ViewModeGlyph(compact: true).stroke(style: StrokeStyle(lineWidth: 1.5, lineCap: .butt)), size: CGSize(width: 15, height: 12))
 }
 
 /// A player icon by name: the drawn ones where the system symbol is too busy, else the symbol.
@@ -268,90 +242,14 @@ struct PlayerIconImage: View {
 
     var body: some View {
         if symbol == "music.mic" {
-            MicGlyph()
-                .stroke(style: StrokeStyle(lineWidth: max(1.3, size * 0.085), lineCap: .round, lineJoin: .round))
-                .frame(width: size * 1.05, height: size * 1.05)
+            Glyph(kind: .mic).sized(height: size * 1.05)
+        } else if symbol == "hifispeaker" {
+            Glyph(kind: .connect).sized(height: size * 0.95)
         } else if symbol == "list.bullet" {
-            QueueGlyph()
-                .stroke(style: StrokeStyle(lineWidth: max(1.3, size * 0.09), lineCap: .round, lineJoin: .round))
-                .frame(width: size * 0.95, height: size * 0.95)
+            Glyph(kind: .queue).sized(height: size * 0.92)
         } else {
             Image(systemName: symbol).font(.system(size: size, weight: weight))
         }
-    }
-}
-
-/// Shuffle, after Spotify's: two S-curves that cross, the one from the bottom left running over and the one from the top
-/// left broken where it passes under, each ending in an arrowhead on the right. Laid out on a box a little wider than tall.
-struct ShuffleGlyph: Shape {
-    func path(in rect: CGRect) -> Path {
-        func p(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: rect.minX + x * rect.width, y: rect.minY + y * rect.height) }
-        func cubic(_ a: CGPoint, _ b: CGPoint, _ c: CGPoint, _ d: CGPoint, _ t: CGFloat) -> CGPoint {
-            let u = 1 - t
-            let x = u * u * u * a.x + 3 * u * u * t * b.x + 3 * u * t * t * c.x + t * t * t * d.x
-            let y = u * u * u * a.y + 3 * u * u * t * b.y + 3 * u * t * t * c.y + t * t * t * d.y
-            return CGPoint(x: x, y: y)
-        }
-        let left: CGFloat = 0.05, bend: CGFloat = 0.12, join: CGFloat = 0.72, tip: CGFloat = 0.95
-        let top: CGFloat = 0.17, bottom: CGFloat = 0.84
-        var path = Path()
-        // Over: bottom left to top right, in one piece.
-        path.move(to: p(left, bottom))
-        path.addLine(to: p(bend, bottom))
-        path.addCurve(to: p(join, top), control1: p(0.36, bottom), control2: p(0.46, top))
-        path.addLine(to: p(tip, top))
-        // Under: top left to bottom right, open around the crossing.
-        let a = p(bend, top), b = p(0.36, top), c = p(0.46, bottom), d = p(join, bottom)
-        path.move(to: p(left, top))
-        path.addLine(to: a)
-        for step in 1...14 { path.addLine(to: cubic(a, b, c, d, 0.34 * CGFloat(step) / 14)) }
-        path.move(to: cubic(a, b, c, d, 0.67))
-        for step in 1...14 { path.addLine(to: cubic(a, b, c, d, 0.67 + 0.33 * CGFloat(step) / 14)) }
-        path.addLine(to: p(tip, bottom))
-        // Arrowheads.
-        for y in [top, bottom] {
-            path.move(to: p(tip - 0.17, y - 0.16))
-            path.addLine(to: p(tip, y))
-            path.addLine(to: p(tip - 0.17, y + 0.16))
-        }
-        return path
-    }
-}
-
-/// Up Next, after Spotify's: a pill for the song that plays over two lines for what comes after.
-struct QueueGlyph: Shape {
-    func path(in rect: CGRect) -> Path {
-        func p(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: rect.minX + x * rect.width, y: rect.minY + y * rect.height) }
-        var path = Path()
-        let pill = CGRect(x: rect.minX + rect.width * 0.04, y: rect.minY + rect.height * 0.04,
-                          width: rect.width * 0.92, height: rect.height * 0.27)
-        path.addRoundedRect(in: pill, cornerSize: CGSize(width: pill.height / 2, height: pill.height / 2))
-        for y in [0.645, 0.95] as [CGFloat] {
-            path.move(to: p(0.02, y))
-            path.addLine(to: p(0.98, y))
-        }
-        return path
-    }
-}
-
-/// Add to queue, after Spotify's: a plus, a hook for the queue, and two lines.
-struct AddQueueGlyph: Shape {
-    func path(in rect: CGRect) -> Path {
-        func p(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: rect.minX + x * rect.width, y: rect.minY + y * rect.height) }
-        var path = Path()
-        path.move(to: p(0.04, 0.2)); path.addLine(to: p(0.34, 0.2))
-        path.move(to: p(0.19, 0.05)); path.addLine(to: p(0.19, 0.35))
-        let turn = rect.height * 0.12
-        path.move(to: p(0.5, 0.11))
-        path.addLine(to: CGPoint(x: rect.minX + rect.width * 0.96 - turn, y: rect.minY + rect.height * 0.11))
-        path.addArc(center: CGPoint(x: rect.minX + rect.width * 0.96 - turn, y: rect.minY + rect.height * 0.23), radius: turn,
-                    startAngle: .degrees(-90), endAngle: .degrees(90), clockwise: false)
-        path.addLine(to: p(0.5, 0.35))
-        for y in [0.66, 0.97] as [CGFloat] {
-            path.move(to: p(0.15, y))
-            path.addLine(to: p(0.98, y))
-        }
-        return path
     }
 }
 
@@ -374,44 +272,24 @@ struct ViewModeGlyph: Shape {
     }
 }
 
-/// Previous or next: a triangle against a thin bar, with softly rounded corners.
-struct SkipGlyph: Shape {
-    var forward: Bool
-
+/// Play in the round button, after Spotify's: a triangle with rounded corners, a little right of the middle.
+struct PlayGlyph: Shape {
     func path(in rect: CGRect) -> Path {
-        let bar = max(1.6, rect.width * 0.15)
-        let gap = rect.width * 0.04
-        let tip = rect.width - bar - gap
         var path = Path()
-        // Drawn pointing right, then mirrored for previous.
-        let triangle = [CGPoint(x: 0, y: 0), CGPoint(x: tip, y: rect.height / 2), CGPoint(x: 0, y: rect.height)]
-        path.addRoundedTriangle(triangle, radius: rect.width * 0.08)
-        path.addRoundedRect(in: CGRect(x: rect.width - bar, y: 0, width: bar, height: rect.height),
-                            cornerSize: CGSize(width: bar / 2, height: bar / 2))
-        let flip = forward ? CGAffineTransform.identity : CGAffineTransform(a: -1, b: 0, c: 0, d: 1, tx: rect.width, ty: 0)
-        return path.applying(flip).applying(CGAffineTransform(translationX: rect.minX, y: rect.minY))
+        path.addRoundedTriangle([CGPoint(x: rect.minX, y: rect.minY), CGPoint(x: rect.maxX, y: rect.midY), CGPoint(x: rect.minX, y: rect.maxY)],
+                                radius: rect.width * 0.1)
+        return path
     }
 }
 
-/// Repeat: a rounded, nearly square loop with an opening at the bottom, where an arrowhead points left into it, like
-/// Spotify's.
-struct LoopGlyph: Shape {
+/// Pause in the round button: two bars with rounded corners.
+struct PauseGlyph: Shape {
     func path(in rect: CGRect) -> Path {
-        let head = rect.height * 0.2
-        let box = CGRect(x: rect.minX, y: rect.minY, width: rect.width, height: rect.height - head)
-        let radius = box.height * 0.32
-        let gapLeft = box.minX + box.width * 0.36
-        let tip = box.minX + box.width * 0.5
         var path = Path()
-        path.move(to: CGPoint(x: gapLeft, y: box.maxY))
-        path.addArc(tangent1End: CGPoint(x: box.minX, y: box.maxY), tangent2End: CGPoint(x: box.minX, y: box.minY), radius: radius)
-        path.addArc(tangent1End: CGPoint(x: box.minX, y: box.minY), tangent2End: CGPoint(x: box.maxX, y: box.minY), radius: radius)
-        path.addArc(tangent1End: CGPoint(x: box.maxX, y: box.minY), tangent2End: CGPoint(x: box.maxX, y: box.maxY), radius: radius)
-        path.addArc(tangent1End: CGPoint(x: box.maxX, y: box.maxY), tangent2End: CGPoint(x: box.minX, y: box.maxY), radius: radius)
-        path.addLine(to: CGPoint(x: tip, y: box.maxY))
-        path.move(to: CGPoint(x: tip + head, y: box.maxY - head))
-        path.addLine(to: CGPoint(x: tip, y: box.maxY))
-        path.addLine(to: CGPoint(x: tip + head, y: box.maxY + head))
+        let bar = rect.width * 0.32
+        let corner = CGSize(width: bar * 0.3, height: bar * 0.3)
+        path.addRoundedRect(in: CGRect(x: rect.minX, y: rect.minY, width: bar, height: rect.height), cornerSize: corner)
+        path.addRoundedRect(in: CGRect(x: rect.maxX - bar, y: rect.minY, width: bar, height: rect.height), cornerSize: corner)
         return path
     }
 }
@@ -446,24 +324,16 @@ struct TransportIcon: View {
         Button(action: action) {
             Group {
                 switch glyph {
-                case .back?, .forward?:
-                    SkipGlyph(forward: glyph == .forward)
-                        .fill(colour)
-                        .frame(width: size * 0.82, height: size * 0.86)
-                case .shuffle?:
-                    ShuffleGlyph()
-                        .stroke(colour, style: StrokeStyle(lineWidth: max(1.4, size * 0.1), lineCap: .round, lineJoin: .round))
-                        .frame(width: size * 1.1, height: size * 0.96)
-                case .loop?:
-                    LoopGlyph()
-                        .stroke(colour, style: StrokeStyle(lineWidth: max(1.4, size * 0.1), lineCap: .round, lineJoin: .round))
-                        .frame(width: size * 1.05, height: size * 1.0)
+                case .back?: Glyph(kind: .previous).sized(height: size * 0.8)
+                case .forward?: Glyph(kind: .next).sized(height: size * 0.8)
+                case .shuffle?: Glyph(kind: .shuffle).sized(height: size * 0.95)
+                case .loop?: Glyph(kind: .loop).sized(height: size * 0.95)
                 case nil:
                     Image(systemName: symbol)
                         .font(.system(size: size, weight: on == nil ? .regular : .medium))
-                        .foregroundStyle(colour)
                 }
             }
+                .foregroundStyle(colour)
                 .frame(width: size + 12, height: size + 12)
                 .overlay(alignment: .bottom) {
                     if on == true {
