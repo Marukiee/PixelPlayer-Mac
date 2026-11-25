@@ -66,5 +66,12 @@ if let stub = ProcessInfo.processInfo.environment["PP_STUB"], let server = URL(s
     semaphore.wait()
 }
 
+matchingChecks()
+if ProcessInfo.processInfo.environment["PP_FAKE_SONOS"] != nil {
+    let done = DispatchSemaphore(value: 0)
+    Task { await sonosChecks(); done.signal() }
+    done.wait()
+}
+
 print(failures == 0 ? "all \(passes) checks passed" : "\(failures) failed, \(passes) passed")
 exit(failures == 0 ? 0 : 1)
