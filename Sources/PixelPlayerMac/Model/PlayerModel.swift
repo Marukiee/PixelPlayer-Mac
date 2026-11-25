@@ -74,7 +74,9 @@ final class PlayerModel {
     /// The song whose details are shown in a sheet.
     var infoSong: Song?
     var shuffle = false
-    var repeatAll = true
+    var repeatAll = true {
+        didSet { RemoteController.shared.modesChanged() }
+    }
     var volume: Double = 60 {
         didSet { Playback.shared.setVolume(volume) }
     }
@@ -92,12 +94,17 @@ final class PlayerModel {
     var volumes: [String: Double] = ["living": 42, "kitchen": 28, "bedroom": 30, "study": 20]
     var individualVolume = false
 
-    var userQueue: [Song] = Library.shared.isSample ? Sample.userQueue : []
-    var upNext: [Song] = Library.shared.isSample ? Sample.upNext : []
+    var userQueue: [Song] = Library.shared.isSample ? Sample.userQueue : [] {
+        didSet { RemoteController.shared.queueChanged() }
+    }
+    var upNext: [Song] = Library.shared.isSample ? Sample.upNext : [] {
+        didSet { RemoteController.shared.queueChanged() }
+    }
 
     var duration: Double { Double(current.seconds) }
 
     var groupName: String {
+        if let phone = RemoteController.shared.active { return phone.name }
         let names = Sample.rooms.filter { group.contains($0.id) }.map(\.name)
         if names.isEmpty { return "This Mac" }
         return names.count == 1 ? names[0] : names.joined(separator: " + ")

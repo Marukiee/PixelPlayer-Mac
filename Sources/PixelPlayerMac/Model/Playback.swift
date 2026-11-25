@@ -12,7 +12,8 @@ final class Playback {
     private let player = AVPlayer()
     private var timeObserver: Any?
     private var endObserver: NSObjectProtocol?
-    private var history: [Song] = []
+    /// Songs played before the current one, oldest first.
+    private(set) var history: [Song] = []
     /// Real listening time of the song that plays, for counting the listen (spec section 4).
     private var listenedMs = 0
     private var lastTick: Double?
@@ -48,14 +49,18 @@ final class Playback {
         start(song)
     }
 
-    private func start(_ song: Song) {
+    private func start(_ song: Song, at seconds: Double = 0) {
         endListen()
         if model.current.id != "" && model.current.id != song.id { history.append(model.current) }
         model.current = song
-        model.position = 0
-        guard !Library.shared.isSample, let url = url(for: song) else { return }
+        model.position = seconds
+        guard !Library.shared.isSample else { return }
+        // On a phone the phone plays; the Mac only tells it what.
+        if RemoteController.shared.isActive { RemoteController.shared.userChangedTrack(); return }
+        guard let url = url(for: song) else { return }
         player.replaceCurrentItem(with: AVPlayerItem(url: url))
         player.volume = Debug.active ? 0 : Float(model.volume / 100)
+        if seconds > 0 { player.seek(to: CMTime(seconds: seconds, preferredTimescale: 600)) }
         player.play()
         model.isPlaying = true
         updateNowPlaying()
@@ -72,7 +77,8 @@ final class Playback {
 
     func setPlaying(_ playing: Bool) {
         guard !Library.shared.isSample else { return }
-        if player.currentItem == nil, playing, model.current.id != "" { start(model.current); return }
+        if RemoteController.shared.isActive { RemoteController.shared.setPlaying(playing); return }
+        if player.currentItem == nil, playing, model.current.id != "" { start(model.current, at: model.position); return }
         playing ? player.play() : player.pause()
         lastTick = nil
         updateNowPlaying()
@@ -81,11 +87,13 @@ final class Playback {
 
     func seek(to seconds: Double) {
         guard !Library.shared.isSample else { return }
+        if RemoteController.shared.isActive { RemoteController.shared.seek(to: seconds); return }
         player.seek(to: CMTime(seconds: seconds, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
         updateNowPlaying()
     }
 
     func setVolume(_ value: Double) {
+        if RemoteController.shared.isActive { RemoteController.shared.setVolume(value); return }
         // Scripted runs stay silent: they play real audio, and nobody at the Mac asked for it.
         player.volume = Debug.active ? 0 : Float(value / 100)
     }
@@ -103,6 +111,37 @@ final class Playback {
             endListen()
             model.isPlaying = false
         }
+    }
+
+    /// A phone takes over: the Mac stops its own sound, and what it played so far counts as a listen.
+    func handOff() {
+        if player.rate > 0 { report("paused") }
+        endListen()
+        player.pause()
+        player.replaceCurrentItem(with: nil)
+        updateNowPlaying()
+    }
+
+    /// The phone moved to another song by itself (the song ended, or someone used the phone). The queue here follows,
+    /// without starting anything: the phone plays, the Mac only shows it.
+    func follow(to id: String) {
+        if let i = model.userQueue.firstIndex(where: { $0.id == id }) {
+            history.append(model.current)
+            history += model.userQueue[..<i]
+            model.current = model.userQueue[i]
+            model.userQueue.removeFirst(i + 1)
+        } else if let i = model.upNext.firstIndex(where: { $0.id == id }) {
+            history.append(model.current)
+            history += model.userQueue + model.upNext[..<i]
+            model.userQueue = []
+            model.current = model.upNext[i]
+            model.upNext.removeFirst(i + 1)
+        } else if let i = history.lastIndex(where: { $0.id == id }) {
+            model.upNext.insert(contentsOf: Array(history[(i + 1)...]) + [model.current], at: 0)
+            model.current = history[i]
+            history.removeSubrange(i...)
+        }
+        updateNowPlaying()
     }
 
     /// Back to the start of the song, or to the one before when it has only just begun.

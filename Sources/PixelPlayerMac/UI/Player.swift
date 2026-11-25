@@ -59,7 +59,7 @@ struct PlayerSideButtons: View {
         @Bindable var model = model
         HStack(spacing: 4) {
             BarIcon(symbol: "quote.bubble", label: "Lyrics", active: model.fullPlayer) { model.setFullPlayer(!model.fullPlayer) }
-            BarIcon(symbol: "hifispeaker", label: "Connect · \(model.groupName)", active: !model.group.isEmpty) { model.showDevices.toggle() }
+            BarIcon(symbol: RemoteController.shared.isActive ? "iphone" : "hifispeaker", label: "Connect · \(model.groupName)", active: !model.group.isEmpty || RemoteController.shared.isActive) { model.showDevices.toggle() }
                 .popover(isPresented: $model.showDevices, arrowEdge: .top) { DevicesPopover() }
             BarIcon(symbol: "list.bullet", label: "Up Next", active: model.showQueue) {
                 withAnimation(Motion.panel) { model.showQueue.toggle() }
@@ -426,21 +426,25 @@ struct SongInfoSheet: View {
 /// volume, Individueel volume that opens) told with the Mac's own form rows.
 struct DevicesPopover: View {
     @Environment(PlayerModel.self) private var model
+    private var remote: RemoteController { .shared }
 
     var body: some View {
         @Bindable var model = model
         Form {
             Section("Playing on") {
                 LabeledContent {
-                    Button("Disconnect") { model.group = [] }.controlSize(.small)
+                    Button("Disconnect") { remote.disconnect(); model.group = [] }.controlSize(.small)
+                        .disabled(model.group.isEmpty && !remote.isActive)
                 } label: {
                     Label {
                         VStack(alignment: .leading, spacing: 1) {
                             Text(model.groupName)
-                            Text(model.group.isEmpty ? "Mac speakers" : "Sonos").font(.caption).foregroundStyle(.secondary)
+                            Text(remote.isActive ? "Phone" : model.group.isEmpty ? "Mac speakers" : "Sonos")
+                                .font(.caption).foregroundStyle(.secondary)
                         }
                     } icon: {
-                        Image(systemName: model.group.count > 1 ? "hifispeaker.2.fill" : "hifispeaker.fill").foregroundStyle(.tint)
+                        Image(systemName: remote.isActive ? "iphone" : model.group.count > 1 ? "hifispeaker.2.fill" : "hifispeaker.fill")
+                            .foregroundStyle(.tint)
                     }
                 }
                 Slider(value: Binding(get: { model.groupVolume }, set: { model.groupVolume = $0 }), in: 0...100) {
@@ -461,7 +465,8 @@ struct DevicesPopover: View {
                 }
             }
             Section("This Mac") {
-                Toggle(isOn: Binding(get: { model.group.isEmpty }, set: { if $0 { model.group = [] } })) {
+                Toggle(isOn: Binding(get: { model.group.isEmpty && !remote.isActive },
+                                     set: { if $0 { remote.disconnect(); model.group = [] } })) {
                     Label("Mac speakers", systemImage: "laptopcomputer")
                 }
             }
@@ -474,20 +479,33 @@ struct DevicesPopover: View {
                 }
             }
             Section {
-                ForEach(Sample.phones) { phone in
-                    LabeledContent {
-                        Text("Later")
-                    } label: {
-                        Label(phone.name, systemImage: "iphone")
+                ForEach(remote.phones) { phone in
+                    Toggle(isOn: Binding(get: { remote.active == phone },
+                                         set: { on in on ? remote.connect(phone) : remote.disconnect() })) {
+                        Label {
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(phone.name)
+                                if let note = remote.note(for: phone) {
+                                    Text(note).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                                }
+                            }
+                        } icon: {
+                            Image(systemName: "iphone")
+                        }
                     }
-                    .foregroundStyle(.secondary)
                 }
             } header: {
                 Text("Phones")
+            } footer: {
+                if remote.phones.isEmpty {
+                    Text("Pair a phone with this Mac and turn on \(Text("PixelPlayer › Settings › Play from › Use this phone as remote player").bold()) on it.")
+                        .foregroundStyle(.secondary)
+                }
             }
         }
         .formStyle(.grouped)
         .toggleStyle(.checkbox)
         .frame(width: 280, height: 600)
+        .onAppear { remote.refreshPhones() }
     }
 }

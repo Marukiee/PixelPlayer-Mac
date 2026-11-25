@@ -98,6 +98,37 @@ enum Debug {
             if let song = Library.shared.songs.first(where: { $0.title == value }) { model.setLiked(song, parts[0] == "like") }
         case "seek":
             model.seek(to: Double(value) ?? 0)
+        case "phone":
+            // `phone:<name>` plays on that phone (PP_REMOTE_TCP lists them), `phone:off` comes back to the Mac.
+            let remote = RemoteController.shared
+            remote.refreshPhones()
+            if value == "off" { remote.disconnect() } else if let phone = remote.phones.first(where: { $0.name == value }) { remote.connect(phone) }
+        case "next":
+            Playback.shared.next()
+        case "prev":
+            Playback.shared.previous()
+        case "pause", "resume":
+            model.setPlaying(parts[0] == "resume")
+        case "volume":
+            model.volume = Double(value) ?? 50
+        case "repeat":
+            model.repeatAll = value == "1"
+        case "addqueue", "playnext":
+            if let song = Library.shared.songs.first(where: { $0.title == value }) {
+                if parts[0] == "playnext" { model.userQueue.insert(song, at: 0) } else { model.userQueue.append(song) }
+            }
+        case "remotestate":
+            // What the Mac shows while a phone plays, for the remote checks.
+            let remote = RemoteController.shared
+            let line = "\(parts.count > 1 ? value : "state")\tcurrent=\(model.current.title)\tid=\(model.current.id)\tpos=\(Int(model.position))"
+                + "\tplaying=\(model.isPlaying)\tvolume=\(Int(model.volume))\tqueue=\(model.userQueue.count)+\(model.upNext.count)"
+                + "\tactive=\(remote.active?.name ?? "-")\tnote=\(remote.active.flatMap(remote.note(for:)) ?? remote.phones.first.flatMap(remote.note(for:)) ?? "-")\n"
+            let url = file("remote.txt")
+            if let handle = try? FileHandle(forWritingTo: url) {
+                handle.seekToEndOfFile(); handle.write(Data(line.utf8)); try? handle.close()
+            } else {
+                try? line.write(to: url, atomically: true, encoding: .utf8)
+            }
         case "dump":
             // What the merged library looks like, for checks of the local-first rules.
             let lines = Library.shared.songs.map { "\($0.id)\t\($0.title)\t\($0.artist)\tlocal=\($0.isLocal)\tserver=\($0.source.serverID ?? "-")\tliked=\(Library.shared.likedIDs.contains($0.id))" }
