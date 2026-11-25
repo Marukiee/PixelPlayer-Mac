@@ -46,6 +46,7 @@ private struct SourcesPane: View {
     @LocalState private var password = ""
     @LocalState private var folder = MusicFolder.path
     @LocalState private var sonos = true
+    @LocalState private var remoteHosts = UserDefaults.standard.string(forKey: "remote.hosts") ?? ""
 
     private var library: Library { Library.shared }
 
@@ -83,6 +84,15 @@ private struct SourcesPane: View {
                 Text("Navidrome")
             } footer: {
                 Text("\(Text("Navidrome › Settings › Users").bold()). The password stays in your keychain.")
+                    .foregroundStyle(.secondary)
+            }
+            Section {
+                TextField("Over the network", text: $remoteHosts, prompt: Text("192.168.1.20:47123 Pixel"))
+                    .onChange(of: remoteHosts) { UserDefaults.standard.set(remoteHosts, forKey: "remote.hosts") }
+            } header: {
+                Text("Phones")
+            } footer: {
+                Text("Pair the phone with this Mac, then on the phone: \(Text("PixelPlayer › Settings › Play from › Use this phone as remote player").bold()). It shows up in Connect.")
                     .foregroundStyle(.secondary)
             }
             Section("Sonos") {

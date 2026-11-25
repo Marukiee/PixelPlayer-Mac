@@ -16,7 +16,7 @@ public enum RemoteProtocol {
 
     /// The last three parts of a path, so the phone finds its own copy in a differently named music folder.
     public static func pathTail(_ path: String?) -> String {
-        guard let path, !path.isEmpty, !path.contains("://") else { return "" }
+        guard let path, !path.trimmingCharacters(in: .whitespaces).isEmpty, !path.contains("://") else { return "" }
         let parts = path.replacingOccurrences(of: "\\", with: "/").split(separator: "/").map(String.init).filter { !$0.isEmpty }
         return parts.suffix(3).joined(separator: "/")
     }

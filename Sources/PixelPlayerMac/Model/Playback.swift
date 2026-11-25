@@ -56,7 +56,7 @@ final class Playback {
         model.position = seconds
         guard !Library.shared.isSample else { return }
         // On a phone the phone plays; the Mac only tells it what.
-        if RemoteController.shared.isActive { RemoteController.shared.userChangedTrack(); return }
+        if RemoteController.shared.controlsPlayback { RemoteController.shared.userChangedTrack(); return }
         guard let url = url(for: song) else { return }
         player.replaceCurrentItem(with: AVPlayerItem(url: url))
         player.volume = Debug.active ? 0 : Float(model.volume / 100)
@@ -77,7 +77,7 @@ final class Playback {
 
     func setPlaying(_ playing: Bool) {
         guard !Library.shared.isSample else { return }
-        if RemoteController.shared.isActive { RemoteController.shared.setPlaying(playing); return }
+        if RemoteController.shared.controlsPlayback { RemoteController.shared.setPlaying(playing); return }
         if player.currentItem == nil, playing, model.current.id != "" { start(model.current, at: model.position); return }
         playing ? player.play() : player.pause()
         lastTick = nil
@@ -87,13 +87,13 @@ final class Playback {
 
     func seek(to seconds: Double) {
         guard !Library.shared.isSample else { return }
-        if RemoteController.shared.isActive { RemoteController.shared.seek(to: seconds); return }
+        if RemoteController.shared.controlsPlayback { RemoteController.shared.seek(to: seconds); return }
         player.seek(to: CMTime(seconds: seconds, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
         updateNowPlaying()
     }
 
     func setVolume(_ value: Double) {
-        if RemoteController.shared.isActive { RemoteController.shared.setVolume(value); return }
+        if RemoteController.shared.controlsPlayback { RemoteController.shared.setVolume(value); return }
         // Scripted runs stay silent: they play real audio, and nobody at the Mac asked for it.
         player.volume = Debug.active ? 0 : Float(value / 100)
     }
@@ -112,6 +112,9 @@ final class Playback {
             model.isPlaying = false
         }
     }
+
+    /// Whether sound comes out of this Mac right now.
+    var isPlayingHere: Bool { player.rate > 0 }
 
     /// A phone takes over: the Mac stops its own sound, and what it played so far counts as a listen.
     func handOff() {

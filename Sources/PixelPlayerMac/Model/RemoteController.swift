@@ -52,6 +52,9 @@ final class RemoteController {
     private(set) var notes: [String: String] = [:]
 
     var isActive: Bool { active != nil }
+    /// Whether play, pause, seek and volume go to the phone. While it connects, the Mac keeps playing itself,
+    /// so a phone that does not answer costs nothing.
+    var controlsPlayback: Bool { active != nil && phase != .connecting }
 
     @ObservationIgnored private var link: RemoteLink?
     @ObservationIgnored private var opening = false
@@ -127,8 +130,10 @@ final class RemoteController {
 
     func connect(_ phone: RemotePhone) {
         guard phone != active, !Library.shared.isSample else { return }
+        // From one phone to another the music carries on.
+        let wasPlaying = model.isPlaying
         if active != nil { disconnect() }
-        Playback.shared.handOff()
+        model.isPlaying = wasPlaying
         model.group = []
         notes[phone.id] = nil
         active = phone
@@ -149,13 +154,14 @@ final class RemoteController {
     /// Back to this Mac: the phone pauses and lets go. The song and the place in it stay, ready to play here.
     func disconnect() {
         guard active != nil else { return }
+        let wasControlling = controlsPlayback
         if let link {
             link.send(RemoteMessage.simple("pause"))
             link.send(RemoteMessage.simple("bye"))
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { link.close() }
         }
         finish(note: nil)
-        model.isPlaying = false
+        if wasControlling { model.isPlaying = false }
     }
 
     private func finish(note: String?) {
@@ -194,7 +200,7 @@ final class RemoteController {
         guard ok else {
             if first {
                 finish(note: "No answer. On the phone, turn on PixelPlayer › Settings › Play from › Use this phone as remote player.")
-                model.isPlaying = false
+                if !Playback.shared.isPlayingHere { model.isPlaying = false }
             } else {
                 scheduleReconnect()
             }
@@ -202,6 +208,7 @@ final class RemoteController {
         }
         link = newLink
         lastReceived = .now
+        if first { Playback.shared.handOff() }
         phase = .connected
         reconnectAttempts = 0
         newLink.send(RemoteMessage.hello(name: Host.current().localizedName ?? "Mac", session: true))

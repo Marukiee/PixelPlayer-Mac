@@ -67,7 +67,9 @@ if let stub = ProcessInfo.processInfo.environment["PP_STUB"], let server = URL(s
 }
 
 matchingChecks()
-if ProcessInfo.processInfo.environment["PP_FAKE_SONOS"] != nil {
+remoteChecks()
+// The pure Sonos checks always run; the live part only with PP_FAKE_SONOS set.
+do {
     let done = DispatchSemaphore(value: 0)
     Task { await sonosChecks(); done.signal() }
     done.wait()
