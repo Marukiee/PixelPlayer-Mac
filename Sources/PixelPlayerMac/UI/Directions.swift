@@ -15,7 +15,9 @@ struct RootView: View {
             } detail: {
                 detail
                     // Without its own width the floating player decides how wide the content is, and squeezes the sidebar.
-                    .navigationSplitViewColumnWidth(min: 640, ideal: 860)
+                    .navigationSplitViewColumnWidth(min: 640, ideal: 900)
+                    // A dark page in dark mode; it also runs under the sidebar, so the sidebar's glass is dark too.
+                    .background(PP.page.ignoresSafeArea())
             }
             .searchable(text: $model.searchText, placement: .sidebar, prompt: "Search")
             if model.fullScreen {
@@ -194,7 +196,7 @@ struct Sidebar: View {
                 .padding(.trailing, 16)
             }
         }
-        .navigationSplitViewColumnWidth(min: 280, ideal: 320, max: 420)
+        .navigationSplitViewColumnWidth(min: 260, ideal: 280, max: 420)
         .toolbar(removing: .sidebarToggle)
     }
 }

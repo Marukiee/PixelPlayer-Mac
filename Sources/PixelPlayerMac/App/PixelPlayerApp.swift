@@ -79,8 +79,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         for window in NSApp.windows where window.isVisible && window.frame.width > 800 {
             guard let split = split(in: window.contentView), let sidebar = split.arrangedSubviews.first,
-                  sidebar.frame.width < 280 else { continue }
-            split.setPosition(320, ofDividerAt: 0)
+                  sidebar.frame.width < 260 else { continue }
+            split.setPosition(280, ofDividerAt: 0)
         }
     }
 

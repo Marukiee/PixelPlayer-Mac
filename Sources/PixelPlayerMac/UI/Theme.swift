@@ -18,6 +18,10 @@ enum PP {
     static let tertiaryContainer = adaptive(0xFFD8EC, 0x5A2F50)
     static let onTertiaryContainer = adaptive(0x7A2E5E, 0xFFD8EC)
     static let window = adaptive(0xFAF8FF, 0x111318)
+    /// Behind the pages: the system's window colour in light, near black in dark, as dark as Spotify feels.
+    static let page = Color(nsColor: NSColor(name: nil) { appearance in
+        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? NSColor(hex: 0x121212, alpha: 1) : .windowBackgroundColor
+    })
     static let surface = adaptive(0xF0F2FD, 0x1A1C23)
     static let surfaceHigh = adaptive(0xE5E8F7, 0x242733)
     static let ink = adaptive(0x1A1B21, 0xE4E2EA)
