@@ -1,4 +1,5 @@
 import SwiftUI
+import PixelPlayerKit
 
 /// The drawn covers of the made-up sample music.
 enum ArtStyle: Hashable {
@@ -39,8 +40,11 @@ struct Song: Identifiable, Hashable {
     var track: Int? = nil
     var source = SongSource()
     var addedText = ""
+    /// When the song came into the library, in seconds since 1970, for sorting by recently added.
+    var addedAt: Double? = nil
 
     var artist: String { artistName ?? album.artist }
+    var orderFields: TrackOrder.Fields { TrackOrder.Fields(title: title, artist: artist, album: album.title, track: track, added: addedAt) }
     var duration: String { String(format: "%d:%02d", seconds / 60, seconds % 60) }
     var added: String { addedText }
     var isLocal: Bool { source.localURL != nil }

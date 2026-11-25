@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import PixelPlayerKit
 
 /// Scripted captures of the prototype, so every direction is shown in the same state. Only active
 /// with `PP_DEBUG_DIR` set. Screenshots are made with `screencapture -l` of the app's own windows,
@@ -8,7 +9,8 @@ import AppKit
 ///
 /// - `PP_APPEARANCE=light|dark`, `PP_WINDOW=1180x760`, `PP_SLOW=6`, `PP_FREEZE=1`
 /// - `PP_SCRIPT=page:home,wait:1,shot:a-home,devices:1,wait:1.5,shot:a-devices,quit`
-///   Steps: page (home, search, songs, liked, playlist:<id>, album:<id>, artist:<id>), filter, search:<text>, queue (1|0), devices (1|0), full (1|0), indiv (1|0), play (1|0),
+///   Steps: page (home, search, songs, liked, playlist:<id>, album:<id>, artist:<id>, shelf:<key>), filter, search:<text>, sort:<order>, queue (1|0), devices (1|0), full (1|0), indiv (1|0), play (1|0),
+///   minimize, openapp (as Open PixelPlayer in the menu bar), resume, dump, render:<name>[:sheet] (without the screen),
 ///   appearance, wait, slow, shot:<name>, settings:<tab>, settingsshot:<name>, closesettings,
 ///   stage:<name> (menu bar panel), frames:<name>:<seconds>, quit.
 @MainActor
@@ -177,6 +179,14 @@ enum Debug {
             // What the merged library looks like, for checks of the local-first rules.
             let lines = Library.shared.songs.map { "\($0.id)\t\($0.title)\t\($0.artist)\tlocal=\($0.isLocal)\tserver=\($0.source.serverID ?? "-")\tliked=\(Library.shared.likedIDs.contains($0.id))" }
             try? lines.joined(separator: "\n").write(to: file("library.txt"), atomically: true, encoding: .utf8)
+        case "sort":
+            // `sort:title|artist|album|added|custom` orders the list on the page, as the sort menu does.
+            if let order = TrackOrder(rawValue: value) { model.trackOrders[model.route] = order }
+        case "minimize":
+            mainWindow()?.miniaturize(nil)
+        case "openapp":
+            // What Open PixelPlayer in the menu bar panel does.
+            MainWindow.show(open: nil)
         case "fullscreen":
             model.setFullScreen(value == "1")
         case "info":
@@ -193,6 +203,14 @@ enum Debug {
             try? await Task.sleep(for: .seconds(Double(value) ?? 1))
         case "shot":
             await shot(value) { mainWindow() }
+        case "render":
+            // `render:<name>[:sheet]` draws the window (or its sheet) into a picture without the screen, so it also works
+            // while the screen is locked. Glass and materials come out flat; for checking content, not looks.
+            let window = parts.count > 2 && parts[2] == "sheet" ? mainWindow()?.attachedSheet : mainWindow()
+            if let view = window?.contentView, let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) {
+                view.cacheDisplay(in: view.bounds, to: rep)
+                try? rep.representation(using: .png, properties: [:])?.write(to: file("\(value).png"))
+            }
         case "focusshot":
             // Moves keyboard focus a few steps, as Tab does, and captures without clearing it: for checking focus rings.
             if let window = mainWindow() {
@@ -221,7 +239,7 @@ enum Debug {
         case "frames":
             if let window = mainWindow() { startFrames(window.windowNumber, name: value, seconds: Double(parts.count > 2 ? parts[2] : "4") ?? 4) }
         case "windows":
-            let lines = NSApp.windows.map { "\(String(describing: type(of: $0))) visible=\($0.isVisible) id=\($0.windowNumber) frame=\($0.frame) level=\($0.level.rawValue)" }
+            let lines = NSApp.windows.map { "\(String(describing: type(of: $0))) visible=\($0.isVisible) id=\($0.windowNumber) frame=\($0.frame) level=\($0.level.rawValue) identifier=\($0.identifier?.rawValue ?? "-") minimized=\($0.isMiniaturized)" }
             try? lines.joined(separator: "\n").write(to: file("windows.txt"), atomically: true, encoding: .utf8)
         case "quit":
             try? await Task.sleep(for: .seconds(0.5))

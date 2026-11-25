@@ -190,7 +190,9 @@ actor CoverCache {
     static let shared = CoverCache()
     private var memory: [String: NSImage] = [:]
     private let folder: URL = {
-        let url = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0].appendingPathComponent("PixelPlayer/covers", isDirectory: true)
+        // A scripted run keeps its covers to itself, apart from the real app's.
+        let url = ProcessInfo.processInfo.environment["PP_DEBUG_DIR"].map { URL(fileURLWithPath: $0).appendingPathComponent("covers", isDirectory: true) }
+            ?? FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0].appendingPathComponent("PixelPlayer/covers", isDirectory: true)
         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         return url
     }()
@@ -200,9 +202,14 @@ actor CoverCache {
         if let image = memory[key] { return image }
         let file = folder.appendingPathComponent(key.replacingOccurrences(of: "/", with: "_") + ".img")
         if let image = NSImage(contentsOf: file) { memory[key] = image; return image }
-        // A local album uses the cover inside its music file, unless the server has one.
+        // A local album uses the cover inside its music file, unless the server has one; without one inside,
+        // a picture in the album's folder (cover.jpg, folder.jpg and the like).
         if album.coverArtID == nil, let local = album.localCover {
-            if let data = await LocalScanner.artwork(of: local.path), let image = NSImage(data: data) {
+            var data = await LocalScanner.artwork(of: local.path)
+            if data.flatMap(NSImage.init(data:)) == nil, let picture = LocalScanner.folderArtwork(near: local.path) {
+                data = try? Data(contentsOf: picture)
+            }
+            if let data, let image = NSImage(data: data) {
                 try? data.write(to: file)
                 memory[key] = image
                 return image

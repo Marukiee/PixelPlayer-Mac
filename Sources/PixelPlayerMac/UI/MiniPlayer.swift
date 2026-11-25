@@ -4,6 +4,7 @@ import SwiftUI
 /// system's own buttons and sliders.
 struct MenuBarPanel: View {
     @Environment(PlayerModel.self) private var model
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -29,9 +30,13 @@ struct MenuBarPanel: View {
                 Text(model.groupName).lineLimit(1)
                 Spacer()
                 Menu("Change") {
-                    ForEach(Sample.rooms) { room in
-                        Toggle(room.name, isOn: Binding(get: { model.group.contains(room.id) },
-                                                        set: { on in if on { model.group.insert(room.id) } else { model.group.remove(room.id) } }))
+                    // The same rooms and switches as Connect in the player.
+                    ForEach(SonosOutput.shared.rooms) { room in
+                        Toggle(room.name, isOn: Binding(get: { SonosOutput.shared.isOn(room) }, set: { SonosOutput.shared.setRoom(room, on: $0) }))
+                            .disabled(SonosOutput.shared.isLocked(room))
+                    }
+                    if SonosOutput.shared.rooms.isEmpty {
+                        Text("No speakers found yet")
                     }
                 }
                 .menuStyle(.borderlessButton)
@@ -50,7 +55,7 @@ struct MenuBarPanel: View {
             }
             Divider()
             HStack {
-                Button("Open PixelPlayer") {}
+                Button("Open PixelPlayer") { MainWindow.show(open: openWindow) }
                 Spacer()
                 SettingsLink { Image(systemName: "gearshape") }.help("Settings")
             }
