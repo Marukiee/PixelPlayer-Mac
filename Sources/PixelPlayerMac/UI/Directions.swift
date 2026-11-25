@@ -51,7 +51,10 @@ struct RootView: View {
                 } else {
                     RouteContent()
                         // A new version shows as a small popup over the top right of the page.
-                        .overlay(alignment: .topTrailing) { UpdateCard() }
+                        .overlay(alignment: .topTrailing) {
+                            // Up in the empty band at the top of the window, level with the traffic lights.
+                            UpdateCard().ignoresSafeArea(.container, edges: .top)
+                        }
                     .transition(.opacity)
                 }
             }

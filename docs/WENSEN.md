@@ -12,6 +12,10 @@ Alles wat Mark vroeg, met wat klaar is en wat nog moet. Bijgewerkt bij elke rond
 - **Spotify.** Grijs in de welkom en in Instellingen tot het er is.
 - **Nederlandse vertaling** (zie ROADMAP).
 
+## In de volgende versie, klaar op main
+
+- Updatemelding hoger: bovenin het venster, op de hoogte van de knopjes linksboven.
+
 ## In 0.2.2
 
 - Bij het openen staat het laatst gespeelde nummer klaar, op de plek waar je was, met de wachtrij; de eerste keer Your Mix.

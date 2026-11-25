@@ -68,7 +68,7 @@ struct UpdateCard: View {
         .padding(.leading, 12).padding(.trailing, 14).padding(.vertical, 10)
         .frame(width: 420)
         .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .padding(.top, 16)
+        .padding(.top, 12)
         .padding(.trailing, 20)
     }
 
