@@ -54,7 +54,7 @@ struct MenuBarPanel: View {
                 Spacer()
                 SettingsLink { Image(systemName: "gearshape") }.help("Settings")
             }
-            .buttonStyle(.borderless)
+            .buttonStyle(PressStyle())
         }
         .padding(14)
         .frame(width: 300)

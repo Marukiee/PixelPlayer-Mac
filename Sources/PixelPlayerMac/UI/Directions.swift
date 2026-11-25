@@ -22,6 +22,9 @@ struct RootView: View {
                     .zIndex(10)
             }
         }
+        // With keyboard navigation on in macOS, every button would get a square blue ring, also round covers and glass
+        // buttons. The app's own buttons go without; Tab still moves between them.
+        .focusEffectDisabled()
         .sheet(item: $model.infoSong) { SongInfoSheet(song: $0) }
         // Room for the sidebar, the content and the queue side by side, so none of them is ever pushed aside.
         .frame(minWidth: 1100, minHeight: 640)
@@ -55,6 +58,8 @@ struct RootView: View {
                 FloatingPlayer()
                     .padding(.horizontal, 24)
                     .padding(.bottom, 16)
+                    // The bar is hosted apart from the page, so it needs its own: no square ring around round buttons.
+                    .focusEffectDisabled()
             }
             if model.showQueue {
                 QueueInspector()

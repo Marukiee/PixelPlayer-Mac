@@ -139,6 +139,10 @@ enum Debug {
             } else {
                 try? line.write(to: url, atomically: true, encoding: .utf8)
             }
+        case "testupdate":
+            // The whole update path against the real latest release: check, download, the checks, and the swap.
+            // Run a release build with PP_UPDATE_TEST_FROM set; the new app is put in place but not opened.
+            await Updater.shared.runTestUpdate()
         case "update":
             // `update:available|downloading|installing|failed` shows the update card with a made-up release.
             let release = Updater.Release(version: "0.2.0", notes: "Faster start\n\nNew\n\n\u{2022} Lyrics follow the song on Sonos\n\u{2022} Add songs to a playlist from the right-click menu",
@@ -182,6 +186,13 @@ enum Debug {
             try? await Task.sleep(for: .seconds(Double(value) ?? 1))
         case "shot":
             await shot(value) { mainWindow() }
+        case "focusshot":
+            // Moves keyboard focus a few steps, as Tab does, and captures without clearing it: for checking focus rings.
+            if let window = mainWindow() {
+                for _ in 0..<(Int(parts.count > 2 ? parts[2] : "3") ?? 3) { window.selectNextKeyView(nil) }
+                try? await Task.sleep(for: .seconds(0.5))
+                await capture(window.windowNumber, to: file("\(value).png"))
+            }
         case "settings":
             if let tab = SettingsTab(rawValue: value) { model.settingsTab = tab }
             if settingsWindow() == nil { model.settingsRequest += 1 }

@@ -105,7 +105,7 @@ struct TransportButtons: View {
             if modes { toggle("repeat", "Repeat", on: model.repeatAll) { model.repeatAll.toggle() } }
         }
         .font(large ? .title2 : .title3)
-        .buttonStyle(.borderless)
+        .buttonStyle(PressStyle())
         .foregroundStyle(.primary)
     }
 
@@ -128,7 +128,7 @@ struct LikeButton: View {
                 .foregroundStyle(model.liked ? AnyShapeStyle(.green) : AnyShapeStyle(.secondary))
                 .contentTransition(.symbolEffect(.replace))
         }
-        .buttonStyle(.borderless)
+        .buttonStyle(PressStyle())
         .help(model.liked ? "Remove from Liked Songs" : "Liked Songs")
     }
 }

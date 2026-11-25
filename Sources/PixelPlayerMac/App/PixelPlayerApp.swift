@@ -25,6 +25,7 @@ struct PixelPlayerApp: App {
             MenuBarPanel()
                 .environment(model)
                 .tint(PP.primary)
+                .focusEffectDisabled()
         }
         .menuBarExtraStyle(.window)
     }

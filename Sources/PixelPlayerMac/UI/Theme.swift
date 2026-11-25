@@ -158,6 +158,9 @@ struct HoverHighlight: ViewModifier {
 struct PressStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
+            // The whole frame takes the click, not only the strokes of a symbol.
+            .contentShape(Rectangle())
+            .opacity(configuration.isPressed ? 0.7 : 1)
             .scaleEffect(configuration.isPressed ? pressedScale : 1)
             .animation(Motion.bouncy, value: configuration.isPressed)
     }

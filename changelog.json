@@ -1,5 +1,21 @@
 [
   {
+    "version": "0.1.1",
+    "date": "2026-11-25",
+    "en": {
+      "title": "No blue squares",
+      "fixed": [
+        "With keyboard navigation on in macOS, buttons and covers no longer get a square blue ring"
+      ]
+    },
+    "nl": {
+      "title": "Geen blauwe vakjes",
+      "fixed": [
+        "Met toetsenbordnavigatie aan in macOS krijgen knoppen en hoezen geen blauw vierkant meer"
+      ]
+    }
+  },
+  {
     "version": "0.1.0",
     "date": "2026-11-25",
     "en": {
