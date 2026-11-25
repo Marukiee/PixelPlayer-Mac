@@ -10,7 +10,7 @@ import PixelPlayerKit
 /// - `PP_APPEARANCE=light|dark`, `PP_WINDOW=1180x760`, `PP_SLOW=6`, `PP_FREEZE=1`
 /// - `PP_SCRIPT=page:home,wait:1,shot:a-home,devices:1,wait:1.5,shot:a-devices,quit`
 ///   Steps: page (home, search, songs, liked, playlist:<id>, album:<id>, artist:<id>, shelf:<key>), filter, search:<text>, sort:<order>, queue (1|0), devices (1|0), full (1|0), indiv (1|0), play (1|0),
-///   minimize, openapp (as Open PixelPlayer in the menu bar), resume, dump,
+///   minimize, openapp (as Open PixelPlayer in the menu bar), resume, dump, render:<name>[:sheet] (without the screen),
 ///   appearance, wait, slow, shot:<name>, settings:<tab>, settingsshot:<name>, closesettings,
 ///   stage:<name> (menu bar panel), frames:<name>:<seconds>, quit.
 @MainActor
