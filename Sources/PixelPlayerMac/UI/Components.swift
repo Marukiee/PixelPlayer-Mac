@@ -124,7 +124,7 @@ struct LikeButton: View {
     var body: some View {
         Button { withAnimation(Motion.bouncy) { model.liked.toggle() } } label: {
             Image(systemName: model.liked ? "heart.fill" : "heart")
-                .foregroundStyle(model.liked ? AnyShapeStyle(.pink) : AnyShapeStyle(.secondary))
+                .foregroundStyle(model.liked ? AnyShapeStyle(.green) : AnyShapeStyle(.secondary))
                 .contentTransition(.symbolEffect(.replace))
         }
         .buttonStyle(.borderless)

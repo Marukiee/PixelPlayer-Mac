@@ -62,8 +62,11 @@ struct FloatingPlayer: View {
 
     var body: some View {
         HStack(spacing: 16) {
-            NowPlayingInfo(cover: 40, round: true)
-                .frame(minWidth: 120, maxWidth: 190, alignment: .leading)
+            HStack(spacing: 12) {
+                NowPlayingInfo(cover: 40, round: true)
+                LikeButton().font(.title3)
+            }
+            .frame(minWidth: 150, maxWidth: 230, alignment: .leading)
             TransportButtons(modes: false)
             InlinePosition()
                 .frame(minWidth: 90, maxWidth: 300)
@@ -78,8 +81,8 @@ struct FloatingPlayer: View {
 
 // MARK: Speelt nu
 
-/// The full player: the cover large and the lyrics beside it. The controls stay where they always are,
-/// in the player at the bottom, so nothing is shown twice.
+/// Now Playing: the lyrics large, as the main thing, with the cover and the song beside them. The controls,
+/// the heart included, stay in the player at the bottom, so nothing is shown twice.
 struct NowPlayingView: View {
     @Environment(PlayerModel.self) private var model
     private let lyrics = [
@@ -90,42 +93,50 @@ struct NowPlayingView: View {
         "Your coat still on the chair",
         "The radio is low",
         "And everything is slow",
+        "Stay a little longer",
+        "Before the lights come on",
+        "Here in the blue hour",
+        "We don't need a song",
     ]
+    /// The line that is sung now; the ones before it fade, the ones after it wait.
+    private let current = 3
 
     var body: some View {
         GeometryReader { geo in
-            let cover = min(geo.size.height - 64, geo.size.width * 0.44, 440)
-            HStack(alignment: .center, spacing: 40) {
-                CoverArt(album: model.current.album, radius: 10)
-                    .frame(width: cover, height: cover)
-                    .shadow(color: .black.opacity(0.2), radius: 18, y: 8)
-                VStack(alignment: .leading, spacing: 14) {
+            let cover = min(geo.size.height - 230, geo.size.width * 0.3, 320)
+            HStack(alignment: .top, spacing: 48) {
+                VStack(alignment: .leading, spacing: 18) {
+                    CoverArt(album: model.current.album, radius: 10)
+                        .frame(width: cover, height: cover)
+                        .shadow(color: .black.opacity(0.2), radius: 18, y: 8)
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Blue Hour Sessions · 2023").font(.subheadline).foregroundStyle(.secondary)
-                        HStack(alignment: .firstTextBaseline) {
-                            Text(model.current.title).font(.largeTitle.weight(.bold))
-                            Spacer()
-                            LikeButton().font(.title2)
-                        }
-                        Text(model.current.artist).font(.title2).foregroundStyle(.secondary)
+                        Text(model.current.title).font(.title.weight(.bold))
+                        Text(model.current.artist).font(.title3).foregroundStyle(.secondary)
+                        Text("Blue Hour Sessions · 2023").font(.callout).foregroundStyle(.tertiary)
                     }
-                    Divider()
-                    Text("Lyrics").font(.headline)
-                    VStack(alignment: .leading, spacing: 10) {
+                    .lineLimit(1)
+                }
+                .frame(width: cover, alignment: .leading)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 20) {
                         ForEach(lyrics.indices, id: \.self) { i in
                             Text(lyrics[i])
-                                .font(.title3.weight(i == 2 ? .semibold : .regular))
-                                .foregroundStyle(i == 2 ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
+                                .font(.system(size: 32, weight: .bold))
+                                .foregroundStyle(i == current ? AnyShapeStyle(.primary)
+                                                 : i < current ? AnyShapeStyle(.tertiary) : AnyShapeStyle(.secondary))
                         }
                     }
-                    Spacer(minLength: 0)
-                    Text("44.1 kHz · 192 kbps · MP3").font(.caption).foregroundStyle(.tertiary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.bottom, 48)
                 }
-                .frame(maxWidth: 400, maxHeight: cover, alignment: .topLeading)
+                .scrollIndicators(.never)
+                .frame(maxWidth: 640)
             }
-            .frame(width: geo.size.width, height: geo.size.height)
+            // Under the close button: 28 from the top, a button of 40, then 28 again.
+            .padding(.top, 96)
+            .padding(.horizontal, 28)
+            .frame(width: geo.size.width, height: geo.size.height, alignment: .topLeading)
         }
-        .padding(24)
         .overlay(alignment: .topLeading) {
             Button { model.setFullPlayer(false) } label: {
                 Image(systemName: "chevron.down").font(.system(size: 16, weight: .semibold)).foregroundStyle(.primary)
