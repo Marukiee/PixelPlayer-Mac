@@ -1,5 +1,39 @@
 [
   {
+    "version": "0.2.0",
+    "date": "2026-11-25",
+    "en": {
+      "title": "Your own music, properly",
+      "new": [
+        "A welcome at first start for your music folder, Navidrome and Sonos",
+        "Real lyrics, following the song when they are timed",
+        "Sort lists by title, artist or album, and Show all on Home"
+      ],
+      "better": [
+        "Hover like Spotify, without zoom, and a wider sidebar",
+        "Genres and covers from your own FLAC files, so mixes and covers show up"
+      ],
+      "fixed": [
+        "Buttons that did nothing now work, such as Play and Shuffle in menus and clearing the queue"
+      ]
+    },
+    "nl": {
+      "title": "Je eigen muziek, goed",
+      "new": [
+        "Een welkom bij de eerste start voor je muziekmap, Navidrome en Sonos",
+        "Echte songteksten, die meelopen met het nummer als ze getimed zijn",
+        "Lijsten sorteren op titel, artiest of album, en Show all op Home"
+      ],
+      "better": [
+        "Hover zoals Spotify, zonder zoom, en een bredere zijbalk",
+        "Genres en hoezen uit je eigen FLAC-bestanden, zodat mixen en hoezen verschijnen"
+      ],
+      "fixed": [
+        "Knoppen die niets deden werken nu, zoals Play en Shuffle in menu's en de wachtrij leegmaken"
+      ]
+    }
+  },
+  {
     "version": "0.1.1",
     "date": "2026-11-25",
     "en": {
