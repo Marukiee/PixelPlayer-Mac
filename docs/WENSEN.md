@@ -18,6 +18,9 @@ Alles wat Mark vroeg, met wat klaar is en wat nog moet. Bijgewerkt bij elke rond
 ## Voor 0.2.8 (wordt gebundeld, nog niet uitbrengen)
 - Shuffle opnieuw over Spotify gelegd: rechte diagonalen, onderbroken lijn loopt recht door onder de kruising.
 - Getekende iconen in een laag: doorzichtig wit (mixkop) geeft geen lichte vlekjes meer bij de pijlpunten.
+- Lijstkoppen zoals Spotify: kop in eigen kleur (donker), grotere witte titel, hoes groeit mee, 4 pt hoek, meta als "576 songs, 31 hr 21 min".
+- Liked Songs-hoes in Spotify's verloop met hun hartje.
+- App-icoon een tikje naar rechts.
 
 ## In 0.2.7 (uitgebracht)
 

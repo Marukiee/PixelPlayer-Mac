@@ -230,12 +230,15 @@ final class Library {
         return mix.count > 3 ? "\(names) and \(mix.count - 3) more" : names
     }
 
-    /// "12 songs · 1 h 4 m"
+    /// "12 songs, 1 hr 4 min", as Spotify writes it.
     static func summary(_ songs: [Song]) -> String {
-        let seconds = songs.reduce(0) { $0 + $1.seconds }
+        "\(songCount(songs.count)), \(duration(songs.reduce(0) { $0 + $1.seconds }))"
+    }
+
+    /// "1 hr 4 min", or "38 min 12 sec" under an hour, as on Spotify's list pages.
+    static func duration(_ seconds: Int) -> String {
         let hours = seconds / 3600, minutes = (seconds % 3600) / 60
-        let time = hours > 0 ? "\(hours) h \(minutes) m" : "\(minutes) m"
-        return "\(songCount(songs.count)) · \(time)"
+        return hours > 0 ? "\(hours) hr \(minutes) min" : "\(minutes) min \(seconds % 60) sec"
     }
     var isSample: Bool { status == .sample }
     /// True once there is music to show.

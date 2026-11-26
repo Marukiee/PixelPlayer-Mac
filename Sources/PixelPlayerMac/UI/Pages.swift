@@ -20,16 +20,16 @@ struct RouteContent: View {
             case .search:
                 SearchPage(term: "")
             case .songs:
-                TrackListPage(header: TrackHeader(kind: "Library", title: "All Songs", meta: Library.shared.isSample ? "1,284 songs · 81 h 12 m" : Library.summary(Library.shared.songs),
+                TrackListPage(header: TrackHeader(kind: "Library", title: "All Songs", meta: Library.shared.isSample ? "1,284 songs, 81 hr 12 min" : Library.summary(Library.shared.songs),
                                                   art: .songs, tint: Color(hex: 0x0058CA)),
                               songs: Library.shared.songs, firstOrder: .title)
             case .liked:
-                TrackListPage(header: TrackHeader(kind: "Playlist", title: "Liked Songs", meta: Library.shared.isSample ? "141 songs · 9 h 12 m" : Library.summary(Library.shared.liked),
-                                                  art: .liked, tint: Color(hex: 0x4B37D8)),
+                TrackListPage(header: TrackHeader(kind: "Playlist", title: "Liked Songs", meta: Library.shared.isSample ? "141 songs, 9 hr 12 min" : Library.summary(Library.shared.liked),
+                                                  art: .liked, tint: Color(hex: 0x5038A0)),
                               songs: Library.shared.liked, share: "Liked Songs")
             case .playlist(let id):
                 let list = Library.shared.playlists.first { $0.id == id } ?? Playlist(id: id, title: "Playlist", songs: [])
-                TrackListPage(header: TrackHeader(kind: "Playlist", title: list.title, meta: songCount(list.songs.count),
+                TrackListPage(header: TrackHeader(kind: "Playlist", title: list.title, meta: Library.summary(list.songs),
                                                   art: .collage(list.songs.map(\.album)), tint: Color(hex: list.songs.first?.album.tint ?? 0x23408F)),
                               songs: list.songs, orders: TrackOrder.allCases, firstOrder: .custom, share: list.title)
             case .album(let id):
@@ -37,7 +37,7 @@ struct RouteContent: View {
                     ?? Library.shared.album(at: 0)
                 let songs = Library.shared.songs(for: .album(album.id))
                 TrackListPage(header: TrackHeader(kind: "Album", title: album.title,
-                                                  meta: [album.year > 0 ? String(album.year) : "", songCount(songs.count)].filter { !$0.isEmpty }.joined(separator: " · "),
+                                                  meta: [album.year > 0 ? String(album.year) : "", Library.summary(songs)].filter { !$0.isEmpty }.joined(separator: " • "),
                                                   art: .album(album), tint: Color(hex: album.tint), artist: album.artist),
                               songs: songs, showAlbum: false, showAdded: false, showCover: false, showSort: false, share: "\(album.title) by \(album.artist)",
                               more: Shelves.items("more-album:\(album.id)"), moreRoute: .shelf("more-album:\(album.id)"))
@@ -63,7 +63,7 @@ struct RouteContent: View {
                 let mix = Library.shared.mixes.first { $0.id == id }
                 let songs = mix.map { Library.shared.songs(for: $0) } ?? []
                 TrackListPage(header: TrackHeader(kind: "Mix", title: mix?.title ?? "Mix",
-                                                  meta: [mix?.subtitle ?? "", Library.summary(songs)].filter { !$0.isEmpty }.joined(separator: " · "),
+                                                  meta: [mix?.subtitle ?? "", Library.summary(songs)].filter { !$0.isEmpty }.joined(separator: " • "),
                                                   art: .collage((mix?.covers ?? []) + (mix?.covers.reversed() ?? [])),
                                                   tint: Color(hex: mix?.covers.first?.tint ?? 0x23408F)),
                               songs: songs, share: mix?.title)
@@ -495,6 +495,7 @@ struct TrackListPage: View {
     var more: [ShelfItem] = []
     var moreRoute: Route? = nil
     @Environment(PlayerModel.self) private var model
+    @Environment(\.colorScheme) private var colorScheme
     @LocalState private var width: CGFloat = 900
     /// List rows with covers, or compact lines without them (View as, as in Spotify). Remembered for every list.
     @AppStorage("tracks.view") private var viewMode = "list"
@@ -505,27 +506,57 @@ struct TrackListPage: View {
         let order = model.trackOrders[model.route] ?? firstOrder
         let reversed = model.trackReversed[model.route] ?? false
         let songs = showSort ? order.sorted(self.songs, reversed: reversed, fields: \.orderFields) : self.songs
+        // As on Spotify: the cover grows with the page from 128 to 232 points, and the title is a little over four tenths of it.
+        let cover = min(232, max(128, 128 + (width - 600) / 424 * 104))
+        let titleSize = (cover * 0.42).rounded()
+        let dark = colorScheme == .dark
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(alignment: .bottom, spacing: 24) {
-                    ArtworkView(art: header.art, radius: 8)
-                        .frame(width: 200, height: 200)
-                        .shadow(color: .black.opacity(0.3), radius: 20, y: 10)
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(header.kind).font(.subheadline.weight(.semibold))
-                        Text(header.title).font(.system(size: 60, weight: .heavy)).lineLimit(1).minimumScaleFactor(0.5)
+                    ArtworkView(art: header.art, radius: 4)
+                        .frame(width: cover, height: cover)
+                        // One shadow for the whole cover, not one for the heart on it as well.
+                        .compositingGroup()
+                        .shadow(color: .black.opacity(0.5), radius: 30, y: 4)
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text(header.kind).font(.system(size: 14))
+                        Text(header.title)
+                            .font(.system(size: titleSize, weight: .heavy))
+                            .tracking(-titleSize * 0.025)
+                            .lineLimit(1).minimumScaleFactor(0.4)
+                            .padding(.top, 2)
                         HStack(spacing: 0) {
                             if let artist = header.artist {
-                                LinkText(artist) { PlayerModel.shared.go(.artist(artist)) }.fontWeight(.semibold).foregroundStyle(.primary)
-                                if !header.meta.isEmpty { Text(" · ") }
+                                LinkText(artist) { PlayerModel.shared.go(.artist(artist)) }.fontWeight(.bold)
+                                    .foregroundStyle(dark ? AnyShapeStyle(Color.white) : AnyShapeStyle(.primary))
+                                if !header.meta.isEmpty { Text(" • ") }
                             }
                             Text(header.meta)
                         }
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 14))
+                        .foregroundStyle(dark ? AnyShapeStyle(Color.white.opacity(0.7)) : AnyShapeStyle(.secondary))
+                        .padding(.top, 12)
+                        .padding(.bottom, 4)
                     }
+                    .foregroundStyle(dark ? AnyShapeStyle(Color.white) : AnyShapeStyle(.primary))
                 }
                 .padding(.horizontal, margin)
                 .padding(.top, margin)
+                .padding(.bottom, 24)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(alignment: .top) {
+                    // Dark: the header in its own colour, darker towards the bottom, then a short fall to the page under the
+                    // buttons, as on Spotify. Light keeps the soft wash.
+                    if dark {
+                        VStack(spacing: 0) {
+                            header.tint.overlay(LinearGradient(colors: [.black.opacity(0), .black.opacity(0.5)], startPoint: .top, endPoint: .bottom))
+                            header.tint.overlay(LinearGradient(colors: [.black.opacity(0.6), PP.page], startPoint: .top, endPoint: .bottom))
+                                .frame(height: 232)
+                        }
+                        .padding(.bottom, -232)
+                        .ignoresSafeArea()
+                    }
+                }
                 HStack(spacing: 18) {
                     PlayCircle(title: header.title, songs: { songs })
                     PlainIconButton(symbol: "shuffle", label: "Shuffle") { PlayerModel.shared.play(songs, shuffled: true) }
@@ -563,9 +594,11 @@ struct TrackListPage: View {
         }
         .ignoresSafeArea(.container, edges: .top)
         .background(alignment: .top) {
-            LinearGradient(colors: [header.tint.opacity(0.55), header.tint.opacity(0)], startPoint: .top, endPoint: .bottom)
-                .frame(height: 440)
-                .ignoresSafeArea()
+            if !dark {
+                LinearGradient(colors: [header.tint.opacity(0.55), header.tint.opacity(0)], startPoint: .top, endPoint: .bottom)
+                    .frame(height: 440)
+                    .ignoresSafeArea()
+            }
         }
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
     }

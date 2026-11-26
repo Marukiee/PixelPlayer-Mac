@@ -114,7 +114,13 @@ struct ArtworkView: View {
     var body: some View {
         switch art {
         case .liked:
-            tile(colors: [Color(hex: 0x4B37D8), Color(hex: 0x9FCBF2)], symbol: "heart.fill")
+            // Spotify's own gradient for Liked Songs, with its heart: a third of the tile, flat white.
+            GeometryReader { geo in
+                RoundedRectangle(cornerRadius: radius, style: .continuous)
+                    .fill(LinearGradient(colors: Color.steps(from: 0x450AF5, to: 0xC4EFD9), startPoint: .topLeading, endPoint: .bottomTrailing))
+                    .overlay { LikedHeart().fill(.white).frame(width: geo.size.width * 0.323, height: geo.size.width * 0.323 * 113 / 125) }
+            }
+            .aspectRatio(1, contentMode: .fit)
         case .songs:
             tile(colors: [Color(hex: 0x0058CA), Color(hex: 0x74B0FF)], symbol: "music.note")
         case .album(let album):
@@ -137,6 +143,40 @@ struct ArtworkView: View {
                 }
         }
         .aspectRatio(1, contentMode: .fit)
+    }
+}
+
+extension Color {
+    /// A gradient's colours mixed the way a web page mixes them (straight in sRGB), in small steps: SwiftUI on its own mixes
+    /// in linear light, which makes the middle lighter and bluer than Spotify's.
+    static func steps(from a: UInt32, to b: UInt32, count: Int = 9) -> [Color] {
+        func part(_ c: UInt32, _ shift: UInt32) -> Double { Double((c >> shift) & 0xFF) / 255 }
+        return (0..<count).map { i in
+            let t = Double(i) / Double(count - 1)
+            func mix(_ shift: UInt32) -> Double { part(a, shift) + (part(b, shift) - part(a, shift)) * t }
+            return Color(.sRGB, red: mix(16), green: mix(8), blue: mix(0))
+        }
+    }
+}
+
+/// Spotify's heart: two round lobes that overlap a little, so the dip between them is shallow, and straight sides down to a
+/// softly rounded point. Measured on Mark's screenshot of the Liked Songs cover (125 by 113).
+struct LikedHeart: Shape {
+    func path(in rect: CGRect) -> Path {
+        let u = rect.width / 125
+        func p(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: rect.minX + x * u, y: rect.minY + y * u) }
+        let radius: CGFloat = 34.5, left = p(34, 34.5), right = p(91, 34.5), tip = p(62.5, 117)
+        // Where each side leaves its lobe on the way to the point.
+        let reach = acos(radius / hypot(62.5 - 34, 117 - 34.5)), base = atan2(117 - 34.5, 62.5 - 34)
+        let leftAngle = base + reach, rightAngle = Double.pi - leftAngle
+        let dip = atan2(-sqrt(radius * radius - 28.5 * 28.5), 28.5)
+        var path = Path()
+        path.move(to: p(34 + radius * cos(leftAngle), 34.5 + radius * sin(leftAngle)))
+        path.addArc(center: left, radius: radius * u, startAngle: .radians(leftAngle), endAngle: .radians(dip), clockwise: false)
+        path.addArc(center: right, radius: radius * u, startAngle: .radians(Double.pi - dip), endAngle: .radians(rightAngle), clockwise: false)
+        path.addArc(tangent1End: tip, tangent2End: p(34 + radius * cos(leftAngle), 34.5 + radius * sin(leftAngle)), radius: 9 * u)
+        path.closeSubpath()
+        return path
     }
 }
 
