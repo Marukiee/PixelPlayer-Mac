@@ -892,6 +892,7 @@ struct SearchPage: View {
 
     private var browse: some View {
         VStack(alignment: .leading, spacing: 36) {
+            RecentSearches()
             if !genres.isEmpty {
                 VStack(alignment: .leading, spacing: 14) {
                     Text("Browse").font(.title2.weight(.bold))
@@ -940,6 +941,8 @@ struct SearchPage: View {
                     .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                     .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                     .onTapGesture { PlayerModel.shared.go(.album(album.id)) }
+                    // Whatever is opened or played from the results goes into Recent searches, as in Spotify.
+                    .simultaneousGesture(TapGesture().onEnded { SearchHistory.shared.remember(SearchHistory.code(album: album)) })
                 }
             }
             .frame(width: 320)
@@ -948,6 +951,7 @@ struct SearchPage: View {
                 VStack(spacing: 0) {
                     ForEach(Array(songs.prefix(4).enumerated()), id: \.element.id) { index, song in
                         TrackRow(index: index + 1, song: song, context: songs, showAlbum: false, showAdded: false)
+                            .simultaneousGesture(TapGesture().onEnded { SearchHistory.shared.remember(SearchHistory.code(song: song)) })
                     }
                 }
                 .frame(height: 224, alignment: .top)
@@ -957,8 +961,100 @@ struct SearchPage: View {
             Shelf(title: "Albums", showAll: .shelf("albums:\(term)")) {
                 FittingRow(items: albums, minWidth: 160) { album in
                     ShelfCell(item: .album(album))
+                        .simultaneousGesture(TapGesture().onEnded { SearchHistory.shared.remember(SearchHistory.code(album: album)) })
                 }
             }
+        }
+    }
+}
+
+/// Recent searches on the search page while nothing is typed, as in Spotify: what was opened from a search, newest first,
+/// each with a cross under the pointer, and a way to clear them all. Works as SpotCopy's on Android.
+struct RecentSearches: View {
+    private var history: SearchHistory { SearchHistory.shared }
+
+    var body: some View {
+        let recent = history.codes.compactMap(RecentSearch.init(code:))
+        if !recent.isEmpty {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("Recent searches").font(.title2.weight(.bold))
+                    Spacer()
+                    ShowAllButton(title: "Clear recent searches") { withAnimation(Motion.panel) { history.clear() } }
+                }
+                FittingRow(items: Array(recent.prefix(12)), minWidth: 150, spacing: 12) { item in
+                    RecentSearchCard(item: item)
+                }
+            }
+            .transition(.opacity)
+        }
+    }
+}
+
+private struct RecentSearchCard: View {
+    let item: RecentSearch
+    @Environment(PlayerModel.self) private var model
+    @LocalState private var hovering = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Group {
+                switch item {
+                case .album(let album): CoverArt(album: album, radius: 6)
+                case .song(let song): CoverArt(album: song.album, radius: 6)
+                case .artist(_, let album): CoverArt(album: album, radius: 0).clipShape(Circle())
+                }
+            }
+            .aspectRatio(1, contentMode: .fit)
+            .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
+            Text(title).font(.callout.weight(.semibold)).lineLimit(1)
+            Text(subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+        }
+        .padding(10)
+        .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.primary.opacity(hovering ? 0.08 : 0)))
+        // The cross in the corner, under the pointer, takes it out of the list.
+        .overlay(alignment: .topTrailing) {
+            Button { withAnimation(Motion.panel) { SearchHistory.shared.forget(item.id) } } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 24, height: 24)
+                    .background(Circle().fill(Color.black.opacity(0.7)))
+            }
+            .buttonStyle(PressStyle())
+            .padding(14)
+            .opacity(hovering ? 1 : 0)
+            .help("Remove from recent searches")
+        }
+        .contentShape(Rectangle())
+        .onTapGesture(perform: open)
+        .onHover { hovering = $0 }
+        .animation(Motion.fade, value: hovering)
+    }
+
+    private var title: String {
+        switch item {
+        case .album(let album): album.title
+        case .song(let song): song.title
+        case .artist(let name, _): name
+        }
+    }
+
+    private var subtitle: String {
+        switch item {
+        case .album(let album): "Album • \(album.artist)"
+        case .song(let song): "Song • \(song.artist)"
+        case .artist: "Artist"
+        }
+    }
+
+    /// As from the results: an album or artist opens, a song plays with its album after it.
+    private func open() {
+        SearchHistory.shared.remember(item.id)
+        switch item {
+        case .album(let album): model.go(.album(album.id))
+        case .artist(let name, _): model.go(.artist(name))
+        case .song(let song): model.play(song, in: Library.shared.songs(for: .album(song.album.id)))
         }
     }
 }
