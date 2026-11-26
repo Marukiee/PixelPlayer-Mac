@@ -12,6 +12,9 @@ final class TrafficLights: NSObject {
 
     private weak var window: NSWindow?
     private var observers: [NSObjectProtocol] = []
+    private var titleObservation: NSKeyValueObservation?
+    private var watching = false
+    private var pending = false
 
     init(window: NSWindow) {
         self.window = window
@@ -27,9 +30,36 @@ final class TrafficLights: NSObject {
                 MainActor.assumeIsolated { self?.place() }
             })
         }
+        // A new title (Now Playing) makes AppKit lay the title bar out again, back to 28 pt.
+        titleObservation = window.observe(\.title) { [weak self] _, _ in
+            DispatchQueue.main.async { self?.schedule() }
+        }
         place()
         // The first layout of the title bar can come after the window shows.
         DispatchQueue.main.async { [weak self] in self?.place() }
+    }
+
+    /// After AppKit's own layout pass, once, however many changes come in at a time.
+    private func schedule() {
+        guard !pending else { return }
+        pending = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            pending = false
+            place()
+        }
+    }
+
+    /// Whatever else lays the title bar out again (a sheet, a new appearance) moves the container or the buttons: follow it.
+    private func watch(_ views: [NSView]) {
+        guard !watching else { return }
+        watching = true
+        for view in views {
+            view.postsFrameChangedNotifications = true
+            observers.append(NotificationCenter.default.addObserver(forName: NSView.frameDidChangeNotification, object: view, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.schedule() }
+            })
+        }
     }
 
     func place() {
@@ -37,6 +67,7 @@ final class TrafficLights: NSObject {
               let close = window.standardWindowButton(.closeButton),
               let titlebar = close.superview,
               let container = titlebar.superview else { return }
+        watch([container, titlebar, close])
         let band = Self.band
         var frame = container.frame
         if frame.height != band || frame.maxY != window.frame.height {
