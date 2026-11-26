@@ -67,7 +67,9 @@ struct RouteContent: View {
                                                   art: mix?.artwork ?? .collage([]),
                                                   // A Daily Mix has its deep colour as the colour of the page, as in SpotCopy.
                                                   tint: Color(hex: mix?.pair.map { DailyMixCover.colours($0).deep } ?? mix?.covers.first?.tint ?? 0x23408F)),
-                              songs: songs, share: mix?.title)
+                              // A Daily Mix is a playlist on Navidrome: first in its own order, as a playlist page.
+                              songs: songs, orders: mix?.pair != nil ? TrackOrder.allCases : [.added, .title, .artist, .album],
+                              firstOrder: mix?.pair != nil ? .custom : .added, share: mix?.title)
             case .shelf(let key):
                 ShelfPage(key: key)
             }

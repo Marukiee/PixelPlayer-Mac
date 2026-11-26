@@ -712,7 +712,8 @@ final class Library {
         let dailyMixes: [Mix] = dailies.compactMap { info in
             guard let list = serverPlaylists.first(where: { $0.id == info.id }), let entries = list.entry, !entries.isEmpty else { return nil }
             let songs = entries.map { preferLocal(serverByID[$0.id] ?? makeSong($0)) }
-            let id = "server-mix:\(list.id)"
+            // No colon in the id: script steps and stored routes split on it.
+            let id = "server-mix-\(list.id)"
             serverMixSongs[id] = songs
             var artists: [String] = []
             for song in songs where !artists.contains(song.artist) && artists.count < 3 { artists.append(song.artist) }

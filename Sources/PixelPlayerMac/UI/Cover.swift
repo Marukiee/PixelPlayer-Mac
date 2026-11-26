@@ -151,8 +151,9 @@ struct Collage: View {
         // times. Fewer than four keep the order given (a mix's two covers crosswise).
         var seen = Set<String>()
         let different = albums.filter { seen.insert($0.id).inserted }
-        let source = different.count >= 4 ? different : albums
-        let picks = (0..<4).map { source[$0 % max(source.count, 1)] }
+        // Never empty: a list without songs (or a mix that is gone) shows the library's first cover.
+        let source = different.count >= 4 ? different : albums.isEmpty ? [Library.shared.album(at: 0)] : albums
+        let picks = (0..<4).map { source[$0 % source.count] }
         Grid(horizontalSpacing: 0, verticalSpacing: 0) {
             GridRow { CoverArt(album: picks[0], radius: 0); CoverArt(album: picks[1], radius: 0) }
             GridRow { CoverArt(album: picks[2], radius: 0); CoverArt(album: picks[3], radius: 0) }
