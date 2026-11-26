@@ -255,6 +255,19 @@ enum Debug {
                 }
                 try? await Task.sleep(for: .seconds(0.5))
             }
+        case "settingsclick":
+            // `settingsclick:<x>:<y>` clicks in the Settings window at that point, in points from its top left (title bar
+            // included, as on a screenshot of it).
+            if let window = settingsWindow(), parts.count > 2, let x = Double(parts[1]), let y = Double(parts[2]) {
+                let location = NSPoint(x: x, y: window.frame.height - y)
+                for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
+                    if let event = NSEvent.mouseEvent(with: type, location: location, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                                      windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1) {
+                        NSApp.postEvent(event, atStart: false)
+                    }
+                }
+                try? await Task.sleep(for: .seconds(0.8))
+            }
         case "mixstate":
             // `mixstate:<name>` writes the playlists, the mixes and Your Mix as the app shows them, for the mix checks.
             let library = Library.shared
