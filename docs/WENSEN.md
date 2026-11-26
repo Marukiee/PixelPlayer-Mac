@@ -15,7 +15,11 @@ Alles wat Mark vroeg, met wat klaar is en wat nog moet. Bijgewerkt bij elke rond
 - **Spotify.** Grijs in de welkom en in Instellingen tot het er is.
 - **Nederlandse vertaling** (zie ROADMAP).
 
-## In 0.2.7 (nog niet uitgebracht, eerst door Mark bekeken)
+## Voor 0.2.8 (wordt gebundeld, nog niet uitbrengen)
+- Shuffle opnieuw over Spotify gelegd: rechte diagonalen, onderbroken lijn loopt recht door onder de kruising.
+- Getekende iconen in een laag: doorzichtig wit (mixkop) geeft geen lichte vlekjes meer bij de pijlpunten.
+
+## In 0.2.7 (uitgebracht)
 
 - Accent Spotify-groen in plaats van blauw: play-knoppen massief groen met zwart teken, schuifjes, vinkjes.
 - Mixes for You: klik op de hoes opent de mix als pagina; de groene knop op de hoes speelt en wordt pauze zolang die mix speelt. Zo ook op albums, artiesten, tegels op Home en de grote play-knop.
