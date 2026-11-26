@@ -42,6 +42,8 @@ Alles wat Mark vroeg, met wat klaar is en wat nog moet. Bijgewerkt bij elke rond
 - Genrechips zoals Spotify: één rij van hooguit 15, alleen wat past, geen pijltje; 32 hoog, tekst 14.
 - Home-, zoek- en bibliotheekicoon heel (onderkant ontbrak), Browse-icoon in het zoekveld nagetekend.
 - Zijbalk-hover zoals Spotify: geopende lijst grijs, hover op een andere eigen grijs, op de geopende lichter.
+- Zijbalk: altijd maar één rij grijs; met de muis op een andere rij is alleen die grijs, de geopende pas weer als de muis van de lijst af is.
+- Breedte van Your Library slepen volgt de muis soepel (werd gemeten op de sleeplijn zelf, die meeschoof).
 - Zoekveld: klik opent de zoekpagina, witte rand meteen en blijft staan zolang die open is.
 - Titelletter: afstand per letter gemeten op Spotify's eigen titelletter, Figtree's kerning uit.
 - Lettertype Mix (Spotify's eigen letter) via Instellingen › Appearance › Font: Import Font… slikt de zip, de map of losse bestanden, ook door te slepen; Get the Font en Use Default. Niet in de repo of de release; zonder import Figtree en de systeemletter. Vervangt de tabel per letter hierboven.

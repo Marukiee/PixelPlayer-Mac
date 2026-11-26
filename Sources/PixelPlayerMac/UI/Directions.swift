@@ -273,6 +273,8 @@ struct LibraryColumn: View {
     @AppStorage("library.width") private var width: Double = 300
     @AppStorage("library.wide") private var wide = false
     @LocalState private var dragStart: Double?
+    /// The width while dragging; stored once the drag ends, not on every step.
+    @LocalState private var liveWidth: Double?
 
     var body: some View {
         HStack(spacing: 0) {
@@ -282,7 +284,7 @@ struct LibraryColumn: View {
                 if model.libraryCollapsed {
                     LibraryRail().frame(width: 58).transition(.opacity)
                 } else {
-                    LibraryPanel().frame(width: wide ? 460 : width).transition(.opacity)
+                    LibraryPanel().frame(width: wide ? 460 : (liveWidth ?? width)).transition(.opacity)
                 }
             }
             .animation(Motion.panel, value: wide)
@@ -292,7 +294,9 @@ struct LibraryColumn: View {
                 .contentShape(Rectangle())
                 .onHover { inside in if inside { NSCursor.resizeLeftRight.push() } else { NSCursor.pop() } }
                 .gesture(
-                    DragGesture(minimumDistance: 1)
+                    // Measured in the window, not on the line itself: the line moves with the width, and measured on it the
+                    // width jumped back and forth under the pointer.
+                    DragGesture(minimumDistance: 1, coordinateSpace: .global)
                         .onChanged { value in
                             let start = dragStart ?? (model.libraryCollapsed ? 58 : (wide ? 460 : width))
                             if dragStart == nil { dragStart = start }
@@ -301,11 +305,18 @@ struct LibraryColumn: View {
                                 if !model.libraryCollapsed { withAnimation(Motion.panel) { model.libraryCollapsed = true } }
                             } else {
                                 if model.libraryCollapsed { withAnimation(Motion.panel) { model.libraryCollapsed = false } }
-                                wide = false
-                                width = min(480, max(240, target))
+                                if wide { wide = false }
+                                // The panel follows the pointer exactly, with nothing animating behind it.
+                                var still = Transaction()
+                                still.disablesAnimations = true
+                                withTransaction(still) { liveWidth = min(480, max(240, target)) }
                             }
                         }
-                        .onEnded { _ in dragStart = nil }
+                        .onEnded { _ in
+                            if let liveWidth { width = liveWidth }
+                            liveWidth = nil
+                            dragStart = nil
+                        }
                 )
         }
     }
@@ -341,7 +352,7 @@ struct LibraryRail: View {
 private struct RailCover: View {
     let item: LibraryItem
     @Environment(PlayerModel.self) private var model
-    @LocalState private var hovering = false
+    private var hovering: Bool { SidebarHoverState.shared.route == item.route }
 
     var body: some View {
         let selected = model.searchText.isEmpty && model.route == item.route
@@ -353,7 +364,7 @@ private struct RailCover: View {
             .contentShape(Rectangle())
             .onTapGesture { model.go(item.route) }
             .simultaneousGesture(TapGesture(count: 2).onEnded { model.play(Library.shared.songs(for: item.route)) })
-            .onHover { hovering = $0 }
+            .onHover { inside in SidebarHoverState.shared.set(item.route, inside) }
             .help("\(item.title) • \(item.subtitle)")
             .contextMenu { LibraryItemMenu(item: item) }
     }
@@ -1058,14 +1069,18 @@ struct RowHighlight: View {
     var radius: CGFloat = 6
 
     var body: some View {
+        // One row lit at a time, as in Spotify (Mark, 2026-11-26): the one under the pointer, and the open one only while the
+        // pointer is on no other row. Moving to another row swaps them at once; off the list the open one comes back.
+        let elsewhere = !hovering && SidebarHoverState.shared.route != nil
         let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
         ZStack {
-            shape.fill(Color.primary.opacity(selected ? 0.1 : 0))
+            shape.fill(Color.primary.opacity(selected && !elsewhere ? 0.1 : 0))
             shape.fill(selected ? AnyShapeStyle(Color.primary.opacity(0.14)) : AnyShapeStyle(PP.rowHover))
                 .padding(hovering || selected ? 0 : 3)
                 .opacity(hovering ? 1 : 0)
         }
-        .animation(.timingCurve(0.25, 0.1, 0.25, 1, duration: (hovering ? 0.05 : 0.15) * Motion.slow), value: hovering)
+        .animation(.timingCurve(0.25, 0.1, 0.25, 1, duration: (hovering || elsewhere ? 0.05 : 0.15) * Motion.slow), value: hovering)
+        .animation(.timingCurve(0.25, 0.1, 0.25, 1, duration: (elsewhere ? 0.05 : 0.15) * Motion.slow), value: elsewhere)
         .animation(nil, value: selected)
     }
 }
