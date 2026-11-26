@@ -425,7 +425,7 @@ struct QueueInspector: View {
                     }
                 }
                 if !model.upNext.isEmpty {
-                    QueueHeading(text: model.playingFrom.isEmpty ? "Next up" : "Next from \(model.playingFrom)")
+                    QueueHeading(text: model.playingFrom.isEmpty ? "Next up" : "Next from: \(model.playingFrom)")
                     ForEach(model.upNext) { song in
                         QueueRow(song: song) { remove(song, from: \.upNext) }
                             .draggable("next:" + song.id)
@@ -506,11 +506,12 @@ struct QueueHeading<Trailing: View>: View {
 
     var body: some View {
         HStack(alignment: .firstTextBaseline) {
-            Text(text).font(.subheadline.weight(.semibold)).foregroundStyle(.secondary).lineLimit(1)
+            // As in Spotify: the headings bold and white.
+            Text(text).font(.system(size: 13, weight: .bold)).lineLimit(1)
             Spacer(minLength: 8)
             trailing.font(.subheadline)
         }
-        .padding(.top, 14).padding(.bottom, 4).padding(.horizontal, 8)
+        .padding(.top, 16).padding(.bottom, 6).padding(.horizontal, 8)
         .listRowSeparator(.hidden)
         .listRowBackground(Color.clear)
         .listRowInsets(EdgeInsets(top: 0, leading: 12, bottom: 0, trailing: 12))
@@ -526,22 +527,29 @@ extension QueueHeading where Trailing == EmptyView {
 struct NowPlayingCard: View {
     @Environment(PlayerModel.self) private var model
 
+    @LocalState private var hovering = false
+
+    /// As in Spotify: a row like the ones under it, the title green; the more button under the pointer.
     var body: some View {
         let song = model.current
-        HStack(spacing: 12) {
-            CoverArt(album: song.album, radius: 6).frame(width: 52, height: 52)
-            VStack(alignment: .leading, spacing: 3) {
-                Text(song.title).fontWeight(.semibold).foregroundStyle(.tint)
-                LinkText(song.artist) { model.go(.artist(song.artist)) }.font(.callout).foregroundStyle(.secondary)
+        HStack(spacing: 10) {
+            CoverArt(album: song.album, radius: 4).frame(width: 36, height: 36)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(song.title).font(.system(size: 13)).foregroundStyle(.tint)
+                LinkText(song.artist) { model.go(.artist(song.artist)) }.font(.system(size: 11.5)).foregroundStyle(.secondary)
             }
             .lineLimit(1)
             Spacer(minLength: 4)
-            if !song.id.isEmpty { NowPlayingMark() }
+            if !song.id.isEmpty { QueueMore(song: song).opacity(hovering ? 1 : 0) }
         }
-        .id(song.id)
+        // Its own identity, so a song that plays and is also queued shows in both places instead of one blank row.
+        .id("now-" + song.id)
         .transition(.opacity)
-        .padding(10)
-        .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color.primary.opacity(0.06)))
+        .padding(.horizontal, 8).padding(.vertical, 6)
+        .background(RoundedRectangle(cornerRadius: 4, style: .continuous).fill(Color.primary.opacity(hovering ? 0.1 : 0)))
+        .contentShape(Rectangle())
+        .onHover { hovering = $0 && !Debug.active }
+        .animation(Motion.fade, value: hovering)
         .contextMenu { if !song.id.isEmpty { SongMenu(song: song) } }
         .animation(Motion.fade, value: song.id)
         .listRowSeparator(.hidden)
@@ -551,8 +559,8 @@ struct NowPlayingCard: View {
     }
 }
 
-/// One song in the queue. Under the pointer: a play button on the cover, and a button to take it out of the queue.
-/// A double click plays it too; drag it to put it somewhere else.
+/// One song in the queue, as in Spotify: cover, title, artist. Under the pointer a light grey round, a play triangle on the
+/// cover and the more button at the end (with Remove from Queue). A double click plays it too; drag it to move it.
 struct QueueRow: View {
     let song: Song
     var remove: (() -> Void)? = nil
@@ -561,14 +569,14 @@ struct QueueRow: View {
     @LocalState private var hovering = false
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 10) {
             Button(action: playIt) {
-                CoverArt(album: song.album, radius: 4).frame(width: 40, height: 40)
+                CoverArt(album: song.album, radius: 4).frame(width: 36, height: 36)
                     .overlay {
                         if hovering {
                             ZStack {
-                                Color.black.opacity(0.4)
-                                Image(systemName: "play.fill").font(.system(size: 14, weight: .bold)).foregroundStyle(.white)
+                                Color.black.opacity(0.5)
+                                PlayGlyph().fill(Color.white).frame(width: 11, height: 12.5).offset(x: 1)
                             }
                             .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
                             .transition(.opacity)
@@ -578,28 +586,15 @@ struct QueueRow: View {
             .buttonStyle(PressStyle())
             .help("Play \(song.title)")
             VStack(alignment: .leading, spacing: 2) {
-                Text(song.title)
-                LinkText(song.artist) { model.go(.artist(song.artist)) }.font(.callout).foregroundStyle(.secondary)
+                Text(song.title).font(.system(size: 13))
+                LinkText(song.artist) { model.go(.artist(song.artist)) }.font(.system(size: 11.5)).foregroundStyle(.secondary)
             }
             .lineLimit(1)
             Spacer(minLength: 4)
-            ZStack(alignment: .trailing) {
-                Text(song.duration).font(.callout).monospacedDigit().foregroundStyle(.secondary)
-                    .opacity(hovering && remove != nil ? 0 : 1)
-                if let remove, hovering {
-                    Button(action: remove) {
-                        Image(systemName: "xmark").font(.system(size: 11, weight: .bold)).foregroundStyle(.secondary)
-                            .frame(width: 26, height: 26)
-                            .background(Circle().fill(Color.primary.opacity(0.08)))
-                    }
-                    .buttonStyle(PressStyle())
-                    .help("Remove from queue")
-                    .transition(.opacity)
-                }
-            }
+            QueueMore(song: song, remove: remove).opacity(hovering ? 1 : 0)
         }
-        .padding(.horizontal, 8).padding(.vertical, 5)
-        .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.primary.opacity(hovering ? 0.07 : 0)))
+        .padding(.horizontal, 8).padding(.vertical, 6)
+        .background(RoundedRectangle(cornerRadius: 4, style: .continuous).fill(Color.primary.opacity(hovering ? 0.1 : 0)))
         .contentShape(Rectangle())
         .onTapGesture(count: 2, perform: playIt)
         .onHover { hovering = $0 && !Debug.active }
@@ -621,6 +616,35 @@ struct QueueRow: View {
     /// A song in the queue plays from its place in the queue, so what lies before it counts as passed.
     private func playIt() {
         if let play { play() } else { Playback.shared.jump(to: song.id) }
+    }
+}
+
+/// The three dots at the end of a queue row: the song's menu, and Remove from Queue where it can be taken out.
+struct QueueMore: View {
+    let song: Song
+    var remove: (() -> Void)? = nil
+    @LocalState private var hovering = false
+
+    var body: some View {
+        Menu {
+            SongMenu(song: song)
+            if let remove {
+                Divider()
+                Button("Remove from Queue", systemImage: "minus.circle", action: remove)
+            }
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(hovering ? PP.iconHover : PP.icon)
+                .frame(width: 26, height: 26)
+                .contentShape(Rectangle())
+        }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .onHover { hovering = $0 }
+        .help("More options for \(song.title)")
     }
 }
 

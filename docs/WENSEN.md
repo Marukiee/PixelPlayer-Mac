@@ -27,6 +27,7 @@ Alles wat Mark vroeg, met wat klaar is en wat nog moet. Bijgewerkt bij elke rond
 - Kop op Spotify-maat zoals Mark Spotify ziet (75% zoom), titel Figtree 800, Playlist en meta kleiner.
 - Home-tegels zoals Spotify: 47 hoog, vet, lichter grijs, artiest vierkant, groene balkjes als hij speelt.
 - Lijstpagina's: genre-chips uit de eigen tags (filteren), zoeken in de lijst, Sort by plus View as in een menu, download-icoon groen gevuld als alles lokaal staat.
+- Wachtrij exact als Spotify: Now playing als gewone rij (titel groen), koppen vet wit, Next from:, hover met grijs, play op de hoes en drie puntjes, geen speelduur.
 
 ## In 0.2.7 (uitgebracht)
 
