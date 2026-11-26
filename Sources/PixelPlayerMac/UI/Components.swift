@@ -230,6 +230,12 @@ enum GlyphImage {
     }
 
     static let addToQueue = make(Glyph(kind: .addQueue), size: CGSize(width: 15, height: 14))
+    /// The Liked Songs cover in colour, as the icon of Add to Liked Songs (as in Spotify on Android).
+    static let likedCover: NSImage = {
+        let renderer = ImageRenderer(content: ArtworkView(art: .liked, radius: 2).frame(width: 15, height: 15))
+        renderer.scale = 2
+        return renderer.nsImage ?? NSImage(size: NSSize(width: 15, height: 15))
+    }()
     static let listView = make(ViewModeGlyph(compact: false).stroke(style: StrokeStyle(lineWidth: 1.5, lineCap: .butt)), size: CGSize(width: 15, height: 12))
     static let compactView = make(ViewModeGlyph(compact: true).stroke(style: StrokeStyle(lineWidth: 1.5, lineCap: .butt)), size: CGSize(width: 15, height: 12))
 }

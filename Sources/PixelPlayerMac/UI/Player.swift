@@ -66,6 +66,7 @@ struct PlayerSideButtons: View {
     var body: some View {
         @Bindable var model = model
         HStack(spacing: 4) {
+            if SleepTimer.shared.isOn { SleepTimerBadge() }
             BarIcon(symbol: lyricsSymbol, label: "Lyrics", active: model.fullPlayer) { model.setFullPlayer(!model.fullPlayer) }
             BarIcon(symbol: RemoteController.shared.isActive ? "iphone" : "hifispeaker", label: "Connect · \(model.groupName)", active: model.showDevices || !model.group.isEmpty || RemoteController.shared.isActive || SonosOutput.shared.controlsPlayback) { model.showDevices.toggle() }
                 .popover(isPresented: $model.showDevices, arrowEdge: .top) { DevicesPopover() }
@@ -75,6 +76,31 @@ struct PlayerSideButtons: View {
             if volume { BarVolume().padding(.horizontal, 4) }
             BarIcon(symbol: "arrow.up.left.and.arrow.down.right", label: "Full screen") { model.setFullScreen(true) }
         }
+    }
+}
+
+/// A green moon in the player while the sleep timer runs: its time left on hover, and the timer's menu on a click.
+struct SleepTimerBadge: View {
+    @LocalState private var hovering = false
+
+    var body: some View {
+        let timer = SleepTimer.shared
+        Menu {
+            SleepTimerMenu()
+            Button("Turn off timer", systemImage: "moon.zzz") { timer.off() }
+        } label: {
+            Image(systemName: "moon.fill")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(PP.primary)
+                .frame(width: 32, height: 32)
+                .contentShape(Rectangle())
+        }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("Sleep timer: \(timer.label ?? "")")
+        .transition(.opacity)
     }
 }
 
@@ -674,16 +700,15 @@ struct SongMenu: View {
     let song: Song
     @Environment(PlayerModel.self) private var model
 
+    /// Mark's order, the same as SpotCopy's on Android: Liked Songs, a playlist, the queue, the album, the artist, Share
+    /// and the sleep timer. Song Info, which only the Mac has, comes last.
     var body: some View {
         let liked = model.likedIDs.contains(song.id)
-        Button("Play", systemImage: "play.fill") { model.play(song) }
-        Button("Play Next", systemImage: "text.line.first.and.arrowtriangle.forward") { model.userQueue.insert(song, at: 0) }
-        Button { model.userQueue.append(song) } label: {
-            Label { Text("Add to Queue") } icon: { Image(nsImage: GlyphImage.addToQueue) }
+        Button { model.setLiked(song, !liked) } label: {
+            Label { Text(liked ? "Remove from Liked Songs" : "Add to Liked Songs") } icon: { Image(nsImage: GlyphImage.likedCover) }
         }
-        Divider()
         // Shown, but greyed: adding would change the playlists on the server.
-        Menu("Add to Playlist", systemImage: "text.badge.plus") {
+        Menu("Add to playlist", systemImage: "plus.circle") {
             ForEach(Library.shared.playlists) { list in
                 Button(list.title) { Task { await Library.shared.setInPlaylist(song, playlistID: list.id, on: true) } }
                     .disabled(list.songs.contains { $0.id == song.id })
@@ -693,15 +718,36 @@ struct SongMenu: View {
         }
         .disabled(song.source.serverID == nil || Library.shared.client == nil)
         .help(song.source.serverID == nil ? "This song is only on this Mac, so it can't go into a Navidrome playlist." : "")
-        Button(liked ? "Remove from Liked Songs" : "Save to Liked Songs", systemImage: liked ? "heart.slash" : "heart") {
-            model.setLiked(song, !liked)
+        Button { model.userQueue.append(song) } label: {
+            Label { Text("Add to queue") } icon: { Image(nsImage: GlyphImage.addToQueue) }
         }
-        Divider()
-        Button("Go to Artist", systemImage: "music.microphone") { model.go(.artist(song.artist)) }
-        Button("Go to Album", systemImage: "square.stack") { model.go(.album(song.album.id)) }
+        Button("Go to album", systemImage: "square.stack") { model.go(.album(song.album.id)) }
+        Button("Go to artist", systemImage: "person") { model.go(.artist(song.artist)) }
+        Button("Share", systemImage: "square.and.arrow.up") { Share.text(Share.text(for: song)) }
+        SleepTimerMenu()
         Divider()
         Button("Song Info", systemImage: "info.circle") { model.infoSong = song }
-        Button("Share", systemImage: "square.and.arrow.up") { Share.text(Share.text(for: song)) }
+    }
+}
+
+/// The sleep timer's choices, in the song menu and behind the moon in the player: Spotify's minutes and End of track, and
+/// Turn off with the time left while it runs.
+struct SleepTimerMenu: View {
+    private var timer: SleepTimer { SleepTimer.shared }
+
+    var body: some View {
+        Menu {
+            if let left = timer.label {
+                Button("Turn off timer (\(left))", systemImage: "moon.zzz") { timer.off() }
+                Divider()
+            }
+            ForEach(SleepTimer.minutes, id: \.self) { minutes in
+                Button(minutes == 60 ? "1 hour" : "\(minutes) minutes") { timer.start(minutes: minutes) }
+            }
+            Button("End of track") { timer.endOfTrack() }
+        } label: {
+            Label(timer.label.map { "Sleep timer: \($0)" } ?? "Sleep timer", systemImage: "moon")
+        }
     }
 }
 
