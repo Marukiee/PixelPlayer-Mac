@@ -35,7 +35,7 @@ struct SongLine: View {
             CoverArt(album: song.album, radius: 4).frame(width: cover, height: cover)
             VStack(alignment: .leading, spacing: 1) {
                 Text(song.title).font(.mix(13))
-                Text(song.artist).font(.mix(12)).foregroundStyle(.secondary)
+                Text(song.artist).font(.mix(12)).foregroundStyle(PP.subdued)
             }
             .lineLimit(1)
             Spacer(minLength: 4)
@@ -61,7 +61,7 @@ struct PositionSlider: View {
                 RemainingTime()
             }
             .font(.mix(12, tabular: true))
-            .foregroundStyle(.secondary)
+            .foregroundStyle(PP.subdued)
         }
     }
 }
@@ -166,7 +166,7 @@ struct InlinePosition: View {
             RemainingTime().frame(width: 40, alignment: .leading)
         }
         .font(.mix(12, tabular: true))
-        .foregroundStyle(.secondary)
+        .foregroundStyle(PP.subdued)
     }
 }
 
@@ -424,7 +424,7 @@ struct LikeButton: View {
             }
         } label: {
             PlayerIconImage(symbol: saved ? "checkmark.circle.fill" : "plus.circle", size: size)
-                .foregroundStyle(saved ? AnyShapeStyle(PP.primary) : AnyShapeStyle(.secondary))
+                .foregroundStyle(saved ? AnyShapeStyle(PP.primary) : AnyShapeStyle(PP.subdued))
                 .contentTransition(.opacity)
                 .scaleEffect(pop ? 1.3 : 1)
         }
@@ -443,11 +443,11 @@ struct VolumeSlider: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            Image(systemName: "speaker.fill").font(.caption).foregroundStyle(.secondary)
+            Image(systemName: "speaker.fill").font(.caption).foregroundStyle(PP.subdued)
             Slider(value: Binding(get: { model.groupVolume }, set: { model.groupVolume = $0 }), in: 0...100)
                 .controlSize(.mini)
                 .frame(width: width)
-            Image(systemName: "speaker.wave.3.fill").font(.caption).foregroundStyle(.secondary)
+            Image(systemName: "speaker.wave.3.fill").font(.caption).foregroundStyle(PP.subdued)
         }
         .help("Volume")
     }

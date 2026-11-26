@@ -14,7 +14,10 @@ struct PixelPlayerApp: App {
         }
         // No toolbar band at the top: the content runs to the edge and the traffic lights sit in the sidebar.
         .windowStyle(.hiddenTitleBar)
-        .commands { PlaybackCommands(model: model) }
+        .commands {
+            PlaybackCommands(model: model)
+            ZoomCommands()
+        }
         .defaultSize(width: 1280, height: 800)
         Settings {
             SettingsView()

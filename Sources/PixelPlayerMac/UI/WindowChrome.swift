@@ -1,14 +1,15 @@
 import AppKit
 import SwiftUI
 
-/// Spotify's band at the top is 64 px with 8 px around Home and the search field; at the 75% Mark uses that is 48 pt. Its
+/// Spotify's band at the top is 64 px with 8 px around Home and the search field, at 48 pt in a window at 75%. Its
 /// traffic lights sit in the middle of that band, level with back and forward, Home and the search field. macOS puts them
 /// in a 28 pt title bar, so they are moved down, as Electron's trafficLightPosition does: the title bar's container is made
 /// as tall as the band and the three buttons are placed in its middle. AppKit lays the title bar out again on a resize or
 /// after full screen, so this is done again each time.
 @MainActor
 final class TrafficLights: NSObject {
-    static let band: CGFloat = 48
+    /// Spotify's band is 64 at 100%; with the zoom it grows and shrinks, the traffic lights stay as they are.
+    static var band: CGFloat { TopBar.height * ZoomLevel.shared.value }
 
     private weak var window: NSWindow?
     private var observers: [NSObjectProtocol] = []

@@ -19,7 +19,7 @@ struct NowPlayingInfo: View {
             .help(model.fullPlayer ? "Close lyrics" : "Lyrics")
             VStack(alignment: .leading, spacing: 2) {
                 LinkText(model.current.title) { model.go(.album(model.current.album.id)) }.font(.mix(14))
-                LinkText(model.current.artist) { model.go(.artist(model.current.artist)) }.font(.mix(12)).foregroundStyle(.secondary)
+                LinkText(model.current.artist) { model.go(.artist(model.current.artist)) }.font(.mix(12)).foregroundStyle(PP.subdued)
             }
             .lineLimit(1)
         }
@@ -229,7 +229,7 @@ struct NowPlayingView: View {
                 // The song itself, title over artist, rather than the word Lyrics over both.
                 VStack(alignment: .leading, spacing: 1) {
                     Text(model.current.title).font(.mix(14))
-                    Text(model.current.artist).font(.mix(12)).foregroundStyle(.secondary)
+                    Text(model.current.artist).font(.mix(12)).foregroundStyle(PP.subdued)
                 }
                 .lineLimit(1)
             }
@@ -307,7 +307,7 @@ struct FullScreenPlayer: View {
                     HStack(alignment: .bottom) {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(model.current.title).titleFont(30)
-                            Text(model.current.artist).font(.mix(16)).foregroundStyle(.secondary)
+                            Text(model.current.artist).font(.mix(16)).foregroundStyle(PP.subdued)
                         }
                         .lineLimit(1)
                         Spacer()
@@ -584,11 +584,11 @@ struct NowPlayingCard: View {
     /// As in Spotify: a row like the ones under it, the title green; the more button under the pointer.
     var body: some View {
         let song = model.current
-        HStack(spacing: 10) {
-            CoverArt(album: song.album, radius: 4).frame(width: 36, height: 36)
+        HStack(spacing: 12) {
+            CoverArt(album: song.album, radius: 4).frame(width: 48, height: 48)
             VStack(alignment: .leading, spacing: 2) {
-                Text(song.title).font(.mix(13)).foregroundStyle(.tint)
-                LinkText(song.artist) { model.go(.artist(song.artist)) }.font(.mix(11.5)).foregroundStyle(.secondary)
+                Text(song.title).font(.mix(16)).foregroundStyle(.tint)
+                LinkText(song.artist) { model.go(.artist(song.artist)) }.font(.mix(14)).foregroundStyle(PP.subdued)
             }
             .lineLimit(1)
             Spacer(minLength: 4)
@@ -597,7 +597,7 @@ struct NowPlayingCard: View {
         // Its own identity, so a song that plays and is also queued shows in both places instead of one blank row.
         .id("now-" + song.id)
         .transition(.opacity)
-        .padding(.horizontal, 8).padding(.vertical, 6)
+        .padding(.horizontal, 8).padding(.vertical, 8)
         .background(RoundedRectangle(cornerRadius: 4, style: .continuous).fill(Color.primary.opacity(hovering ? 0.1 : 0)))
         .contentShape(Rectangle())
         .onHover { hovering = $0 && !Debug.active }
@@ -622,14 +622,14 @@ struct QueueRow: View {
     @LocalState private var hovering = false
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 12) {
             Button(action: playIt) {
-                CoverArt(album: song.album, radius: 4).frame(width: 36, height: 36)
+                CoverArt(album: song.album, radius: 4).frame(width: 48, height: 48)
                     .overlay {
                         if hovering {
                             ZStack {
                                 Color.black.opacity(0.5)
-                                PlayGlyph().fill(Color.white).frame(width: 11, height: 12.5).offset(x: 1)
+                                PlayGlyph().fill(Color.white).frame(width: 15, height: 17.5).offset(x: 1)
                             }
                             .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
                             .transition(.opacity)
@@ -639,14 +639,14 @@ struct QueueRow: View {
             .buttonStyle(PressStyle())
             .help("Play \(song.title)")
             VStack(alignment: .leading, spacing: 2) {
-                Text(song.title).font(.mix(13))
-                LinkText(song.artist) { model.go(.artist(song.artist)) }.font(.mix(11.5)).foregroundStyle(.secondary)
+                Text(song.title).font(.mix(16))
+                LinkText(song.artist) { model.go(.artist(song.artist)) }.font(.mix(14)).foregroundStyle(PP.subdued)
             }
             .lineLimit(1)
             Spacer(minLength: 4)
             QueueMore(song: song, remove: remove).opacity(hovering ? 1 : 0)
         }
-        .padding(.horizontal, 8).padding(.vertical, 6)
+        .padding(.horizontal, 8).padding(.vertical, 8)
         .background(RoundedRectangle(cornerRadius: 4, style: .continuous).fill(Color.primary.opacity(hovering ? 0.1 : 0)))
         .contentShape(Rectangle())
         .onTapGesture(count: 2, perform: playIt)
@@ -743,7 +743,7 @@ struct QueueEmpty: View {
         VStack(spacing: 8) {
             Image(systemName: symbol).font(.system(size: 26, weight: .medium)).foregroundStyle(.tertiary)
             Text(title).font(.mix(16, .bold))
-            Text(text).font(.mix(14)).foregroundStyle(.secondary).multilineTextAlignment(.center)
+            Text(text).font(.mix(14)).foregroundStyle(PP.subdued).multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 40).padding(.horizontal, 16)

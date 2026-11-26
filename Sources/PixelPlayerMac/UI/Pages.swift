@@ -273,7 +273,7 @@ struct PlainIcon: View {
     var onColour = false
 
     var body: some View {
-        let style = onColour ? AnyShapeStyle(.white.opacity(hovering ? 1 : 0.75)) : (hovering ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
+        let style = onColour ? AnyShapeStyle(.white.opacity(hovering ? 1 : 0.75)) : (hovering ? AnyShapeStyle(.primary) : AnyShapeStyle(PP.subdued))
         Group {
             if symbol == "shuffle" {
                 // The same drawn shuffle as in the player: square, with a fine line, like Spotify's.
@@ -343,7 +343,7 @@ struct ShowAllButton: View {
         Button(action: action) {
             Text(title)
                 .font(.mix(14, .bold))
-                .foregroundStyle(hovering ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
+                .foregroundStyle(hovering ? AnyShapeStyle(.primary) : AnyShapeStyle(PP.subdued))
                 .underline(hovering)
                 .contentShape(Rectangle())
         }
@@ -426,7 +426,7 @@ struct CoverCell: View {
                 }
             VStack(alignment: round ? .center : .leading, spacing: 2) {
                 Text(title).font(.mix(16))
-                Text(subtitle).font(.mix(14)).foregroundStyle(.secondary)
+                Text(subtitle).font(.mix(14)).foregroundStyle(PP.subdued)
             }
             .lineLimit(1)
         }
@@ -451,7 +451,7 @@ struct WeekCard: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Listened this week").font(.mix(16, .bold))
                 Text("6 h 49 m").titleFont(32)
-                Text("12% more than last week").font(.mix(14)).foregroundStyle(.secondary)
+                Text("12% more than last week").font(.mix(14)).foregroundStyle(PP.subdued)
             }
             .frame(width: 210, alignment: .leading)
             Chart {
@@ -467,7 +467,7 @@ struct WeekCard: View {
             VStack(spacing: 6) {
                 ArtworkView(art: .artist(Library.shared.album(at: 0))).frame(width: 64, height: 64)
                 Text("Kestrel Bay").font(.mix(16))
-                Text("Most played").font(.mix(14)).foregroundStyle(.secondary)
+                Text("Most played").font(.mix(14)).foregroundStyle(PP.subdued)
             }
             .frame(width: 130)
         }
@@ -568,7 +568,7 @@ struct TrackListPage: View {
                             Text(header.meta)
                         }
                         .font(.mix(14))
-                        .foregroundStyle(dark ? AnyShapeStyle(Color.white.opacity(0.7)) : AnyShapeStyle(.secondary))
+                        .foregroundStyle(dark ? AnyShapeStyle(Color.white.opacity(0.7)) : AnyShapeStyle(PP.subdued))
                         .padding(.top, 10)
                         .padding(.bottom, 4)
                     }
@@ -628,7 +628,7 @@ struct TrackListPage: View {
                                  compact: compact)
                     }
                     if songs.isEmpty && (genre != nil || !filterText.isEmpty) {
-                        Text("No songs match").font(.mix(14)).foregroundStyle(.secondary).padding(.vertical, 32)
+                        Text("No songs match").font(.mix(14)).foregroundStyle(PP.subdued).padding(.vertical, 32)
                     }
                 }
                 .padding(.horizontal, margin - 12)
@@ -708,7 +708,7 @@ private struct SortHeader: View {
                         .foregroundStyle(PP.primary)
                 }
             }
-            .foregroundStyle(active || (hovering && sortable) ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
+            .foregroundStyle(active || (hovering && sortable) ? AnyShapeStyle(.primary) : AnyShapeStyle(PP.subdued))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -794,7 +794,7 @@ struct TrackRow: View {
                 } else if playing {
                     NowPlayingMark()
                 } else {
-                    Text("\(index)").font(.mix(16, tabular: true)).foregroundStyle(.secondary)
+                    Text("\(index)").font(.mix(16, tabular: true)).foregroundStyle(PP.subdued)
                 }
             }
             .frame(width: 24)
@@ -803,22 +803,22 @@ struct TrackRow: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(song.title).font(.mix(16)).foregroundStyle(playing ? AnyShapeStyle(.tint) : AnyShapeStyle(.primary))
                     if !compact {
-                        LinkText(song.artist) { model.go(.artist(song.artist)) }.font(.mix(14)).foregroundStyle(.secondary)
+                        LinkText(song.artist) { model.go(.artist(song.artist)) }.font(.mix(14)).foregroundStyle(PP.subdued)
                     }
                 }
                 .lineLimit(1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             if compact {
-                LinkText(song.artist) { model.go(.artist(song.artist)) }.font(.mix(14)).foregroundStyle(.secondary).lineLimit(1)
+                LinkText(song.artist) { model.go(.artist(song.artist)) }.font(.mix(14)).foregroundStyle(PP.subdued).lineLimit(1)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             if showAlbum {
-                LinkText(song.album.title) { model.go(.album(song.album.id)) }.font(.mix(14)).foregroundStyle(.secondary).lineLimit(1)
+                LinkText(song.album.title) { model.go(.album(song.album.id)) }.font(.mix(14)).foregroundStyle(PP.subdued).lineLimit(1)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             if showAdded {
-                Text(song.added).font(.mix(14)).foregroundStyle(.secondary).lineLimit(1)
+                Text(song.added).font(.mix(14)).foregroundStyle(PP.subdued).lineLimit(1)
                     .frame(width: 130, alignment: .leading)
             }
             // As in Spotify: a green check when the song is saved (liked or in a playlist), a plus under the pointer to
@@ -835,7 +835,7 @@ struct TrackRow: View {
                         model.setLiked(song, true)
                         showPlaylists = true
                     } label: {
-                        PlayerIconImage(symbol: "plus.circle", size: 17).foregroundStyle(.secondary)
+                        PlayerIconImage(symbol: "plus.circle", size: 17).foregroundStyle(PP.subdued)
                     }
                     .buttonStyle(PressStyle())
                     .help("Save to Liked Songs")
@@ -843,11 +843,11 @@ struct TrackRow: View {
             }
             .frame(width: 24)
             .popover(isPresented: $showPlaylists, arrowEdge: .bottom) { AddToPlaylistView(song: song) }
-            Text(song.duration).font(.mix(14, tabular: true)).foregroundStyle(.secondary).frame(width: 44, alignment: .center)
+            Text(song.duration).font(.mix(14, tabular: true)).foregroundStyle(PP.subdued).frame(width: 44, alignment: .center)
             ZStack {
                 if hovering {
                     Menu { SongMenu(song: song) } label: {
-                        PlayerIconImage(symbol: "ellipsis", size: 15).foregroundStyle(.secondary)
+                        PlayerIconImage(symbol: "ellipsis", size: 15).foregroundStyle(PP.subdued)
                             .frame(width: 24, height: 24).contentShape(Rectangle())
                     }
                     .menuStyle(.button)
@@ -946,7 +946,7 @@ struct SearchPage: View {
                                 .shadow(color: .black.opacity(0.2), radius: 10, y: 5)
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(album.title).titleFont(32).lineLimit(2)
-                                Text("Album · \(album.artist)").foregroundStyle(.secondary).lineLimit(1)
+                                Text("Album · \(album.artist)").foregroundStyle(PP.subdued).lineLimit(1)
                             }
                         }
                         Spacer(minLength: 0)
@@ -1028,7 +1028,7 @@ private struct RecentSearchCard: View {
             .aspectRatio(1, contentMode: .fit)
             .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
             Text(title).font(.mix(16)).lineLimit(1)
-            Text(subtitle).font(.mix(14)).foregroundStyle(.secondary).lineLimit(1)
+            Text(subtitle).font(.mix(14)).foregroundStyle(PP.subdued).lineLimit(1)
         }
         .padding(10)
         .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.primary.opacity(hovering ? 0.08 : 0)))
@@ -1119,7 +1119,7 @@ struct ConnectPage: View {
                 Text(library.scanning ? "Reading your music" : "Connect your music").titleFont(24)
                 Text(library.scanning ? "The first time takes a moment for a large folder. Your songs appear here by themselves."
                      : "PixelPlayer plays your Navidrome library, with the music on this Mac first.")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(PP.subdued)
                     .multilineTextAlignment(.center)
             }
             if library.scanning {
@@ -1127,7 +1127,7 @@ struct ConnectPage: View {
             }
             switch library.status {
             case .loading(let what):
-                HStack(spacing: 8) { ProgressView().controlSize(.small); Text(what).foregroundStyle(.secondary) }
+                HStack(spacing: 8) { ProgressView().controlSize(.small); Text(what).foregroundStyle(PP.subdued) }
             case .failed(let message):
                 Text(message).foregroundStyle(.red).multilineTextAlignment(.center)
             default:
@@ -1226,7 +1226,7 @@ struct ShelfPage: View {
             VStack(alignment: .leading, spacing: 20) {
                 Text(Shelves.title(key)).titleFont(32)
                 if items.isEmpty {
-                    Text("Nothing here yet").foregroundStyle(.secondary)
+                    Text("Nothing here yet").foregroundStyle(PP.subdued)
                 }
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 20, alignment: .top)], alignment: .leading, spacing: 28) {
                     ForEach(items.indices, id: \.self) { ShelfCell(item: items[$0]) }
@@ -1531,7 +1531,7 @@ struct ArtistPage: View {
                 Button(showMore ? "Show less" : "Show more") { withAnimation(Motion.panel) { showMore.toggle() } }
                     .buttonStyle(.plain)
                     .font(.mix(14, .bold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(PP.subdued)
                     .padding(.top, 6)
                     .padding(.leading, 12)
             }
@@ -1559,7 +1559,7 @@ struct ArtistPage: View {
                     VStack(alignment: .leading, spacing: 3) {
                         Text(liked.count == 1 ? "You\u{2019}ve liked 1 song" : "You\u{2019}ve liked \(liked.count) songs")
                             .font(.mix(16, .bold))
-                        Text("By \(name)").font(.mix(14)).foregroundStyle(.secondary)
+                        Text("By \(name)").font(.mix(14)).foregroundStyle(PP.subdued)
                     }
                     Spacer(minLength: 0)
                 }
@@ -1652,7 +1652,7 @@ struct AddToPlaylistView: View {
             Text("Add to playlist").font(.mix(14, .bold))
             // A plain field on a soft fill: no blue focus ring, and not focused before you click it.
             HStack(spacing: 6) {
-                PlayerIconImage(symbol: "magnifyingglass", size: 13).foregroundStyle(.secondary)
+                PlayerIconImage(symbol: "magnifyingglass", size: 13).foregroundStyle(PP.subdued)
                 TextField("Find a playlist", text: $search).textFieldStyle(.plain)
             }
             .padding(.horizontal, 10).frame(height: 30)
@@ -1673,12 +1673,12 @@ struct AddToPlaylistView: View {
             Divider()
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 2) {
-                    Text("Saved in").font(.mix(12, .bold)).foregroundStyle(.secondary).padding(.top, 2)
+                    Text("Saved in").font(.mix(12, .bold)).foregroundStyle(PP.subdued).padding(.top, 2)
                     row(title: "Liked Songs", subtitle: songCount(model.likedIDs.count), art: .liked,
                         on: model.likedIDs.contains(song.id), busy: false) { model.setLiked(song, !model.likedIDs.contains(song.id)) }
                     let lists = library.playlists.filter { search.isEmpty || $0.title.looselyContains(search) }
                     if !lists.isEmpty {
-                        Text("Playlists").font(.mix(12, .bold)).foregroundStyle(.secondary).padding(.top, 8)
+                        Text("Playlists").font(.mix(12, .bold)).foregroundStyle(PP.subdued).padding(.top, 8)
                     }
                     ForEach(lists) { list in
                         let inList = list.songs.contains { $0.id == song.id }
@@ -1719,7 +1719,7 @@ struct AddToPlaylistView: View {
                 ArtworkView(art: art, radius: 4).frame(width: 36, height: 36)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(title).font(.mix(14)).lineLimit(1)
-                    Text(subtitle).font(.mix(12)).foregroundStyle(.secondary)
+                    Text(subtitle).font(.mix(12)).foregroundStyle(PP.subdued)
                 }
                 Spacer(minLength: 8)
                 if busy {
@@ -1727,7 +1727,7 @@ struct AddToPlaylistView: View {
                 } else {
                     Image(systemName: on ? "checkmark.circle.fill" : "circle")
                         .font(.system(size: 18))
-                        .foregroundStyle(on ? AnyShapeStyle(PP.primary) : AnyShapeStyle(.secondary))
+                        .foregroundStyle(on ? AnyShapeStyle(PP.primary) : AnyShapeStyle(PP.subdued))
                 }
             }
             .padding(.vertical, 4).padding(.horizontal, 6)

@@ -58,7 +58,7 @@ struct UpdateCard: View {
                     }
                 }
                 .font(.mix(12))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(PP.subdued)
                 .clipped()
             }
             Spacer(minLength: 8)
@@ -121,7 +121,7 @@ struct UpdateCard: View {
             HStack(spacing: 6) {
                 Button("Later") { dismissedVersion = shown?.version ?? "" }
                     .buttonStyle(.plain)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(PP.subdued)
                     .padding(.horizontal, 8)
                 Button { Task { await updater.install() } } label: { pill(Text("Update")) }
                     .buttonStyle(PressStyle())

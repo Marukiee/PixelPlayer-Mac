@@ -55,7 +55,9 @@ struct RootView: View {
         .sheet(isPresented: Bindable(model).showOnboarding) { OnboardingView().environment(model) }
         .sheet(item: Bindable(model).infoSong) { SongInfoSheet(song: $0) }
         // Room for the library, the content and the queue side by side, so none of them is ever pushed aside.
-        .frame(minWidth: 1100, minHeight: 640)
+        // The zoom of View › Zoom In and Out: laid out at a larger or smaller size, then scaled to the window.
+        .zoomed(ZoomLevel.shared.value)
+        .frame(minWidth: 1100 * ZoomLevel.shared.value, minHeight: 640 * ZoomLevel.shared.value)
         .onAppear {
             model.startClock()
             Debug.windowAppeared()
@@ -102,35 +104,38 @@ struct RootView: View {
 /// button and the search field. Measured on Spotify (64 px, items 48 px with 8 px around them, Home and the field 8 px
 /// apart, the field 474 px at most) and taken at the 75% Mark uses, as everything else.
 struct TopBar: View {
+    /// Spotify's band at 100% (64 px, Home and the search field 48, 8 apart, the field at most 474 wide).
+    static let height: CGFloat = 64
     var searchFocused: FocusState<Bool>.Binding
     @Environment(PlayerModel.self) private var model
 
     var body: some View {
         ZStack {
             HStack(spacing: 0) {
-                HistoryButtons().padding(.leading, 82)
+                // Just past the traffic lights, which keep their size whatever the zoom.
+                HistoryButtons().padding(.leading, 82 / ZoomLevel.shared.value)
                 Spacer(minLength: 0)
             }
-            HStack(spacing: 6) {
+            HStack(spacing: 8) {
                 HomeButton()
                 SearchField(focused: searchFocused)
-                    .frame(maxWidth: 356)
+                    .frame(maxWidth: 474)
             }
-            .padding(.horizontal, 160)
+            .padding(.horizontal, 200)
             HStack(spacing: 0) {
                 Spacer(minLength: 0)
-                ProfileButton().padding(.trailing, 6)
+                ProfileButton().padding(.trailing, 8)
             }
         }
         // As tall as the band the traffic lights are moved into, so all of them share one centre line.
-        .frame(height: TrafficLights.band)
+        .frame(height: Self.height)
         .frame(maxWidth: .infinity)
         .background(TrafficLightsPlacer().frame(width: 0, height: 0))
     }
 }
 
 /// The account in a round button at the right of the band, as Spotify's (measured: 48 px round in #1F1F1F with a 32 px
-/// picture, 8 px from the edge; here at the band's 0.75). A click says who is signed in and opens the settings.
+/// picture, 8 px from the edge). A click says who is signed in and opens the settings.
 struct ProfileButton: View {
     @Environment(PlayerModel.self) private var model
     @LocalState private var hovering = false
@@ -143,8 +148,8 @@ struct ProfileButton: View {
             Button(account == nil ? "Connect to Navidrome…" : "Account…") { open(.sources) }
             Button("Settings…") { open(.general) }
         } label: {
-            AccountPicture(size: 24)
-                .frame(width: 36, height: 36)
+            AccountPicture(size: 32)
+                .frame(width: 48, height: 48)
                 .background(Circle().fill(hovering ? PP.fieldHover : PP.field))
                 .scaleEffect(hovering ? 1.04 : 1)
                 .contentShape(Circle())
@@ -196,9 +201,9 @@ struct HomeButton: View {
         Button { model.go(.home) } label: {
             SpotifyIcon(name: open ? "home_on" : "home")
                 .fill(style: FillStyle(eoFill: true))
-                .frame(width: 18, height: 18)
+                .frame(width: 24, height: 24)
                 .foregroundStyle(open || hovering ? AnyShapeStyle(.primary) : AnyShapeStyle(PP.icon))
-                .frame(width: 36, height: 36)
+                .frame(width: 48, height: 48)
                 .background(Circle().fill(hovering ? PP.fieldHover : PP.field))
                 .scaleEffect(hovering ? 1.04 : 1)
                 .contentShape(Circle())
@@ -228,30 +233,30 @@ struct SearchField: View {
         HStack(spacing: 0) {
             SpotifyIcon(name: "search")
                 .fill(style: FillStyle(eoFill: true))
-                .frame(width: 18, height: 18)
+                .frame(width: 24, height: 24)
                 .foregroundStyle(active || hovering ? AnyShapeStyle(.primary) : AnyShapeStyle(PP.icon))
-                .padding(.trailing, 9)
+                .padding(.trailing, 12)
             TextField("What do you want to play?", text: $model.searchText)
                 .textFieldStyle(.plain)
-                .font(.mix(12))
+                .font(.mix(16))
                 .focused(focused)
                 .onExitCommand { model.searchText = ""; focused.wrappedValue = false }
             if !model.searchText.isEmpty {
                 Button { model.searchText = "" } label: {
-                    PlayerIconImage(symbol: "xmark", size: 11).foregroundStyle(PP.icon)
-                        .frame(width: 22, height: 22).contentShape(Rectangle())
+                    PlayerIconImage(symbol: "xmark", size: 14).foregroundStyle(PP.icon)
+                        .frame(width: 29, height: 29).contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .help("Clear")
-                .padding(.trailing, 6)
+                .padding(.trailing, 8)
             }
-            Rectangle().fill(PP.fieldDivider).frame(width: 1, height: 19)
-                .padding(.trailing, 9)
+            Rectangle().fill(PP.fieldDivider).frame(width: 1, height: 25)
+                .padding(.trailing, 12)
             BrowseButton()
         }
-        .padding(.leading, 9)
-        .padding(.trailing, 12)
-        .frame(height: 36)
+        .padding(.leading, 12)
+        .padding(.trailing, 16)
+        .frame(height: 48)
         .background(Capsule().fill(hovering || active ? PP.fieldHover : PP.field))
         .overlay(Capsule().strokeBorder(Color.primary.opacity(active ? 1 : hovering ? 0.1 : 0), lineWidth: active ? 2 : 1))
         .contentShape(Capsule())
@@ -283,7 +288,7 @@ private struct BrowseButton: View {
             BrowseGlyph()
                 .fill(style: FillStyle(eoFill: true))
                 .foregroundStyle(open || hovering ? AnyShapeStyle(.primary) : AnyShapeStyle(PP.icon))
-                .frame(width: 18, height: 18)
+                .frame(width: 24, height: 24)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -330,7 +335,7 @@ struct BrowseGlyph: Shape {
 /// or narrower, as in Spotify. Dragged narrow enough, it folds.
 struct LibraryColumn: View {
     @Environment(PlayerModel.self) private var model
-    @AppStorage("library.width") private var width: Double = 300
+    @AppStorage("library.width") private var width: Double = 320
     @AppStorage("library.wide") private var wide = false
     @LocalState private var dragStart: Double?
     /// The width while dragging; stored once the drag ends, not on every step.
@@ -342,7 +347,7 @@ struct LibraryColumn: View {
                 // Folding and opening glide, the panel and the strip fading into each other. Spotify does it in one frame,
                 // but Mark likes the animation (2026-11-26).
                 if model.libraryCollapsed {
-                    LibraryRail().frame(width: 58).transition(.opacity)
+                    LibraryRail().frame(width: 72).transition(.opacity)
                 } else {
                     LibraryPanel().frame(width: wide ? 460 : (liveWidth ?? width)).transition(.opacity)
                 }
@@ -358,7 +363,7 @@ struct LibraryColumn: View {
                     // width jumped back and forth under the pointer.
                     DragGesture(minimumDistance: 1, coordinateSpace: .global)
                         .onChanged { value in
-                            let start = dragStart ?? (model.libraryCollapsed ? 58 : (wide ? 460 : width))
+                            let start = dragStart ?? (model.libraryCollapsed ? 72 : (wide ? 460 : width))
                             if dragStart == nil { dragStart = start }
                             let target = start + value.translation.width
                             if target < 180 {
@@ -369,7 +374,7 @@ struct LibraryColumn: View {
                                 // The panel follows the pointer exactly, with nothing animating behind it.
                                 var still = Transaction()
                                 still.disablesAnimations = true
-                                withTransaction(still) { liveWidth = min(480, max(240, target)) }
+                                withTransaction(still) { liveWidth = min(480, max(280, target)) }
                             }
                         }
                         .onEnded { _ in
@@ -417,9 +422,9 @@ private struct RailCover: View {
     var body: some View {
         let selected = model.searchText.isEmpty && model.route == item.route
         ArtworkView(art: item.art, radius: 4)
-            .frame(width: 38, height: 38)
+            .frame(width: 48, height: 48)
             .clipShape(item.kind == .artists ? AnyShape(Circle()) : AnyShape(RoundedRectangle(cornerRadius: 4, style: .continuous)))
-            .padding(6.5)
+            .padding(8)
             .background(RowHighlight(selected: selected, hovering: hovering))
             .contentShape(Rectangle())
             .onTapGesture { model.go(item.route) }
@@ -623,12 +628,12 @@ struct LibraryPanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             header
-            chips.padding(.horizontal, 12)
-            tools.padding(.leading, 8).padding(.trailing, 12).padding(.top, 6).padding(.bottom, 2)
+            chips.padding(.horizontal, 16)
+            tools.padding(.leading, 8).padding(.trailing, 16).padding(.top, 8).padding(.bottom, 2)
             ScrollView {
                 // Its own view, so the hover over the panel never sorts the library again.
                 LibraryItems(sort: sort, view: view)
-                    .padding(.horizontal, 6)
+                    .padding(.horizontal, 8)
                     .padding(.bottom, 8)
             }
             .scrollIndicators(.automatic)
@@ -664,13 +669,13 @@ struct LibraryPanel: View {
             WidenButton()
         }
         .padding(.trailing, 8)
-        .frame(height: 48)
+        .frame(height: 59)
     }
 
     /// One kind at a time, as in Spotify: the chosen chip turns white, the others step aside and a cross shows to go back.
     private var chips: some View {
         ScrollView(.horizontal) {
-            HStack(spacing: 6) {
+            HStack(spacing: 8) {
                 if model.filter != .all {
                     FilterChip(title: nil, chosen: false) { withAnimation(Motion.panel) { model.filter = .all } }
                         .transition(.opacity.combined(with: .scale(scale: 0.8)))
@@ -726,7 +731,7 @@ struct LibraryList: View {
         case .list:
             LazyVStack(spacing: 0) { ForEach(items) { LibraryRow(item: $0) } }
         case .grid, .largeGrid:
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: view == .grid ? 74 : 112), spacing: 2, alignment: .top)], spacing: 2) {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: view == .grid ? 92 : 140), spacing: 2, alignment: .top)], spacing: 2) {
                 ForEach(items) { LibraryTile(item: $0) }
             }
         }
@@ -799,8 +804,8 @@ struct LibraryOptionsMenu: View {
             .pickerStyle(.palette)
         } label: {
             HStack(spacing: 6) {
-                Text(order.title).font(.mix(12))
-                Image(systemName: (LibraryView(rawValue: view) ?? .list).symbol).font(.system(size: 12, weight: .medium))
+                Text(order.title).font(.mix(14))
+                Image(systemName: (LibraryView(rawValue: view) ?? .list).symbol).font(.system(size: 15, weight: .medium))
             }
             .foregroundStyle(hovering ? PP.iconHover : PP.icon)
             .contentShape(Rectangle())
@@ -824,13 +829,13 @@ struct FilterChip: View {
     var body: some View {
         Group {
             if let title {
-                Text(title).font(.mix(12)).padding(.horizontal, 11)
+                Text(title).font(.mix(14)).padding(.horizontal, 12)
             } else {
-                PlayerIconImage(symbol: "xmark", size: 10).frame(width: 26)
+                PlayerIconImage(symbol: "xmark", size: 12).frame(width: 32)
             }
         }
         .foregroundStyle(chosen ? Color.black : Color.primary)
-        .frame(height: 26)
+        .frame(height: 32)
         .background(Capsule().fill(chosen ? AnyShapeStyle(Color.white) : AnyShapeStyle(Color.primary.opacity(hovering ? 0.16 : 0.1))))
         .contentShape(Capsule())
         .onTapGesture(perform: action)
@@ -849,9 +854,9 @@ struct SidebarIconButton: View {
 
     var body: some View {
         Button(action: action) {
-            PlayerIconImage(symbol: symbol, size: 13)
+            PlayerIconImage(symbol: symbol, size: 16)
                 .foregroundStyle(hovering ? PP.iconHover : PP.icon)
-                .frame(width: 28, height: 28)
+                .frame(width: 32, height: 32)
                 .background(Circle().fill(Color.primary.opacity(hovering ? 0.08 : 0)))
                 .contentShape(Circle())
         }
@@ -874,19 +879,19 @@ struct LibraryTitleButton: View {
         Button {
             withAnimation(Motion.panel) { model.libraryCollapsed = true }
         } label: {
-            HStack(spacing: 10) {
+            HStack(spacing: 12) {
                 FoldGlyph()
                     .foregroundStyle(hovering ? PP.iconHover : PP.icon)
-                    .frame(width: 13, height: 13)
+                    .frame(width: 16, height: 16)
                     .opacity(iconIn ? 1 : 0)
-                    .offset(x: iconIn ? 0 : -13)
+                    .offset(x: iconIn ? 0 : -16)
                 Text("Your Library")
-                    .font(.mix(13, .bold))
+                    .font(.mix(16, .bold))
                     .foregroundStyle(.primary)
             }
-            .padding(.leading, 13)
+            .padding(.leading, 16)
             .frame(height: 30)
-            .offset(x: titleIn ? 0 : -19)
+            .offset(x: titleIn ? 0 : -24)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -932,13 +937,13 @@ struct LibraryToggleButton: View {
             // Folding: a small panel with an arrow; opening again from the strip: Spotify's library icon.
             Group {
                 if collapse {
-                    FoldGlyph().frame(width: 13, height: 13)
+                    FoldGlyph().frame(width: 16, height: 16)
                 } else {
-                    SpotifyIcon(name: hovering ? "library_on" : "library").fill(style: FillStyle(eoFill: true)).frame(width: 20, height: 20)
+                    SpotifyIcon(name: hovering ? "library_on" : "library").fill(style: FillStyle(eoFill: true)).frame(width: 24, height: 24)
                 }
             }
                 .foregroundStyle(hovering ? PP.iconHover : PP.icon)
-                .frame(width: 32, height: 32)
+                .frame(width: 40, height: 40)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -957,9 +962,9 @@ struct CreateButton: View {
             Button("Playlist", systemImage: "music.note.list") { CreateButton.askForName() }
                 .disabled(Library.shared.client == nil)
         } label: {
-            PlayerIconImage(symbol: "plus", size: 13)
+            PlayerIconImage(symbol: "plus", size: 16)
                 .foregroundStyle(hovering ? PP.iconHover : PP.icon)
-                .frame(width: 28, height: 28)
+                .frame(width: 35, height: 35)
                 .background(Circle().fill(Color.primary.opacity(hovering ? 0.16 : 0.1)))
                 .contentShape(Circle())
         }
@@ -1000,9 +1005,9 @@ struct WidenButton: View {
             withAnimation(Motion.panel) { wide.toggle() }
         } label: {
             Image(systemName: wide ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
-                .font(.system(size: 12, weight: .semibold))
+                .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(hovering ? PP.iconHover : PP.icon)
-                .frame(width: 28, height: 28)
+                .frame(width: 35, height: 35)
                 .background(Circle().fill(Color.primary.opacity(hovering ? 0.08 : 0)))
                 .contentShape(Circle())
         }
@@ -1036,9 +1041,9 @@ private struct HistoryButton: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: symbol)
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(enabled ? AnyShapeStyle(.primary) : AnyShapeStyle(.tertiary))
-                .frame(width: 28, height: 28)
+                .frame(width: 32, height: 32)
                 .background(Circle().fill(Color.primary.opacity(hovering && enabled ? 0.08 : 0)))
                 .contentShape(Circle())
         }
@@ -1067,14 +1072,15 @@ struct LibraryRow: View {
     private var selected: Bool { model.searchText.isEmpty && model.route == item.route }
 
     var body: some View {
-        HStack(spacing: 10) {
+        // Spotify's rows (open.spotify.com, 100%): 64 high, the cover 48 with 8 around it, the words 12 after it.
+        HStack(spacing: 12) {
             if !compact {
-                ArtworkView(art: item.art, radius: 4).frame(width: 38, height: 38)
+                ArtworkView(art: item.art, radius: 4).frame(width: 48, height: 48)
                     .overlay {
                         // Hovering shows play on the cover, as in Spotify. Shown at once, like the grey behind the row.
                         ZStack {
                             Color.black.opacity(0.4)
-                            PlayGlyph().fill(Color.white).frame(width: 12, height: 14).offset(x: 1)
+                            PlayGlyph().fill(Color.white).frame(width: 15, height: 17.5).offset(x: 1)
                         }
                         .clipShape(item.kind == .artists ? AnyShape(Circle()) : AnyShape(RoundedRectangle(cornerRadius: 4, style: .continuous)))
                         .opacity(hovering ? 1 : 0)
@@ -1084,29 +1090,29 @@ struct LibraryRow: View {
             if compact {
                 HStack(spacing: 4) {
                     Text(item.title).foregroundStyle(playing ? AnyShapeStyle(.tint) : AnyShapeStyle(.primary))
-                    Text("• " + (item.subtitle.components(separatedBy: " • ").first ?? "")).foregroundStyle(.secondary)
+                    Text("• " + (item.subtitle.components(separatedBy: " • ").first ?? "")).foregroundStyle(PP.subdued)
                 }
-                .font(.mix(13))
+                .font(.mix(14))
                 .lineLimit(1)
             } else {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(item.title).font(.mix(13)).foregroundStyle(playing ? AnyShapeStyle(.tint) : AnyShapeStyle(.primary))
+                    Text(item.title).font(.mix(16)).foregroundStyle(playing ? AnyShapeStyle(.tint) : AnyShapeStyle(.primary))
                     HStack(spacing: 4) {
                         // A pinned item carries a small green pin, as in Spotify.
                         if Library.shared.isPinned(item.route) {
-                            PlayerIconImage(symbol: "pin.fill", size: 9).foregroundStyle(PP.primary)
+                            PlayerIconImage(symbol: "pin.fill", size: 12).foregroundStyle(PP.primary)
                         }
                         Text(item.subtitle)
                     }
-                    .font(.mix(11.5)).foregroundStyle(.secondary)
+                    .font(.mix(14)).foregroundStyle(PP.subdued)
                 }
                 .lineLimit(1)
             }
             Spacer(minLength: 4)
             if playing { NowPlayingMark() }
         }
-        .padding(.vertical, compact ? 6 : 6.5)
-        .padding(.horizontal, 6.5)
+        .padding(.vertical, compact ? 8 : 8)
+        .padding(.horizontal, 8)
         .background(RowHighlight(selected: selected, hovering: hovering))
         .contentShape(Rectangle())
         .onTapGesture { model.go(item.route) }
@@ -1155,10 +1161,10 @@ struct LibraryTile: View {
             ArtworkView(art: item.art, radius: 4)
                 .aspectRatio(1, contentMode: .fit)
                 .clipShape(item.kind == .artists ? AnyShape(Circle()) : AnyShape(RoundedRectangle(cornerRadius: 4, style: .continuous)))
-            Text(item.title).font(.mix(12)).lineLimit(1)
-            Text(item.subtitle).font(.mix(11)).foregroundStyle(.secondary).lineLimit(1)
+            Text(item.title).font(.mix(16)).lineLimit(1)
+            Text(item.subtitle).font(.mix(14)).foregroundStyle(PP.subdued).lineLimit(1)
         }
-        .padding(6)
+        .padding(8)
         .background(RowHighlight(selected: selected, hovering: hovering))
         .contentShape(Rectangle())
         .onTapGesture { model.go(item.route) }

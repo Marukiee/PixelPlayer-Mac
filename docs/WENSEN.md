@@ -51,6 +51,8 @@ Alles wat Mark vroeg, met wat klaar is en wat nog moet. Bijgewerkt bij elke rond
 - Songtekst eerst van LRCLIB zoals de Android-app, op duur gekozen; daarna het bestand en Navidrome.
 - Home: Your Mix als kop zoals een playlist (variant A), kleur uit de hoezen, dezelfde hoezen als de tegel; collages met vier verschillende hoezen.
 - Naam uit het Navidrome-account ("Made for ..."), geen naam in de code; profielknop rechtsboven met foto (Gravatar via Navidrome) of letter.
+- View › Actual Size, Zoom In en Zoom Out (⌘0, ⌘+, ⌘−) zoals Spotify, met zijn stappen; alle maten zijn nu Spotify's maten op 100% (bovenbalk 64, Your Library en wachtrij met hoezen van 48, tekst 16 en 14).
+- Tweede tekst en "Show all" in Spotify's grijs #B3B3B3 (was donkerder).
 - Iconen hetzelfde als in de Android-app: shuffle, play (ook de groene knop), pauze, vorige, volgende, herhalen, wachtrij, Connect, toevoegen aan wachtrij, meer, sluiten, omlaag, plus, opslaan (groen vinkje), toevoegen (ring met plus), downloaden, zoeken, punaise, slaaptimer.
 
 ## In 0.2.7 (uitgebracht)

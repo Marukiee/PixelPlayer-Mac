@@ -73,6 +73,9 @@ enum PP {
     static let ink = adaptive(0x1A1B21, 0xE4E2EA)
     static let inkSecondary = adaptive(0x5A5E70, 0xA8ACBE)
     static let hairline = adaptive(0x1A1B21, 0xFFFFFF, opacityLight: 0.07, opacityDark: 0.08)
+    /// Spotify's second text colour (text-subdued, #B3B3B3 measured on open.spotify.com): artists, albums, times, "Show all".
+    /// The system's secondary grey came out darker (#A4A4A4), so that text looked thinner than Spotify's.
+    static let subdued = adaptive(0x6A6A6A, 0xB3B3B3)
     /// The player's icons, as solid colours: on glass the system's text colours take on the colour beneath and look washed.
     static let icon = adaptive(0x5E5E5E, 0xB3B3B3)
     static let iconHover = adaptive(0x000000, 0xFFFFFF)
