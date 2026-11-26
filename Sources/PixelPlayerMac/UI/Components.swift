@@ -413,3 +413,25 @@ struct LinkText: View {
             .onTapGesture(perform: action)
     }
 }
+
+/// The green bars Spotify shows on a tile that plays: four thin bars that move while the music plays and rest when it
+/// pauses.
+struct PlayingBars: View {
+    var playing: Bool
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 30, paused: !playing)) { context in
+            let t = context.date.timeIntervalSinceReferenceDate
+            HStack(alignment: .bottom, spacing: 1.5) {
+                ForEach(0..<4, id: \.self) { i in
+                    // Each bar its own speed and phase, so they never move together.
+                    let speeds = [5.1, 3.7, 6.3, 4.4], phases = [0.0, 1.3, 2.1, 0.7]
+                    let level = playing ? 0.3 + 0.7 * (0.5 + 0.5 * sin(t * speeds[i] + phases[i])) : [0.35, 0.6, 0.25, 0.8][i]
+                    Capsule(style: .continuous).fill(PP.primary).frame(width: 2.5, height: 3 + 11 * level)
+                }
+            }
+            .frame(width: 14.5, height: 14, alignment: .bottom)
+        }
+        .accessibilityLabel(playing ? "Playing" : "Paused")
+    }
+}

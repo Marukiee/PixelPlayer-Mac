@@ -100,6 +100,11 @@ enum Debug {
         case "playsong":
             // `playsong:<title>` starts that song with the whole library after it.
             if let song = Library.shared.songs.first(where: { $0.title == value }) { model.play(song, in: Library.shared.songs) }
+        case "playlist":
+            // `playlist:<id>` presses the green button of that playlist, as on its tile on Home.
+            if let list = Library.shared.playlists.first(where: { $0.id == value }) {
+                model.togglePlay(from: list.title) { list.songs }
+            }
         case "playmix":
             // `playmix:<id>` presses the green button of that mix, as on its cover.
             if let mix = Library.shared.mixes.first(where: { $0.id == value }) {

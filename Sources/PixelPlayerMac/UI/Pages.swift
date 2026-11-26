@@ -88,7 +88,7 @@ struct HomePage: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 36) {
                 MixHero()
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: width > 940 ? 4 : 2), spacing: 12) {
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: width > 940 ? 4 : 2), spacing: 8) {
                     ForEach(quick) { QuickTile(item: $0) }
                 }
                 .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
@@ -289,30 +289,35 @@ struct QuickTile: View {
     @Environment(PlayerModel.self) private var model
     @LocalState private var hovering = false
 
+    /// Spotify's shortcut tiles, measured on Mark's screenshots side by side: 47 high with the cover square and flush (artists
+    /// too), the title bold, a lighter grey than the page, a small corner. While it plays: green bars, the button on hover.
     var body: some View {
-        HStack(spacing: 12) {
+        let active = model.isPlaying(from: item.title) { Library.shared.songs(for: item.route) }
+        HStack(spacing: 8) {
             ArtworkView(art: item.art, radius: 0)
-                .frame(width: 56, height: 56)
-                .clipShape(item.kind == .artists ? AnyShape(Circle().inset(by: 4)) : AnyShape(Rectangle()))
-            Text(item.title).fontWeight(.semibold).lineLimit(2)
-            Spacer(minLength: 12)
+                .frame(width: 47, height: 47)
+            Text(item.title).fontWeight(.bold).lineLimit(2)
+            Spacer(minLength: 10)
         }
         // The play button lies over the end of the tile, so the title has the whole width when it is not shown.
         .overlay(alignment: .trailing) {
-            let active = model.isPlaying(from: item.title) { Library.shared.songs(for: item.route) }
-            GreenPlayButton(size: 36, playing: active && model.isPlaying, label: item.title) {
-                model.togglePlay(from: item.title) { Library.shared.songs(for: item.route) }
+            ZStack {
+                PlayingBars(playing: model.isPlaying)
+                    .opacity(active && !hovering ? 1 : 0)
+                GreenPlayButton(size: 31, playing: active && model.isPlaying, label: item.title) {
+                    model.togglePlay(from: item.title) { Library.shared.songs(for: item.route) }
+                }
+                .opacity(hovering ? 1 : 0)
+                .allowsHitTesting(hovering)
             }
-            .padding(.trailing, 10)
-            .opacity(hovering || active ? 1 : 0)
-            .allowsHitTesting(hovering || active)
+            .padding(.trailing, 8)
         }
         .frame(minWidth: 0, maxWidth: .infinity)
-        .frame(height: 56)
-        .background(Color.primary.opacity(hovering ? 0.1 : 0.06))
-        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .frame(height: 47)
+        .background(Color.primary.opacity(hovering ? 0.2 : 0.14))
+        .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
         // A click on the tile opens it; the play button plays it.
-        .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
         .onTapGesture { model.go(item.route) }
         .onHover { hovering = $0 && !Debug.active }
         .onAppear { if Debug.hovered(item.title) { hovering = true } }
@@ -506,21 +511,23 @@ struct TrackListPage: View {
         let order = model.trackOrders[model.route] ?? firstOrder
         let reversed = model.trackReversed[model.route] ?? false
         let songs = showSort ? order.sorted(self.songs, reversed: reversed, fields: \.orderFields) : self.songs
-        // As on Spotify: the cover grows with the page from 128 to 232 points.
-        let cover = min(232, max(128, 128 + (width - 600) / 424 * 104))
+        // As on Spotify, the cover grows with the page, at the size Mark sees Spotify: his runs zoomed to three quarters, so
+        // its 128 to 232 pixels are 96 to 174 points here (measured against his screenshots side by side).
+        let zoom: CGFloat = 0.75
+        let cover = zoom * min(232, max(128, 128 + (width / zoom - 600) / 424 * 104))
         // Spotify's capitals are three tenths of the cover high.
         let titleSize = (cover * 0.302 / TitleFont.capHeight).rounded()
         let dark = colorScheme == .dark
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                HStack(alignment: .bottom, spacing: 24) {
+                HStack(alignment: .bottom, spacing: 18) {
                     ArtworkView(art: header.art, radius: 4)
                         .frame(width: cover, height: cover)
                         // One shadow for the whole cover, not one for the heart on it as well.
                         .compositingGroup()
                         .shadow(color: .black.opacity(0.5), radius: 30, y: 4)
                     VStack(alignment: .leading, spacing: 0) {
-                        Text(header.kind).font(.system(size: 14))
+                        Text(header.kind).font(.system(size: 11))
                         TitleFont.text(header.title, size: titleSize)
                             .lineLimit(1).minimumScaleFactor(0.4)
                             .padding(.top, 2)
@@ -532,9 +539,9 @@ struct TrackListPage: View {
                             }
                             Text(header.meta)
                         }
-                        .font(.system(size: 14))
+                        .font(.system(size: 11.5))
                         .foregroundStyle(dark ? AnyShapeStyle(Color.white.opacity(0.7)) : AnyShapeStyle(.secondary))
-                        .padding(.top, 12)
+                        .padding(.top, 10)
                         .padding(.bottom, 4)
                     }
                     .foregroundStyle(dark ? AnyShapeStyle(Color.white) : AnyShapeStyle(.primary))

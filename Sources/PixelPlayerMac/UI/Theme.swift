@@ -7,13 +7,14 @@ typealias LocalState<Value> = SwiftUI.State<Value>
 
 /// The big page titles: Figtree (Resources/Fonts, SIL Open Font License), of forty free fonts the one that lies closest over
 /// Spotify's title font. Measured on open.spotify.com: eight titles in Spotify's own font against each candidate at the same
-/// cap height, Figtree at weight 850 shares 78% of the pixels (its S nearly exactly), Inter Display 74%, SF Pro 69%. The
+/// cap height, Figtree shares 78% of the pixels (its S nearly exactly), Inter Display 74%, SF Pro 69%. Weight 800, a step
+/// under the closest fit of 850, because Mark found 850 a touch too heavy. The
 /// closest fit has the letters 1.9% of the size closer and the spaces 6.9% narrower.
 enum TitleFont {
     private static let base: CTFontDescriptor? = {
         guard let url = Bundle.main.url(forResource: "FigtreeVariable", withExtension: "ttf", subdirectory: "Fonts"),
               let found = CTFontManagerCreateFontDescriptorsFromURL(url as CFURL) as? [CTFontDescriptor] else { return nil }
-        let axes: [Int: Double] = [0x7767_6874: 850]  // wght
+        let axes: [Int: Double] = [0x7767_6874: 800]  // wght
         return CTFontDescriptorCreateCopyWithAttributes(found[0], [kCTFontVariationAttribute: axes] as CFDictionary)
     }()
 
