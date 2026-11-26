@@ -22,6 +22,8 @@ if [ "$MODE" = release ]; then
   plutil -replace CFBundleShortVersionString -string "${VERSION:?set VERSION}" "$PLIST"
   plutil -replace CFBundleVersion -string "${BUILD:-1}" "$PLIST"
 fi
+# The title font (Figtree, SIL Open Font License), with its licence.
+cp -R Resources/Fonts "$APP/Contents/Resources/Fonts"
 # The icon, drawn in code (scripts/make-icon.swift), in every size macOS asks for.
 ICONSET="$(mktemp -d)/AppIcon.iconset"
 mkdir -p "$ICONSET"

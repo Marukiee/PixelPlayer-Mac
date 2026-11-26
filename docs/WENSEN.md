@@ -22,6 +22,7 @@ Alles wat Mark vroeg, met wat klaar is en wat nog moet. Bijgewerkt bij elke rond
 - Liked Songs-hoes in Spotify's verloop met hun hartje.
 - App-icoon een tikje naar rechts.
 - Wit bolletje bij hover op voortgangsbalk en volume, zoals Spotify.
+- Grote titels in Figtree 850 (OFL), van 40 vrije lettertypes het dichtst bij Spotify's titelletter (78% gelijk), met gemeten spatiering.
 
 ## In 0.2.7 (uitgebracht)
 

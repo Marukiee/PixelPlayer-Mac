@@ -124,7 +124,7 @@ struct MixHero: View {
                 .shadow(color: .black.opacity(0.3), radius: 16, y: 8)
             VStack(alignment: .leading, spacing: 4) {
                 Text("Made for you").font(.subheadline.weight(.semibold)).foregroundStyle(.white.opacity(0.8))
-                Text("Your Mix").font(.system(size: 52, weight: .heavy)).foregroundStyle(.white)
+                TitleFont.text("Your Mix", size: 52).foregroundStyle(.white)
                 Text(Library.shared.yourMixSummary).foregroundStyle(.white.opacity(0.8)).lineLimit(1)
                 Spacer(minLength: 8)
                 HStack(spacing: 18) {
@@ -506,9 +506,10 @@ struct TrackListPage: View {
         let order = model.trackOrders[model.route] ?? firstOrder
         let reversed = model.trackReversed[model.route] ?? false
         let songs = showSort ? order.sorted(self.songs, reversed: reversed, fields: \.orderFields) : self.songs
-        // As on Spotify: the cover grows with the page from 128 to 232 points, and the title is a little over four tenths of it.
+        // As on Spotify: the cover grows with the page from 128 to 232 points.
         let cover = min(232, max(128, 128 + (width - 600) / 424 * 104))
-        let titleSize = (cover * 0.42).rounded()
+        // Spotify's capitals are three tenths of the cover high.
+        let titleSize = (cover * 0.302 / TitleFont.capHeight).rounded()
         let dark = colorScheme == .dark
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
@@ -520,9 +521,7 @@ struct TrackListPage: View {
                         .shadow(color: .black.opacity(0.5), radius: 30, y: 4)
                     VStack(alignment: .leading, spacing: 0) {
                         Text(header.kind).font(.system(size: 14))
-                        Text(header.title)
-                            .font(.system(size: titleSize, weight: .heavy))
-                            .tracking(-titleSize * 0.025)
+                        TitleFont.text(header.title, size: titleSize)
                             .lineLimit(1).minimumScaleFactor(0.4)
                             .padding(.top, 2)
                         HStack(spacing: 0) {
@@ -1303,8 +1302,7 @@ struct ArtistPage: View {
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.white.opacity(0.9))
                     .shadow(color: .black.opacity(0.4), radius: 8)
-                Text(name)
-                    .font(.system(size: 84, weight: .black))
+                TitleFont.text(name, size: 84)
                     .foregroundStyle(.white)
                     .lineLimit(1)
                     .minimumScaleFactor(0.4)

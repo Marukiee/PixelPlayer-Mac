@@ -5,8 +5,46 @@ import AppKit
 /// The property wrapper underneath is still there, so this alias builds with the Command Line Tools.
 typealias LocalState<Value> = SwiftUI.State<Value>
 
-/// The palette: Spotify's green as the accent (Mark's pick), with black on it as in Spotify, and the soft
-/// tones of PixelPlayer on Android for the rest. Every colour is a role, never a raw hex in a view.
+/// The big page titles: Figtree (Resources/Fonts, SIL Open Font License), of forty free fonts the one that lies closest over
+/// Spotify's title font. Measured on open.spotify.com: eight titles in Spotify's own font against each candidate at the same
+/// cap height, Figtree at weight 850 shares 78% of the pixels (its S nearly exactly), Inter Display 74%, SF Pro 69%. The
+/// closest fit has the letters 1.9% of the size closer and the spaces 6.9% narrower.
+enum TitleFont {
+    private static let base: CTFontDescriptor? = {
+        guard let url = Bundle.main.url(forResource: "FigtreeVariable", withExtension: "ttf", subdirectory: "Fonts"),
+              let found = CTFontManagerCreateFontDescriptorsFromURL(url as CFURL) as? [CTFontDescriptor] else { return nil }
+        let axes: [Int: Double] = [0x7767_6874: 850]  // wght
+        return CTFontDescriptorCreateCopyWithAttributes(found[0], [kCTFontVariationAttribute: axes] as CFDictionary)
+    }()
+
+    /// How high the capitals are, as a share of the size, so a title can be sized by its capitals as Spotify's are.
+    static let capHeight: CGFloat = base.map { CTFontGetCapHeight(CTFontCreateWithFontDescriptor($0, 100, nil)) / 100 } ?? 0.705
+
+    /// The title font; the system's heavy font when the file is missing.
+    static func font(_ size: CGFloat) -> Font {
+        guard let base else { return .system(size: size, weight: .heavy) }
+        return Font(CTFontCreateWithFontDescriptor(base, size, nil))
+    }
+
+    /// A title in that font with the measured spacing. Without the file it falls back to the system font, unspaced.
+    static func text(_ string: String, size: CGFloat) -> Text {
+        guard base != nil else { return Text(string).font(.system(size: size, weight: .heavy)) }
+        var title = AttributedString()
+        for (index, word) in string.split(separator: " ", omittingEmptySubsequences: false).enumerated() {
+            if index > 0 {
+                var space = AttributedString(" ")
+                space.tracking = -0.069 * size
+                title += space
+            }
+            var part = AttributedString(String(word))
+            part.tracking = -0.019 * size
+            title += part
+        }
+        title.font = font(size)
+        return Text(title)
+    }
+}
+
 enum PP {
     static let primary = adaptive(0x1DB954, 0x1ED760)
     static let onPrimary = adaptive(0x000000, 0x000000)
