@@ -223,6 +223,16 @@ enum Debug {
             try? await Task.sleep(for: .seconds(0.4))
         case "menuclose":
             MenuPresenter.shared.close()
+        case "responder":
+            // `responder:<name>` writes what has the typing cursor in the window, and whether the window is key.
+            let window = mainWindow()
+            let responder = window?.firstResponder
+            let line = "key=\(window?.isKeyWindow ?? false) responder=\(responder.map { String(describing: type(of: $0)) } ?? "nil") fieldEditor=\((responder as? NSTextView)?.isFieldEditor ?? false) caret=\((responder as? NSTextView)?.insertionPointColor.usingColorSpace(.sRGB).map { String(format: "%.2f %.2f %.2f", $0.redComponent, $0.greenComponent, $0.blueComponent) } ?? "-")"
+            try? line.write(to: file("\(value).txt"), atomically: true, encoding: .utf8)
+        case "searchfocus":
+            // Puts the typing cursor in the search field, as ⌘L does.
+            model.searchRequest += 1
+            try? await Task.sleep(for: .seconds(0.4))
         case "rightclick", "leftclick":
             // `rightclick:<x>:<y>` sends a real click through the window at that point (in points at 100%), as the mouse
             // would: for checking what a right click opens and what a click outside a menu does.

@@ -45,6 +45,7 @@ Alles wat Mark vroeg, met wat klaar is en wat nog moet. Bijgewerkt bij elke rond
 - Zijbalk: altijd maar één rij grijs; met de muis op een andere rij is alleen die grijs, de geopende pas weer als de muis van de lijst af is.
 - Breedte van Your Library slepen volgt de muis soepel (werd gemeten op de sleeplijn zelf, die meeschoof).
 - Zoekveld: klik opent de zoekpagina, witte rand meteen en blijft staan zolang die open is.
+- Zoekveld zoals Spotify (gemeten): witte rand alleen tijdens typen, klik ergens anders haalt de cursor eruit, cursor wit.
 - Titelletter: afstand per letter gemeten op Spotify's eigen titelletter, Figtree's kerning uit.
 - Lettertype Mix (Spotify's eigen letter) via Instellingen › Appearance › Font: Import Font… slikt de zip, de map of losse bestanden, ook door te slepen; Get the Font en Use Default. Niet in de repo of de release; zonder import Figtree en de systeemletter. Vervangt de tabel per letter hierboven.
 - Mix zoals Spotify het tekent: 0,967 zo breed (SpotifyMixUI), titels 0,015 em (800) en 0,019 em (700) krapper; per onderdeel Spotify's dikte (400, 700, 800) en maat, tracklijst en pagina's op Spotify's maat (titel 16, tweede regel 14, koppen 24).

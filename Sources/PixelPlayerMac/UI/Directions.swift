@@ -65,6 +65,7 @@ struct RootView: View {
         .onAppear {
             model.startClock()
             Debug.windowAppeared()
+            ClickAwayFocus.install()
         }
         .onChange(of: model.settingsRequest) { openSettings() }
         .onChange(of: model.fullScreen) { if model.fullScreen { searchFocused = false } }
@@ -229,9 +230,9 @@ struct SearchField: View {
 
     var body: some View {
         @Bindable var model = model
-        // The white ring stays while the search page is open or something is typed, also after a click elsewhere, as in
-        // Spotify on the Mac (Mark, 2026-11-26).
-        let active = focused.wrappedValue || model.route == .search || !model.searchText.isEmpty
+        // The white ring only while typing, as Spotify (measured: 2 inside while focused; after a click elsewhere, also on
+        // the search page, back to the faint edge). A click anywhere else ends the typing (ClickAwayFocus).
+        let active = focused.wrappedValue
         HStack(spacing: 0) {
             SpotifyIcon(name: "search")
                 .fill(style: FillStyle(eoFill: true))
@@ -241,10 +242,17 @@ struct SearchField: View {
             TextField("What do you want to play?", text: $model.searchText)
                 .textFieldStyle(.plain)
                 .font(.mix(16))
+                // Spotify's cursor is white, not the accent green.
+                .tint(Color.primary)
                 .focused(focused)
+                .onChange(of: focused.wrappedValue) { _, now in
+                    guard now else { return }
+                    DispatchQueue.main.async { (NSApp.keyWindow?.firstResponder as? NSTextView)?.insertionPointColor = .labelColor }
+                }
                 .onExitCommand { model.searchText = ""; focused.wrappedValue = false }
             if !model.searchText.isEmpty {
-                Button { model.searchText = "" } label: {
+                // Clearing keeps you typing, as in Spotify.
+                Button { model.searchText = ""; focused.wrappedValue = true } label: {
                     PlayerIconImage(symbol: "xmark", size: 14).foregroundStyle(PP.icon)
                         .frame(width: 29, height: 29).contentShape(Rectangle())
                 }
@@ -1196,6 +1204,29 @@ enum LibraryItemMenu {
             }]
         }
         return entries
+    }
+}
+
+/// A click anywhere outside the text field that is being typed in ends the typing, as on a web page (Mark, 2026-11-26:
+/// the search field kept its white ring and cursor after a click on the black). SwiftUI keeps the focus otherwise.
+@MainActor
+enum ClickAwayFocus {
+    private static var monitor: Any?
+
+    static func install() {
+        guard monitor == nil else { return }
+        monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { event in
+            MainActor.assumeIsolated { release(for: event) }
+            return event
+        }
+    }
+
+    private static func release(for event: NSEvent) {
+        guard let window = event.window, let editor = window.firstResponder as? NSTextView, editor.isFieldEditor,
+              let field = editor.delegate as? NSView else { return }
+        let point = field.convert(event.locationInWindow, from: nil)
+        if field.bounds.contains(point) { return }
+        window.makeFirstResponder(nil)
     }
 }
 
