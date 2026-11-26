@@ -56,6 +56,7 @@ Alles wat Mark vroeg, met wat klaar is en wat nog moet. Bijgewerkt bij elke rond
 - Iconen hetzelfde als in de Android-app: shuffle, play (ook de groene knop), pauze, vorige, volgende, herhalen, wachtrij, Connect, toevoegen aan wachtrij, meer, sluiten, omlaag, plus, opslaan (groen vinkje), toevoegen (ring met plus), downloaden, zoeken, punaise, slaaptimer.
 - Menu's zoals Spotify in plaats van de systeemmenu's: rechtsklik en drie puntjes overal (nummers, wachtrij, speler, Your Library, lijstkop, profiel, plus), donker paneel met Spotify's maten, elke regel een icoon uit de Android-app, Spotify's letters rechts (L, P, Q, A, ⌥A, S) die werken als het menu open is, submenu's ernaast, pijltjes en Esc; Sort by en View as met groene keuze en vinkje. Het zwarte icoontje is weg.
 - Gedownload: groen gevulde cirkel met uitgesneden pijl, zoals Spotify.
+- Vinkje in menu's zoals Spotify's (dunne lijn), gekozen icoon groen; tekst zo dun als Spotify's (zonder de verdikking van macOS, net als Spotify's antialiased).
 - Standaard op 83%, dezelfde stap als Marks Spotify (zoom-level -100); zoomstappen zijn nu die van Spotify (telkens 1,2 keer).
 - Wachtrij: dubbelklik op een nummer in de wachtrij speelt het weer (haalde het weg), Remove from queue staat weer in het menu.
 

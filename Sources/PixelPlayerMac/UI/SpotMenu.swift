@@ -422,7 +422,8 @@ struct MenuRow: View {
         let menus = MenuPresenter.shared
         HStack(spacing: 12) {
             if entry.icon != nil || roomForIcon {
-                MenuIcon(icon: entry.icon, green: entry.green).frame(width: 16, height: 16)
+                // The chosen one's icon goes green with its title, as in Spotify.
+                MenuIcon(icon: entry.icon, green: entry.green || entry.checked).frame(width: 16, height: 16)
             }
             Text(entry.title).font(.mix(14)).lineLimit(1).truncationMode(.tail)
                 .foregroundStyle(entry.checked ? AnyShapeStyle(PP.primary) : AnyShapeStyle(.primary))
@@ -436,7 +437,7 @@ struct MenuRow: View {
                         SubmenuTriangle().fill(PP.subdued).frame(width: 6, height: 12).frame(width: 16, height: 16)
                     }
                     if entry.checked {
-                        SpotifyIcon(name: "check_small").fill(PP.primary, style: FillStyle(eoFill: true)).frame(width: 16, height: 14)
+                        SpotCheck().stroke(PP.primary, style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .miter)).frame(width: 16, height: 16)
                     }
                 }
                 .padding(.leading, 16)
@@ -473,6 +474,21 @@ struct MenuIcon: View {
         case nil:
             Color.clear
         }
+    }
+}
+
+/// Spotify's check in a menu, measured on its icon (16 box): a line 1.5 thick from (1, 9.19) through (4.91, 13.09) to
+/// (15, 3), round at the ends and sharp in the corner. Drawn here, not copied.
+struct SpotCheck: Shape {
+    func path(in rect: CGRect) -> Path {
+        let unit = min(rect.width, rect.height) / 16
+        let origin = CGPoint(x: rect.midX - 8 * unit, y: rect.midY - 8 * unit)
+        func p(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: origin.x + x * unit, y: origin.y + y * unit) }
+        var path = Path()
+        path.move(to: p(1, 9.186))
+        path.addLine(to: p(4.907, 13.093))
+        path.addLine(to: p(15, 3))
+        return path
     }
 }
 

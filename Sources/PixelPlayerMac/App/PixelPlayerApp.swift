@@ -6,6 +6,13 @@ struct PixelPlayerApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     private let model = PlayerModel.shared
 
+    init() {
+        // Text as thin as Spotify's: it draws every letter with -webkit-font-smoothing: antialiased, without the
+        // thickening macOS adds (Mark, 2026-11-26: the letter looked a weight heavier). Set before anything is drawn,
+        // for this app only.
+        UserDefaults.standard.set(0, forKey: "AppleFontSmoothing")
+    }
+
     var body: some Scene {
         WindowGroup("PixelPlayer", id: "main") {
             RootView()
