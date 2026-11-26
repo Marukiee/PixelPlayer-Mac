@@ -69,6 +69,8 @@ struct Mix: Identifiable, Hashable {
     let symbol: String
     let tone: Tone
     let covers: [Album]
+    /// A Daily Mix from Navidrome: its colour pair (1 to 6, as SpotCopy's covers), drawn as a Daily Mix cover.
+    var pair: Int? = nil
 }
 
 enum DeviceKind: Hashable { case mac, sonos, phone }

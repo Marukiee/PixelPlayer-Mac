@@ -450,6 +450,8 @@ private struct RailCover: View {
 enum Artwork {
     case liked, songs
     case album(Album), collage([Album]), artist(Album)
+    /// A Daily Mix from Navidrome: its name, colour pair and the cover of its first artist.
+    case dailyMix(String, Int, Album?)
 }
 
 struct ArtworkView: View {
@@ -474,6 +476,8 @@ struct ArtworkView: View {
             Collage(albums: albums, radius: radius)
         case .artist(let album):
             CoverArt(album: album, radius: 0).clipShape(Circle())
+        case .dailyMix(let title, let pair, let album):
+            DailyMixCover(title: title, pair: pair, album: album, radius: radius)
         }
     }
 

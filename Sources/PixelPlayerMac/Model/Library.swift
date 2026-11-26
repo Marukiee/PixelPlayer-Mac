@@ -179,17 +179,62 @@ final class Library {
     private var songByID: [String: Song] = [:]
 
     private static var today: Int { Calendar.current.ordinality(of: .day, in: .era, for: .now) ?? 1 }
-    static let mixName = "Your Mix"
-    private static var mixTag: String {
-        let format = DateFormatter()
-        format.dateFormat = "yyyy-MM-dd"
-        format.locale = Locale(identifier: "en_US_POSIX")
-        return "PixelPlayer daily mix \(format.string(from: .now))"
+    static let mixName = MixTag.yourMixName
+
+    // MARK: Mixes on Navidrome
+
+    /// Whether Your Mix goes to Navidrome as a playlist, so every app shows the same one (MIXEN-NAVIDROME.md). Asked once,
+    /// in the welcome; until then nothing is written. Off: nothing is written, but today's mix another app wrote is used.
+    var saveMixes: Bool = Library.savedMixChoice.save {
+        didSet { Store.defaults.set(saveMixes, forKey: "mixes.save") }
+    }
+    /// Whether the question was answered (Yes or Not now).
+    var mixQuestionAsked: Bool = Library.savedMixChoice.asked {
+        didSet { Store.defaults.set(mixQuestionAsked, forKey: "mixes.asked") }
     }
 
-    /// Makes today's mix from the library: likes, plays and dates. Again only on a new day or a new library.
+    /// The answer in the welcome or the switch in Settings. Yes writes today's mix at once.
+    func answerMixQuestion(save: Bool) {
+        mixQuestionAsked = true
+        saveMixes = save
+        guard save, !isSample else { return }
+        // Picked again from the songs on Navidrome only, so the list here and on the server are the same.
+        refreshDailyMix()
+        rebuild()
+        Task { await syncYourMix() }
+    }
+
+    /// A scripted run starts without an answer, unless it gives one: `PP_SAVE_MIXES=1` (Yes) or `0` (Not now).
+    private static var savedMixChoice: (asked: Bool, save: Bool) {
+        if Debug.active, let value = ProcessInfo.processInfo.environment["PP_SAVE_MIXES"] { return (true, value == "1") }
+        return (Store.defaults.bool(forKey: "mixes.asked"), Store.defaults.bool(forKey: "mixes.save"))
+    }
+
+    /// What the last sync of the mixes did, for Settings › Developer.
+    struct MixSyncReport: Codable, Equatable {
+        var date: Date
+        var text: String
+        var failed = false
+    }
+
+    var lastMixSync: MixSyncReport? = Store.defaults.data(forKey: "mixes.lastSync").flatMap { try? JSONDecoder().decode(MixSyncReport.self, from: $0) } {
+        didSet { Store.defaults.set(lastMixSync.flatMap { try? JSONEncoder().encode($0) }, forKey: "mixes.lastSync") }
+    }
+
+    private func report(_ text: String, failed: Bool = false) {
+        lastMixSync = MixSyncReport(date: .now, text: text, failed: failed)
+        SonosLog.write("mix sync: \(text)")
+    }
+
+    /// Today's Daily Mixes on Navidrome, made by PixelPlayer (one, `daily`) and SpotCopy (`daily:1` and on). Only read.
+    private var serverMixSongs: [String: [Song]] = [:]
+
+    /// Makes today's mix from the library: likes, plays and dates. Again only on a new day or a new library. While the mix
+    /// goes to Navidrome only songs with a copy there are picked, so the list here and the one on the server are the same.
     func refreshDailyMix() {
-        let candidates = songs.map { song in
+        let pool = client != nil && saveMixes && songs.contains(where: { $0.source.serverID != nil })
+            ? songs.filter { $0.source.serverID != nil } : songs
+        let candidates = pool.map { song in
             MixCandidate(id: song.id, artist: song.artist, liked: likedIDs.contains(song.id), playCount: song.playCount,
                          lastPlayed: song.lastPlayed, added: song.addedAt)
         }
@@ -197,44 +242,105 @@ final class Library {
         mixDay = Self.today
     }
 
-    /// A new day while the app was open: a new mix, and the shared one of today.
+    /// A new day while the app was open: a new mix, the playlists read again (for today's Daily Mixes), and the shared one.
     func checkNewDay() async {
         guard !isSample, !songs.isEmpty, mixDay != Self.today else { return }
         refreshDailyMix()
         sharedMixIDs = nil
+        if let client, let lists = try? await Self.playlistsWithSongs(client) {
+            serverPlaylists = lists
+            rebuild()
+        }
         await syncYourMix()
     }
 
-    /// The same mix on every device: the first one of the day puts it on Navidrome as the playlist Your Mix, the others
-    /// take that one. A playlist called Your Mix that PixelPlayer did not make is never touched.
-    func syncYourMix() async {
+    /// Settings › Developer: today's mix made again here, and written over today's on Navidrome when saving is on.
+    func remakeMixes() async {
+        guard !isSample else { return }
+        refreshDailyMix()
+        sharedMixIDs = nil
+        rebuild()
+        if client == nil { report("Made Your Mix again on this Mac"); return }
+        if let client, let lists = try? await Self.playlistsWithSongs(client) {
+            serverPlaylists = lists
+            rebuild()
+        }
+        await syncYourMix(force: true)
+    }
+
+    /// Every playlist with its songs.
+    private static func playlistsWithSongs(_ client: SubsonicClient) async throws -> [SubsonicPlaylist] {
+        var lists: [SubsonicPlaylist] = []
+        for list in try await client.playlists() { lists.append((try? await client.playlist(id: list.id)) ?? list) }
+        return lists
+    }
+
+    /// The same Your Mix on every device. The first app of the day writes it to Navidrome, the others take that one over.
+    /// Only a playlist with the mark of Your Mix (or the old comment of this Mac) is ever changed or removed, and only one
+    /// of this account. With saving off nothing on the server changes. `force` writes again over today's.
+    func syncYourMix(force: Bool = false) async {
         guard let client, !isSample else { return }
-        let tag = Self.mixTag
-        let existing = serverPlaylists.first { $0.name == Self.mixName }
-        if let existing, existing.comment == tag, let entries = existing.entry, !entries.isEmpty {
+        let user = client.config.user
+        let today = MixTag(kind: "your", date: MixTag.day())
+        // Another app (or this Mac) made it today already: that one it is.
+        if !force, let kept = MixCopies.plan(for: today, in: serverPlaylists.map(\.mixInfo), user: user).keep, kept.tag == today,
+           let entries = serverPlaylists.first(where: { $0.id == kept.id })?.entry, !entries.isEmpty {
             sharedMixIDs = entries.map { localByServerID[$0.id] ?? $0.id }
+            if !saveMixes { report("Took today's Your Mix from Navidrome (\(entries.count) songs)"); return }
+        } else if !saveMixes {
+            report(mixQuestionAsked ? "Saving is off, so Your Mix stays on this Mac" : "Not asked yet, so Your Mix stays on this Mac")
             return
         }
-        if let existing, !(existing.comment ?? "").hasPrefix("PixelPlayer daily mix") { return }
-        let ids = yourMix.compactMap(\.source.serverID)
-        guard ids.count >= 5 else { return }
+        var seen = Set<String>()
+        let ids = mixIDs.compactMap { song(id: $0)?.source.serverID }.filter { seen.insert($0).inserted }
         do {
-            if let existing {
-                try await client.replacePlaylist(id: existing.id, songIDs: ids)
-                try await client.setPlaylistComment(id: existing.id, comment: tag)
-            } else {
-                try await client.createPlaylist(name: Self.mixName, songIDs: ids)
-                if let made = try await client.playlists().first(where: { $0.name == Self.mixName }) {
-                    try await client.setPlaylistComment(id: made.id, comment: tag)
+            // Read again right before writing: another app may have written it a moment ago.
+            let fresh = try await client.playlists()
+            let plan = MixCopies.plan(for: today, in: fresh.map(\.mixInfo), user: user)
+            // Two with the same mark: the oldest stays.
+            for extra in plan.remove { try await client.deletePlaylist(id: extra.id) }
+            var outcome: String
+            if !force, let kept = plan.keep, kept.tag == today {
+                if plan.remove.isEmpty {
+                    // Nothing changed on the server: only this list is read again.
+                    let list = try await client.playlist(id: kept.id)
+                    if let index = serverPlaylists.firstIndex(where: { $0.id == kept.id }) { serverPlaylists[index] = list } else { serverPlaylists.append(list) }
+                    sharedMixIDs = (list.entry ?? []).map { localByServerID[$0.id] ?? $0.id }
+                    rebuild()
+                    report("Took today's Your Mix from Navidrome (\(list.entry?.count ?? 0) songs)")
+                    return
                 }
+                outcome = "Took today's Your Mix from Navidrome"
+            } else if ids.count < 5 {
+                report("Too few songs on Navidrome for Your Mix (\(ids.count))")
+                return
+            } else if let kept = plan.keep {
+                try await client.replacePlaylist(id: kept.id, songIDs: ids)
+                try await client.updatePlaylist(id: kept.id, comment: today.comment, isPublic: false)
+                outcome = "Wrote Your Mix to Navidrome (\(ids.count) songs)"
+            } else {
+                let made = try await client.createPlaylist(name: Self.mixName, songIDs: ids)
+                guard let id = made?.id else { throw SubsonicError.badResponse }
+                try await client.updatePlaylist(id: id, comment: today.comment, isPublic: false)
+                outcome = "Made Your Mix on Navidrome (\(ids.count) songs)"
             }
-            var lists: [SubsonicPlaylist] = []
-            for list in try await client.playlists() { lists.append((try? await client.playlist(id: list.id)) ?? list) }
+            if !plan.remove.isEmpty { outcome += ", removed \(plan.remove.count) twin" + (plan.remove.count == 1 ? "" : "s") }
+            var lists = try await Self.playlistsWithSongs(client)
+            // Another app made one at the same moment: again the oldest stays, and its songs are the mix.
+            let after = MixCopies.plan(for: today, in: lists.map(\.mixInfo), user: user)
+            for extra in after.remove {
+                try await client.deletePlaylist(id: extra.id)
+                lists.removeAll { $0.id == extra.id }
+            }
             serverPlaylists = lists
-            sharedMixIDs = nil
+            if let kept = after.keep, let entries = lists.first(where: { $0.id == kept.id })?.entry {
+                sharedMixIDs = entries.map { localByServerID[$0.id] ?? $0.id }
+            }
             rebuild()
+            saveServerCache(account: client.config.server.absoluteString + "|" + client.config.user)
+            report(outcome)
         } catch {
-            SonosLog.write("your mix sync failed: \(error.localizedDescription)")
+            report("Your Mix: \(error.localizedDescription)", failed: true)
         }
     }
 
@@ -477,6 +583,14 @@ final class Library {
             ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("PixelPlayer/server-library.json")
     }
 
+    /// Settings › Developer: whether the server's list is on disk, and taking it away. The library in use stays; the next
+    /// launch reads everything from Navidrome again.
+    var serverCacheExists: Bool { FileManager.default.fileExists(atPath: Self.serverCacheURL.path) }
+
+    func clearServerCache() {
+        try? FileManager.default.removeItem(at: Self.serverCacheURL)
+    }
+
     /// Only for the same server and account; read off the main thread.
     private func loadServerCache(account: String) async {
         guard serverSongs.isEmpty else { return }
@@ -583,8 +697,29 @@ final class Library {
         var ids = Set(known.map(\.id))
         for song in songs where ids.insert(song.album.id).inserted { known.append(song.album) }
         albums = known
-        playlists = serverPlaylists.map { list in
+        // Mixes are no playlists of the listener's: not in Your Library, not in Add to playlist. Today's Daily Mixes of
+        // this account go to Mixes for you on Home, the oldest of each when there are two.
+        playlists = serverPlaylists.filter { !MixTag.isMix(comment: $0.comment, name: $0.name) }.map { list in
             Playlist(id: list.id, title: list.name, songs: (list.entry ?? []).map { preferLocal(serverByID[$0.id] ?? makeSong($0)) })
+        }
+        let day = MixTag.day()
+        let infos = serverPlaylists.map(\.mixInfo)
+        let dailyTags = Set(infos.compactMap(\.tag).filter { $0.kind == "daily" && $0.date == day })
+        let dailies = dailyTags.compactMap { MixCopies.copies(of: $0, in: infos, user: client?.config.user ?? "").first { $0.tag?.date == day } }
+            // PixelPlayer's Daily Mix first, then Daily Mix 1, 2, ...
+            .sorted { (Int($0.tag?.key ?? "") ?? 0, $0.name) < (Int($1.tag?.key ?? "") ?? 0, $1.name) }
+        serverMixSongs = [:]
+        let dailyMixes: [Mix] = dailies.compactMap { info in
+            guard let list = serverPlaylists.first(where: { $0.id == info.id }), let entries = list.entry, !entries.isEmpty else { return nil }
+            let songs = entries.map { preferLocal(serverByID[$0.id] ?? makeSong($0)) }
+            let id = "server-mix:\(list.id)"
+            serverMixSongs[id] = songs
+            var artists: [String] = []
+            for song in songs where !artists.contains(song.artist) && artists.count < 3 { artists.append(song.artist) }
+            // Colours as SpotCopy's covers: Daily Mix N gets pair N, PixelPlayer's one Daily Mix pair 6.
+            let number = Int(info.tag?.key ?? "") ?? 6
+            return Mix(id: id, title: list.name, subtitle: artists.joined(separator: ", ") + (Set(songs.map(\.artist)).count > 3 ? " and more" : ""),
+                       symbol: "music.note", tone: .blue, covers: Array(songs.map(\.album).prefix(4)), pair: (number - 1) % 6 + 1)
         }
         likedIDs = FavoritesSync.shared.storedLikes
         recentAlbums = serverRecent.map { albumByID[$0.id] ?? makeAlbum($0) }
@@ -593,7 +728,7 @@ final class Library {
         let genres = Dictionary(grouping: songs.filter { !$0.album.genre.isEmpty }, by: { $0.album.genre })
             .sorted { $0.value.count > $1.value.count }.prefix(5)
         let tones: [Tone] = [.pink, .blue, .green, .amber, .teal]
-        mixes = genres.enumerated().map { index, entry in
+        mixes = dailyMixes + genres.enumerated().map { index, entry in
             let covers = Array(Set(entry.value.map(\.album))).prefix(4)
             return Mix(id: "genre-\(entry.key)", title: entry.key, subtitle: "Genre mix", symbol: "music.note", tone: tones[index % tones.count],
                        covers: Array(covers))
@@ -622,6 +757,7 @@ final class Library {
 
     /// The songs of a mix: a genre mix plays that genre, a sample mix the albums on its cover.
     func songs(for mix: Mix) -> [Song] {
+        if let songs = serverMixSongs[mix.id] { return songs }
         if mix.id.hasPrefix("genre-") { return songs.filter { "genre-" + $0.album.genre == mix.id } }
         let albums = Set(mix.covers.map(\.id))
         return songs.filter { albums.contains($0.album.id) }

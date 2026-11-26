@@ -116,9 +116,17 @@ public struct SubsonicPlaylist: Codable, Sendable, Hashable, Identifiable {
     public var duration: Int?
     public var coverArt: String?
     public var owner: String?
+    public var created: String?
     public var changed: String?
     public var comment: String?
+    /// True for someone else's public playlist, which this account can't change.
+    public var readonly: Bool?
     public var entry: [SubsonicSong]?
+
+    /// As the mix rules see it.
+    public var mixInfo: MixPlaylist {
+        MixPlaylist(id: id, name: name, comment: comment, owner: owner, created: created, readonly: readonly ?? false)
+    }
 }
 
 public struct SubsonicStarred: Codable, Sendable, Hashable {
@@ -286,9 +294,25 @@ public struct SubsonicClient: Sendable {
         _ = try await get("unstar", songIDs.map { .init(name: "id", value: $0) }, key: nil, as: Empty.self)
     }
 
-    public func createPlaylist(name: String, songIDs: [String]) async throws {
-        _ = try await get("createPlaylist", [.init(name: "name", value: name)] + songIDs.map { .init(name: "songId", value: $0) },
+    /// Navidrome answers with the new playlist (Subsonic 1.14 and later); older servers answer with nothing.
+    @discardableResult
+    public func createPlaylist(name: String, songIDs: [String]) async throws -> SubsonicPlaylist? {
+        let (data, response) = try await session.data(from: url("createPlaylist", [.init(name: "name", value: name)] + songIDs.map { .init(name: "songId", value: $0) }))
+        if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) { throw SubsonicError.http(http.statusCode) }
+        // A failed answer throws here; an answer without the playlist is no failure.
+        _ = try Self.decode(data, key: nil, as: Empty.self)
+        return try? Self.decode(data, key: "playlist", as: SubsonicPlaylist.self)
+    }
+
+    /// The comment and whether others see it, in one call.
+    public func updatePlaylist(id: String, comment: String, isPublic: Bool) async throws {
+        _ = try await get("updatePlaylist", [.init(name: "playlistId", value: id), .init(name: "comment", value: comment),
+                                             .init(name: "public", value: isPublic ? "true" : "false")],
                           key: nil, as: Empty.self)
+    }
+
+    public func deletePlaylist(id: String) async throws {
+        _ = try await get("deletePlaylist", [.init(name: "id", value: id)], key: nil, as: Empty.self)
     }
 
     /// Replaces all songs of an existing playlist.

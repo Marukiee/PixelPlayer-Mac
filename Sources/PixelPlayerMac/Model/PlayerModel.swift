@@ -67,7 +67,7 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
 }
 
 enum SettingsTab: String, CaseIterable, Identifiable, Hashable {
-    case general, sources, playback, appearance
+    case general, sources, playback, appearance, developer
     var id: String { rawValue }
 }
 
@@ -137,8 +137,19 @@ final class PlayerModel {
     }
     var fullScreen = false
     /// The welcome at first launch (not in scripted runs, which open it with a script step).
-    var showOnboarding = !Library.shared.isSample && !Debug.active && !UserDefaults.standard.bool(forKey: "onboarding.done")
+    var showOnboarding = PlayerModel.firstWelcome || PlayerModel.onlyMixQuestion
     var onboardingStep = 0
+    /// Someone who went through the welcome before the mixes question existed gets only that question, once, with an account.
+    var onboardingOnlyMixes = PlayerModel.onlyMixQuestion
+
+    private static var firstWelcome: Bool {
+        !Library.shared.isSample && !Debug.active && !UserDefaults.standard.bool(forKey: "onboarding.done")
+    }
+
+    private static var onlyMixQuestion: Bool {
+        !Library.shared.isSample && !Debug.active && UserDefaults.standard.bool(forKey: "onboarding.done")
+            && !Library.shared.mixQuestionAsked && ServerSettings.saved != nil
+    }
     /// The song whose details are shown in a sheet.
     var infoSong: Song?
     /// Shuffle as in Spotify and in SpotCopy (Media3's shuffle mode): on, what comes after the current song plays in a mixed

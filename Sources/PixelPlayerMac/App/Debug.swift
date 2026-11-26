@@ -174,8 +174,15 @@ enum Debug {
                 try? line.write(to: url, atomically: true, encoding: .utf8)
             }
         case "onboarding":
-            // `onboarding:<step>` opens the welcome at that step (0 to 4), `onboarding:off` closes it.
-            if value == "off" { model.showOnboarding = false } else { model.onboardingStep = Int(value) ?? 0; model.showOnboarding = true }
+            // `onboarding:<step>` opens the welcome at that step (0 to 5 with an account, the mixes question is 3),
+            // `onboarding:mixes` only the mixes question as someone who saw the welcome before, `onboarding:off` closes it.
+            if value == "off" {
+                model.showOnboarding = false
+            } else {
+                model.onboardingOnlyMixes = value == "mixes"
+                model.onboardingStep = Int(value) ?? 0
+                model.showOnboarding = true
+            }
         case "testupdate":
             // The whole update path against the real latest release: check, download, the checks, and the swap.
             // Run a release build with PP_UPDATE_TEST_FROM set; the new app is put in place but not opened.
@@ -248,6 +255,19 @@ enum Debug {
                 }
                 try? await Task.sleep(for: .seconds(0.5))
             }
+        case "mixstate":
+            // `mixstate:<name>` writes the playlists, the mixes and Your Mix as the app shows them, for the mix checks.
+            let library = Library.shared
+            var lines = ["save=\(library.saveMixes) asked=\(library.mixQuestionAsked)", "last=\(library.lastMixSync?.text ?? "-")"]
+            lines += library.playlists.map { "playlist\t\($0.id)\t\($0.title)\t\($0.songs.count)" }
+            lines += library.mixes.map { "mix\t\($0.id)\t\($0.title)\t\($0.subtitle)\t\(library.songs(for: $0).count)" }
+            lines.append("yourmix\t\(library.yourMix.count)\t" + library.yourMix.map { $0.source.serverID ?? "local:\($0.id)" }.joined(separator: ","))
+            try? lines.joined(separator: "\n").write(to: file("\(value).txt"), atomically: true, encoding: .utf8)
+        case "remakemixes":
+            await Library.shared.remakeMixes()
+        case "mixanswer":
+            // `mixanswer:1` is Yes to saving the mixes, `mixanswer:0` Not now.
+            Library.shared.answerMixQuestion(save: value == "1")
         case "dump":
             // What the merged library looks like, for checks of the local-first rules.
             let lines = Library.shared.songs.map { "\($0.id)\t\($0.title)\t\($0.artist)\tlocal=\($0.isLocal)\tserver=\($0.source.serverID ?? "-")\tliked=\(Library.shared.likedIDs.contains($0.id))" }

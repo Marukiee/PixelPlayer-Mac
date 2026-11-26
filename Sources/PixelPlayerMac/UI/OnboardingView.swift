@@ -12,17 +12,31 @@ struct OnboardingView: View {
     @LocalState private var findSpeakers = UserDefaults.standard.object(forKey: "sonos.search") as? Bool ?? true
 
     private var library: Library { .shared }
-    private static let steps = 5
+
+    enum Page { case welcome, music, navidrome, mixes, sonos, more }
+
+    /// The steps there are now: the mixes question only with an account, and only that one for someone who saw the
+    /// welcome before it existed.
+    private var pages: [Page] {
+        if model.onboardingOnlyMixes { return [.mixes] }
+        return [.welcome, .music, .navidrome] + (hasAccount ? [.mixes] : []) + [.sonos, .more]
+    }
+
+    private var page: Page { pages[min(max(model.onboardingStep, 0), pages.count - 1)] }
+    private var isLast: Bool { model.onboardingStep >= pages.count - 1 }
+    /// The made-up music of the design shots counts as connected, as it does in Settings.
+    private var hasAccount: Bool { library.client != nil || library.isSample }
 
     var body: some View {
         VStack(spacing: 0) {
             Group {
-                switch model.onboardingStep {
-                case 0: welcome
-                case 1: musicHere
-                case 2: navidrome
-                case 3: sonos
-                default: more
+                switch page {
+                case .welcome: welcome
+                case .music: musicHere
+                case .navidrome: navidrome
+                case .mixes: mixes
+                case .sonos: sonos
+                case .more: more
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -97,6 +111,18 @@ struct OnboardingView: View {
             .formStyle(.grouped)
             .scrollDisabled(true)
         }
+    }
+
+    /// As SpotCopy asks it (STIJL.md › Onboarding): two mix covers fanned out, the question and a line under it. The
+    /// answers are the Mac's own buttons below.
+    private var mixes: some View {
+        VStack(spacing: 0) {
+            MixFan().frame(height: 236).padding(.top, 40)
+            Text("Save your mixes to Navidrome?").titleFont(28).multilineTextAlignment(.center).padding(.top, 20)
+            Text("Your Mix becomes a playlist on your server, so every app you use shows the same one. You can change this in Settings.")
+                .font(.mix(15)).foregroundStyle(PP.subdued).multilineTextAlignment(.center).frame(maxWidth: 420).padding(.top, 12)
+        }
+        .padding(.horizontal, 32)
     }
 
     private var sonos: some View {
@@ -190,11 +216,13 @@ struct OnboardingView: View {
 
     private var footer: some View {
         HStack(spacing: 12) {
-            // Where you are: one dot per step.
-            HStack(spacing: 6) {
-                ForEach(0..<Self.steps, id: \.self) { index in
-                    Circle().fill(index == model.onboardingStep ? AnyShapeStyle(PP.primary) : AnyShapeStyle(Color.primary.opacity(0.18)))
-                        .frame(width: 7, height: 7)
+            // Where you are: one dot per step, none when there is only the one question.
+            if pages.count > 1 {
+                HStack(spacing: 6) {
+                    ForEach(pages.indices, id: \.self) { index in
+                        Circle().fill(index == model.onboardingStep ? AnyShapeStyle(PP.primary) : AnyShapeStyle(Color.primary.opacity(0.18)))
+                            .frame(width: 7, height: 7)
+                    }
                 }
             }
             Spacer()
@@ -203,34 +231,73 @@ struct OnboardingView: View {
                     .controlSize(.large)
                     .focusable(false)
             }
-            if model.onboardingStep == 2 && library.client == nil || model.onboardingStep == 3 && !findSpeakers {
-                Button("Skip") { model.onboardingStep += 1 }
+            if page == .mixes {
+                // The answer goes on at once: Not now or Yes, no Continue.
+                Button("Not now") { answer(false) }
                     .controlSize(.large)
                     .focusable(false)
+                Button("Yes") { answer(true) }
+                    .controlSize(.large)
+                    .buttonStyle(.borderedProminent)
+                    .keyboardShortcut(.defaultAction)
+                    .focusable(false)
+            } else {
+                if page == .navidrome && library.client == nil || page == .sonos && !findSpeakers {
+                    Button("Skip") { model.onboardingStep += 1 }
+                        .controlSize(.large)
+                        .focusable(false)
+                }
+                Button(primaryTitle) { next() }
+                    .controlSize(.large)
+                    .buttonStyle(.borderedProminent)
+                    .keyboardShortcut(.defaultAction)
+                    // No blue ring: Return presses it, the pointer clicks it.
+                    .focusable(false)
             }
-            Button(primaryTitle) {
-                if model.onboardingStep >= Self.steps - 1 { finish() } else { model.onboardingStep += 1 }
-            }
-            .controlSize(.large)
-            .buttonStyle(.borderedProminent)
-            .keyboardShortcut(.defaultAction)
-            // No blue ring: Return presses it, the pointer clicks it.
-            .focusable(false)
         }
         .padding(.horizontal, 24)
         .padding(.vertical, 18)
     }
 
     private var primaryTitle: String {
-        switch model.onboardingStep {
-        case 0: "Get Started"
-        case Self.steps - 1: "Start Listening"
-        default: "Continue"
-        }
+        if page == .welcome { return "Get Started" }
+        return isLast ? "Start Listening" : "Continue"
+    }
+
+    private func next() {
+        if isLast { finish() } else { model.onboardingStep += 1 }
+    }
+
+    private func answer(_ save: Bool) {
+        library.answerMixQuestion(save: save)
+        next()
     }
 
     private func finish() {
         UserDefaults.standard.set(true, forKey: "onboarding.done")
         model.showOnboarding = false
+        model.onboardingOnlyMixes = false
+    }
+}
+
+/// Two mix covers fanned out, as on SpotCopy's question: Your Mix in front, the Daily Mix behind it leaning left and
+/// higher so its name stays in sight. With the first covers of the library, else only their colours.
+private struct MixFan: View {
+    private var library: Library { .shared }
+
+    var body: some View {
+        let albums = library.albums
+        ZStack {
+            DailyMixCover(title: "Daily Mix", pair: 6, album: albums.count > 1 ? albums[1] : nil)
+                .frame(width: 168, height: 168)
+                .shadow(color: .black.opacity(0.35), radius: 14, y: 8)
+                .rotationEffect(.degrees(-8))
+                .offset(x: -78, y: -26)
+            DailyMixCover(title: "Your Mix", pair: 5, album: albums.first)
+                .frame(width: 168, height: 168)
+                .shadow(color: .black.opacity(0.35), radius: 14, y: 8)
+                .rotationEffect(.degrees(6))
+                .offset(x: 62, y: 14)
+        }
     }
 }

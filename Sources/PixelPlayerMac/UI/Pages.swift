@@ -64,8 +64,9 @@ struct RouteContent: View {
                 let songs = mix.map { Library.shared.songs(for: $0) } ?? []
                 TrackListPage(header: TrackHeader(kind: "Mix", title: mix?.title ?? "Mix",
                                                   meta: [mix?.subtitle ?? "", Library.summary(songs)].filter { !$0.isEmpty }.joined(separator: " • "),
-                                                  art: .collage((mix?.covers ?? []) + (mix?.covers.reversed() ?? [])),
-                                                  tint: Color(hex: mix?.covers.first?.tint ?? 0x23408F)),
+                                                  art: mix?.artwork ?? .collage([]),
+                                                  // A Daily Mix has its deep colour as the colour of the page, as in SpotCopy.
+                                                  tint: Color(hex: mix?.pair.map { DailyMixCover.colours($0).deep } ?? mix?.covers.first?.tint ?? 0x23408F)),
                               songs: songs, share: mix?.title)
             case .shelf(let key):
                 ShelfPage(key: key)
@@ -1152,6 +1153,14 @@ struct ConnectPage: View {
 
 // MARK: Shelves
 
+extension Mix {
+    /// A Daily Mix from Navidrome gets its two-colour cover, the other mixes four covers.
+    var artwork: Artwork {
+        if let pair { return .dailyMix(title, pair, covers.first) }
+        return .collage(covers + covers.reversed())
+    }
+}
+
 /// One thing on a shelf: an album, an artist (round) or a mix.
 enum ShelfItem {
     case album(Album), artist(Album), mix(Mix)
@@ -1202,7 +1211,7 @@ struct ShelfCell: View {
             case .artist(let album):
                 CoverCell(art: .artist(album), title: album.artist, subtitle: "Artist", round: true) { Library.shared.songs(for: .artist(album.artist)) }
             case .mix(let mix):
-                CoverCell(art: .collage(mix.covers + mix.covers.reversed()), title: mix.title, subtitle: mix.subtitle) { Library.shared.songs(for: mix) }
+                CoverCell(art: mix.artwork, title: mix.title, subtitle: mix.subtitle) { Library.shared.songs(for: mix) }
             }
         }
         // A click on the cover opens it; the green button on the cover plays it.

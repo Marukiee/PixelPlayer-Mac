@@ -62,6 +62,10 @@ Alles wat Mark vroeg, met wat klaar is en wat nog moet. Bijgewerkt bij elke rond
 - Vinkje in menu's zoals Spotify's (dunne lijn), gekozen icoon groen; tekst zo dun als Spotify's (zonder de verdikking van macOS, net als Spotify's antialiased).
 - Standaard op 83%, dezelfde stap als Marks Spotify (zoom-level -100); zoomstappen zijn nu die van Spotify (telkens 1,2 keer).
 - Wachtrij: dubbelklik op een nummer in de wachtrij speelt het weer (haalde het weg), Remove from queue staat weer in het menu.
+- Mixen als Navidrome-playlists, afgesproken met SpotCopy en PixelPlayer: Your Mix krijgt het merkje `[mix:your::datum]` (het oude commentaar telt ook), vlak voor schrijven opnieuw lezen, bij twee met hetzelfde merkje blijft de oudste, privé, alleen nummers met een serverkopie. Daily Mix van PixelPlayer en Daily Mix 1 tot en met n van SpotCopy van vandaag staan alleen-lezen bij Mixes for you, met de tweekleurige hoes zoals SpotCopy. Mixen staan niet meer tussen de gewone playlists (Your Library, Add to playlist).
+- Instelling Save mixes to Navidrome bij Navidrome in Settings › Sources; zonder account grijs en een klik zegt waarom. Uit: niets schrijven, wel de mix van vandaag van een andere app overnemen.
+- Welkom vraagt na het inloggen of je mixen naar Navidrome wilt (Yes of Not now), alleen met account; wie het welkom al zag krijgt alleen die vraag, een keer. Tot het antwoord schrijft de Mac niets.
+- Tab Developer in Settings: welkom opnieuw, Your Mix opnieuw maken (en schrijven als het aan staat), laatste synchronisatie met tijd en uitkomst, servercache wissen, Sonos-log openen, versie en build. Welcome Show Again staat daar nu in plaats van bij General.
 
 ## In 0.2.7 (uitgebracht)
 

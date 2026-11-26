@@ -483,6 +483,9 @@ final class SonosBridge: SonosLocalPlayer, @unchecked Sendable {
 /// (in a scripted run, sonos.log in its folder). No passwords: song titles, ids and what the speaker reports.
 @MainActor
 enum SonosLog {
+    /// Where the log is, for Settings › Developer.
+    static var fileURL: URL { url }
+
     private static let url: URL = {
         if let dir = Debug.directory { return dir.appendingPathComponent("sonos.log") }
         let logs = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask)[0].appendingPathComponent("Logs/PixelPlayer")

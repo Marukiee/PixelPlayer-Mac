@@ -69,6 +69,7 @@ if let stub = ProcessInfo.processInfo.environment["PP_STUB"], let server = URL(s
 matchingChecks()
 remoteChecks()
 mixChecks()
+mixTagChecks()
 libraryChecks()
 fontImportChecks()
 lrclibChecks()

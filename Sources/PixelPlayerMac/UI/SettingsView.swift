@@ -14,6 +14,7 @@ struct SettingsView: View {
             Tab("Sources", systemImage: "music.note.house", value: SettingsTab.sources) { SourcesPane() }
             Tab("Playback", systemImage: "play.circle", value: SettingsTab.playback) { PlaybackPane() }
             Tab("Appearance", systemImage: "paintpalette", value: SettingsTab.appearance) { AppearancePane() }
+            Tab("Developer", systemImage: "chevron.left.forwardslash.chevron.right", value: SettingsTab.developer) { DeveloperPane() }
         }
         .frame(width: 520)
     }
@@ -37,12 +38,6 @@ private struct GeneralPane: View {
                     .disabled(Updater.isDevelopmentBuild)
                 Toggle("Player in the menu bar", isOn: menuBar)
                 Toggle("Hide the sidebar while lyrics show", isOn: $hideSidebarForLyrics)
-                LabeledContent("Welcome") {
-                    Button("Show Again") {
-                        PlayerModel.shared.onboardingStep = 0
-                        PlayerModel.shared.showOnboarding = true
-                    }
-                }
             }
             Section("Updates") {
                 Toggle("Check for updates automatically", isOn: $updater.autoCheck)
@@ -58,7 +53,7 @@ private struct GeneralPane: View {
             }
         }
         .formStyle(.grouped)
-        .frame(height: 330)
+        .frame(height: 300)
     }
 
     private var updaterStatus: String {
@@ -120,6 +115,7 @@ private struct SourcesPane: View {
                         .disabled(server.isEmpty || user.isEmpty || (password.isEmpty && ServerSettings.savedAuth == nil) || library.isSample)
                     }
                 }
+                SaveMixesToggle()
             } header: {
                 Text("Navidrome")
             } footer: {
@@ -160,7 +156,7 @@ private struct SourcesPane: View {
             }
         }
         .formStyle(.grouped)
-        .frame(height: 600)
+        .frame(height: 640)
         .onAppear {
             if library.isSample {
                 server = "http://music.local:4533"; user = "listener"; password = "secret"
@@ -182,6 +178,115 @@ private struct SourcesPane: View {
                  : "Connected · \(library.serverSongCount.formatted()) songs on the server").foregroundStyle(.secondary)
         case .failed(let message): Text(message).foregroundStyle(.red).lineLimit(2)
         }
+    }
+}
+
+/// Your Mix as a playlist on Navidrome, so every app shows the same one. Without an account grey, and only a click on it
+/// says why: no lasting warning.
+private struct SaveMixesToggle: View {
+    @LocalState private var why = false
+    private var library: Library { .shared }
+    private var hasAccount: Bool { library.client != nil || library.isSample }
+    private var on: Binding<Bool> {
+        Binding(get: { hasAccount && library.saveMixes }, set: { library.answerMixQuestion(save: $0) })
+    }
+
+    var body: some View {
+        Toggle(isOn: on) {
+            Text("Save mixes to Navidrome")
+            Text("Your Mix becomes a playlist on your server, so every app shows the same one.")
+        }
+        .disabled(!hasAccount)
+        .overlay {
+            // A greyed switch takes no clicks, so a clear layer over it takes them and tells why.
+            if !hasAccount {
+                Color.clear.contentShape(Rectangle()).onTapGesture { why = true }
+            }
+        }
+        .popover(isPresented: $why, arrowEdge: .trailing) {
+            Text("Connect to Navidrome first. Your mixes are saved to your account there.")
+                .padding(12)
+                .frame(width: 240)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+
+/// For finding out what happened and trying again: the welcome, the mixes, the server's list on disk, the Sonos log.
+private struct DeveloperPane: View {
+    @LocalState private var remaking = false
+    @LocalState private var cacheGone = false
+    private var library: Library { .shared }
+
+    var body: some View {
+        Form {
+            Section {
+                LabeledContent("Welcome") {
+                    Button("Show Again") {
+                        PlayerModel.shared.onboardingStep = 0
+                        PlayerModel.shared.onboardingOnlyMixes = false
+                        PlayerModel.shared.showOnboarding = true
+                    }
+                }
+            }
+            Section {
+                LabeledContent("Your Mix") {
+                    HStack(spacing: 8) {
+                        if remaking { ProgressView().controlSize(.small) }
+                        Button("Make Again") {
+                            remaking = true
+                            Task {
+                                await library.remakeMixes()
+                                remaking = false
+                            }
+                        }
+                        .disabled(remaking || library.isSample)
+                    }
+                }
+                LabeledContent("Last sync") {
+                    if let last = library.lastMixSync {
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text(last.date.formatted(date: .abbreviated, time: .shortened))
+                            Text(last.text).foregroundStyle(last.failed ? AnyShapeStyle(.red) : AnyShapeStyle(.secondary))
+                                .multilineTextAlignment(.trailing)
+                        }
+                    } else {
+                        Text("Not yet").foregroundStyle(.secondary)
+                    }
+                }
+            } header: {
+                Text("Mixes")
+            } footer: {
+                Text(library.saveMixes ? "Make Again also writes Your Mix of today over the one on Navidrome."
+                     : "Saving mixes to Navidrome is off, so Make Again only changes Your Mix on this Mac.")
+                    .foregroundStyle(.secondary)
+            }
+            Section {
+                LabeledContent("Server cache") {
+                    HStack(spacing: 8) {
+                        Text(cacheGone || !library.serverCacheExists ? "Empty" : "server-library.json").foregroundStyle(.secondary)
+                        Button("Clear") {
+                            library.clearServerCache()
+                            cacheGone = true
+                        }
+                        .disabled(cacheGone || !library.serverCacheExists)
+                    }
+                }
+                LabeledContent("Sonos log") {
+                    Button("Open") { NSWorkspace.shared.open(SonosLog.fileURL) }
+                        .disabled(!FileManager.default.fileExists(atPath: SonosLog.fileURL.path))
+                }
+            } footer: {
+                Text("The server cache is read at launch, before Navidrome answers. Cleared, the next launch loads everything from Navidrome again.")
+                    .foregroundStyle(.secondary)
+            }
+            Section {
+                LabeledContent("Version", value: Updater.shared.currentVersion)
+                LabeledContent("Build", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?")
+            }
+        }
+        .formStyle(.grouped)
+        .frame(height: 500)
     }
 }
 
