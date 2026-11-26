@@ -34,6 +34,8 @@ struct PixelPlayerApp: App {
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillFinishLaunching(_ notification: Notification) {
+        // Before the window shows, so it never flashes light on a Mac set to light.
+        Appearance.apply(Appearance.saved)
         // Once: forget the sidebar width macOS saved from earlier versions, so the new, wider default shows.
         let defaults = UserDefaults.standard
         if defaults.integer(forKey: "layout.version") < 2 {
@@ -48,7 +50,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.regular)
         Debug.launch()
         NSApp.activate()
-        Appearance.apply(UserDefaults.standard.string(forKey: "appearance.mode") ?? "System")
         // The spacebar plays and pauses, as in Spotify, unless you are typing. Without this it pressed whatever button had
         // keyboard focus, such as Lyrics.
         NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in

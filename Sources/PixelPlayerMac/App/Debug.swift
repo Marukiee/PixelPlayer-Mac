@@ -10,7 +10,7 @@ import PixelPlayerKit
 /// - `PP_APPEARANCE=light|dark`, `PP_WINDOW=1180x760`, `PP_SLOW=6`, `PP_FREEZE=1`
 /// - `PP_SCRIPT=page:home,wait:1,shot:a-home,devices:1,wait:1.5,shot:a-devices,quit`
 ///   Steps: page (home, search, songs, liked, playlist:<id>, album:<id>, artist:<id>, shelf:<key>), filter, search:<text>, sort:<order>, queue (1|0), devices (1|0), full (1|0), indiv (1|0), play (1|0),
-///   minimize, openapp (as Open PixelPlayer in the menu bar), resume, dump, render:<name>[:sheet] (without the screen),
+///   minimize, resize:<w>x<h>, osfull (1|0), openapp (as Open PixelPlayer in the menu bar), resume, dump, render:<name>[:sheet] (without the screen),
 ///   appearance, wait, slow, shot:<name>, settings:<tab>, settingsshot:<name>, closesettings,
 ///   stage:<name> (menu bar panel), frames:<name>:<seconds>, quit.
 @MainActor
@@ -60,6 +60,8 @@ enum Debug {
         switch name {
         case "dark": NSApp.appearance = NSAppearance(named: .darkAqua)
         case "light": NSApp.appearance = NSAppearance(named: .aqua)
+        // Dark unless asked, as the app itself starts.
+        case nil: NSApp.appearance = NSAppearance(named: .darkAqua)
         default: break
         }
     }
@@ -216,6 +218,27 @@ enum Debug {
             UserDefaults.standard.set(value, forKey: "tracks.view")
         case "minimize":
             mainWindow()?.miniaturize(nil)
+        case "hittest":
+            // `hittest:560x24/800x24` logs which view a click lands on at points of the band (from the window's top left), to check the moved
+            // title bar does not take clicks meant for Home, the search field or back.
+            if let window = mainWindow(), let frame = window.contentView?.superview {
+                for point in value.split(separator: "/") {
+                    let xy = point.split(separator: "x").compactMap { Double($0) }
+                    guard xy.count == 2 else { continue }
+                    let hit = frame.hitTest(NSPoint(x: xy[0], y: window.frame.height - xy[1]))
+                    var chain: [String] = []
+                    var view = hit
+                    while let current = view, chain.count < 4 { chain.append(String(describing: type(of: current))); view = current.superview }
+                    FileHandle.standardError.write(Data("hittest \(point): \(chain.joined(separator: " < "))\n".utf8))
+                }
+            }
+        case "resize":
+            // `resize:1400x820` changes the window's size, to check what follows a resize (the traffic lights).
+            let size = value.split(separator: "x").compactMap { Double($0) }
+            if size.count == 2 { mainWindow()?.setContentSize(NSSize(width: size[0], height: size[1])) }
+        case "osfull":
+            // `osfull:1|0`: the window's own full screen (the green button), not the app's full-screen player.
+            if let window = mainWindow(), window.styleMask.contains(.fullScreen) != (value == "1") { window.toggleFullScreen(nil) }
         case "openapp":
             // What Open PixelPlayer in the menu bar panel does.
             MainWindow.show(open: nil)

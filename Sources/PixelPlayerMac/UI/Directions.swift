@@ -96,7 +96,8 @@ struct RootView: View {
 }
 
 /// The black band at the top, as in Spotify: back and forward beside the traffic lights, and in the middle Home in a round
-/// button and the search field.
+/// button and the search field. Measured on Spotify (64 px, items 48 px with 8 px around them, Home and the field 8 px
+/// apart, the field 474 px at most) and taken at the 75% Mark uses, as everything else.
 struct TopBar: View {
     var searchFocused: FocusState<Bool>.Binding
     @Environment(PlayerModel.self) private var model
@@ -107,19 +108,22 @@ struct TopBar: View {
                 HistoryButtons().padding(.leading, 82)
                 Spacer(minLength: 0)
             }
-            HStack(spacing: 8) {
+            HStack(spacing: 6) {
                 HomeButton()
                 SearchField(focused: searchFocused)
+                    .frame(maxWidth: 356)
             }
-            .frame(maxWidth: 360)
+            .padding(.horizontal, 160)
         }
-        // Level with the traffic lights.
-        .frame(height: 34)
-        .padding(.bottom, 6)
+        // As tall as the band the traffic lights are moved into, so all of them share one centre line.
+        .frame(height: TrafficLights.band)
+        .frame(maxWidth: .infinity)
+        .background(TrafficLightsPlacer().frame(width: 0, height: 0))
     }
 }
 
-/// Home in a dark round button, the house filled while Home is open, as in Spotify.
+/// Home in a dark round button, the house filled while Home is open, as in Spotify: #1F1F1F, lighter (#2A2A2A) and a
+/// little bigger under the pointer, the house white.
 struct HomeButton: View {
     @Environment(PlayerModel.self) private var model
     @LocalState private var hovering = false
@@ -129,22 +133,23 @@ struct HomeButton: View {
         Button { model.go(.home) } label: {
             SpotifyIcon(name: open ? "home_on" : "home")
                 .fill(style: FillStyle(eoFill: true))
-                .frame(width: 16, height: 16)
+                .frame(width: 18, height: 18)
                 .foregroundStyle(open || hovering ? AnyShapeStyle(.primary) : AnyShapeStyle(PP.icon))
-                .frame(width: 32, height: 32)
-                .background(Circle().fill(Color.primary.opacity(hovering ? 0.16 : 0.1)))
+                .frame(width: 36, height: 36)
+                .background(Circle().fill(hovering ? PP.fieldHover : PP.field))
                 .scaleEffect(hovering ? 1.04 : 1)
                 .contentShape(Circle())
         }
         .buttonStyle(PressStyle())
         .onHover { hovering = $0 }
-        .animation(Motion.fade, value: hovering)
+        .animation(.easeInOut(duration: 0.2 * Motion.slow), value: hovering)
         .help("Home")
     }
 }
 
-/// "What do you want to play?", as in Spotify: a dark round field with the magnifier, and at its end the button to the
-/// browse page. Typing shows the results on the page; Esc clears it.
+/// "What do you want to play?", as in Spotify: a dark round field with the magnifier, and at its end, after a thin line, the
+/// button to the browse page. Under the pointer it lightens with a faint ring; while typing the ring is white and thicker.
+/// Typing shows the results on the page; Esc clears it.
 struct SearchField: View {
     var focused: FocusState<Bool>.Binding
     @Environment(PlayerModel.self) private var model
@@ -153,35 +158,40 @@ struct SearchField: View {
     var body: some View {
         @Bindable var model = model
         let active = focused.wrappedValue
-        HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 14, weight: .medium))
+        HStack(spacing: 0) {
+            SpotifyIcon(name: "search")
+                .fill(style: FillStyle(eoFill: true))
+                .frame(width: 18, height: 18)
                 .foregroundStyle(active || hovering ? AnyShapeStyle(.primary) : AnyShapeStyle(PP.icon))
+                .padding(.trailing, 9)
             TextField("What do you want to play?", text: $model.searchText)
                 .textFieldStyle(.plain)
-                .font(.system(size: 13))
+                .font(.system(size: 12))
                 .focused(focused)
                 .onExitCommand { model.searchText = ""; focused.wrappedValue = false }
             if !model.searchText.isEmpty {
                 Button { model.searchText = "" } label: {
                     Image(systemName: "xmark").font(.system(size: 11, weight: .semibold)).foregroundStyle(PP.icon)
+                        .frame(width: 22, height: 22).contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .help("Clear")
+                .padding(.trailing, 6)
             }
-            Rectangle().fill(PP.icon.opacity(0.5)).frame(width: 1, height: 18)
+            Rectangle().fill(PP.fieldDivider).frame(width: 1, height: 19)
+                .padding(.trailing, 9)
             BrowseButton()
         }
-        .padding(.leading, 12)
-        .padding(.trailing, 6)
-        .frame(height: 32)
-        .background(Capsule().fill(Color.primary.opacity(hovering || active ? 0.16 : 0.1)))
-        .overlay(Capsule().strokeBorder(Color.primary.opacity(active ? 0.9 : 0), lineWidth: 1.5))
+        .padding(.leading, 9)
+        .padding(.trailing, 12)
+        .frame(height: 36)
+        .background(Capsule().fill(hovering || active ? PP.fieldHover : PP.field))
+        .overlay(Capsule().strokeBorder(Color.primary.opacity(active ? 1 : hovering ? 0.1 : 0), lineWidth: active ? 2 : 1))
         .contentShape(Capsule())
         .onTapGesture { focused.wrappedValue = true }
         .onHover { hovering = $0 }
-        .animation(Motion.fade, value: hovering)
-        .animation(Motion.fade, value: active)
+        .animation(.easeIn(duration: 0.22 * Motion.slow), value: hovering)
+        .animation(.easeIn(duration: 0.22 * Motion.slow), value: active)
     }
 }
 
@@ -194,13 +204,14 @@ private struct BrowseButton: View {
         let open = model.route == .search && model.searchText.isEmpty
         Button { model.go(.search) } label: {
             Image(systemName: open ? "square.grid.2x2.fill" : "square.grid.2x2")
-                .font(.system(size: 14, weight: .medium))
+                .font(.system(size: 15, weight: .regular))
                 .foregroundStyle(open || hovering ? AnyShapeStyle(.primary) : AnyShapeStyle(PP.icon))
-                .frame(width: 26, height: 26)
+                .frame(width: 18, height: 18)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
+        .animation(Motion.fade, value: hovering)
         .help("Browse")
     }
 }

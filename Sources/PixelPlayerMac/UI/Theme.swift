@@ -57,20 +57,22 @@ enum PP {
     static let tertiaryContainer = adaptive(0xFFD8EC, 0x5A2F50)
     static let onTertiaryContainer = adaptive(0x7A2E5E, 0xFFD8EC)
     static let window = adaptive(0xFAF8FF, 0x111318)
-    /// The sidebar in dark: nearly black, darker than the pages, as Spotify's frame. In light the system's own sidebar stays.
-    static let sidebar = Color(nsColor: NSColor(name: nil) { appearance in
-        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? NSColor(hex: 0x060606, alpha: 1) : .clear
-    })
+    /// The frame around the panels and the band at the top: black, as Spotify's (measured #000). In light a soft grey, so the
+    /// white panels still stand apart from it as Spotify's dark grey ones do from the black.
+    static let sidebar = adaptive(0xE6E6E8, 0x000000)
+    /// Home and the search field in the band: #1F1F1F, and #2A2A2A under the pointer or while typing (measured on Spotify).
+    static let field = adaptive(0xFFFFFF, 0x1F1F1F)
+    static let fieldHover = adaptive(0xF7F7F7, 0x2A2A2A)
+    /// The thin line before the browse button in the search field (measured #7C7C7C).
+    static let fieldDivider = adaptive(0xB8B8B8, 0x7C7C7C)
     /// The queue column: the same as the sidebar beside the page, near black in dark and the sidebar's grey in light.
     /// The panels in the sidebar (Home and Search, Your Library), as Spotify's: dark grey on the black window.
     static let libraryPanel = adaptive(0xFFFFFF, 0x121212)
     static let panel = Color(nsColor: NSColor(name: nil) { appearance in
         NSColor(hex: appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? 0x060606 : 0xF0F0F2, alpha: 1)
     })
-    /// Behind the pages: the system's window colour in light, near black in dark, as dark as Spotify feels.
-    static let page = Color(nsColor: NSColor(name: nil) { appearance in
-        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? NSColor(hex: 0x121212, alpha: 1) : .windowBackgroundColor
-    })
+    /// The page panel: Spotify's #121212 in dark, white in light.
+    static let page = adaptive(0xFFFFFF, 0x121212)
     static let surface = adaptive(0xF0F2FD, 0x1A1C23)
     static let surfaceHigh = adaptive(0xE5E8F7, 0x242733)
     static let ink = adaptive(0x1A1B21, 0xE4E2EA)

@@ -35,6 +35,9 @@ Alles wat Mark vroeg, met wat klaar is en wat nog moet. Bijgewerkt bij elke rond
 - Wachtrij slepen: groen lijntje waar het landt, klein sleepbeeld, korte beweging bij neerzetten.
 - Animaties op Spotify's maat (gemeten): knoppen en chips 0,15 s, play op kaarten 0,3 s omhoog, rijen direct, wachtrij direct open en dicht; bibliotheek sorteert niet meer bij elke hover.
 - Inklappen gemeten op open.spotify.com: kop schuift 0,1 s, icoon volgt na 0,1 s (eruit andersom); in- en uitklappen zelf zonder animatie; strook 72 px met hoezen van 48.
+- Plus slaat op in Liked Songs met een pop, het groene vinkje opent Saved in; "Made for" met je eigen naam.
+- Standaard donker zoals Spotify, ook overdag; licht alleen via Instellingen › Appearance (heeft nu ook panelen).
+- Bovenbalk op Spotify's maat: 48 pt, Home en zoekveld 36 pt met hun kleuren, hover en focusrand; verkeerslichtjes in het midden.
 
 ## In 0.2.7 (uitgebracht)
 

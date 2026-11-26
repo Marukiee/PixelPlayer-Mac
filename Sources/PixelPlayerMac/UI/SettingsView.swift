@@ -221,15 +221,16 @@ private struct PlaybackPane: View {
 }
 
 private struct AppearancePane: View {
-    @AppStorage("appearance.mode") private var theme = "System"
+    @AppStorage("appearance.mode") private var theme = "Dark"
     @LocalState private var accent = "Green"
     @LocalState private var fromCover = false
 
     var body: some View {
         Form {
             Section {
+                // Dark, as Spotify, also by day; light only when chosen here (Mark, 2026-11-26).
                 Picker("Mode", selection: $theme) {
-                    ForEach(["System", "Light", "Dark"], id: \.self) { Text($0) }
+                    ForEach(["Dark", "Light"], id: \.self) { Text($0) }
                 }
                 .pickerStyle(.segmented)
                 .onChange(of: theme) { Appearance.apply(theme) }
@@ -249,16 +250,19 @@ private struct AppearancePane: View {
     }
 }
 
-/// Light, dark or the system's choice, for the whole app.
+/// Dark for the whole app, as Spotify, whatever the Mac is set to and also by day; light only when chosen in Settings.
 @MainActor
 enum Appearance {
     static func apply(_ mode: String) {
         // A scripted run sets its own appearance.
         guard !Debug.active else { return }
-        switch mode {
-        case "Light": NSApp.appearance = NSAppearance(named: .aqua)
-        case "Dark": NSApp.appearance = NSAppearance(named: .darkAqua)
-        default: NSApp.appearance = nil
-        }
+        NSApp.appearance = NSAppearance(named: mode == "Light" ? .aqua : .darkAqua)
+    }
+
+    /// The saved choice, with the old "System" (from before dark was the rule) read as dark.
+    static var saved: String {
+        let defaults = UserDefaults.standard
+        if defaults.string(forKey: "appearance.mode") == "System" { defaults.set("Dark", forKey: "appearance.mode") }
+        return defaults.string(forKey: "appearance.mode") ?? "Dark"
     }
 }
