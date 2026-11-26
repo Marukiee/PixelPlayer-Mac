@@ -23,6 +23,7 @@ Alles wat Mark vroeg, met wat klaar is en wat nog moet. Bijgewerkt bij elke rond
 - App-icoon een tikje naar rechts.
 - Wit bolletje bij hover op voortgangsbalk en volume, zoals Spotify.
 - Grote titels in Figtree 850 (OFL), van 40 vrije lettertypes het dichtst bij Spotify's titelletter (78% gelijk), met gemeten spatiering.
+- Wachtrij met tabs Queue en Recently played zoals Spotify (groen streepje), puntjes en kruisje rechts.
 
 ## In 0.2.7 (uitgebracht)
 

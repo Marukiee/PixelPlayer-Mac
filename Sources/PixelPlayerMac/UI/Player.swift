@@ -362,7 +362,7 @@ struct QueueInspector: View {
     @LocalState private var tab: Tab = .upNext
 
     enum Tab: String, CaseIterable, Identifiable {
-        case upNext = "Up Next", history = "History"
+        case upNext = "Queue", history = "Recently played"
         var id: String { rawValue }
     }
 
@@ -382,10 +382,11 @@ struct QueueInspector: View {
         .animation(Motion.fade, value: tab)
     }
 
+    /// As in Spotify: the two tabs are the title, with the more menu and the close button beside them.
     private var header: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 4) {
-                Text("Queue").font(.title2.weight(.bold))
+                QueueTabs(tab: $tab)
                 Spacer()
                 BarMenu(symbol: "ellipsis", label: "More") {
                     Button("Shuffle Up Next", systemImage: "shuffle") { withAnimation(Motion.panel) { model.upNext.shuffle() } }
@@ -397,7 +398,6 @@ struct QueueInspector: View {
                 }
                 BarIcon(symbol: "xmark", label: "Close") { withAnimation(Motion.panel) { model.showQueue = false } }
             }
-            QueueTabs(tab: $tab)
         }
         .padding(.leading, 20).padding(.trailing, 12)
         .padding(.top, 24)
@@ -895,34 +895,32 @@ struct DevicesPopover: View {
 
 /// Up Next and History: two tabs with a soft round under the pointer and a blue pill that slides to the chosen one,
 /// instead of the system's segmented control, which only lit up on a click and flashed grey before it turned blue.
+/// Queue and Recently played as Spotify shows them: bold words, the chosen one in full white with a green line under it
+/// that slides to the other, the other grey until the pointer is on it.
 struct QueueTabs: View {
     @Binding var tab: QueueInspector.Tab
-    @Namespace private var pill
+    @Namespace private var line
     @LocalState private var hovered: QueueInspector.Tab?
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 22) {
             ForEach(QueueInspector.Tab.allCases) { item in
                 let chosen = item == tab
                 Text(item.rawValue)
-                    .font(.callout.weight(.semibold))
-                    .foregroundStyle(chosen ? AnyShapeStyle(PP.onPrimary) : AnyShapeStyle(.primary))
-                    .padding(.horizontal, 14)
-                    .frame(height: 28)
-                    .background {
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(chosen || hovered == item ? AnyShapeStyle(.primary) : AnyShapeStyle(PP.icon))
+                    .padding(.top, 8)
+                    .padding(.bottom, 10)
+                    .overlay(alignment: .bottom) {
                         if chosen {
-                            Capsule().fill(PP.primary).matchedGeometryEffect(id: "pill", in: pill)
-                        } else if hovered == item {
-                            Capsule().fill(Color.primary.opacity(0.08))
+                            Capsule().fill(PP.primary).frame(height: 3).matchedGeometryEffect(id: "line", in: line)
                         }
                     }
-                    .contentShape(Capsule())
+                    .contentShape(Rectangle())
                     .onHover { inside in if inside { hovered = item } else if hovered == item { hovered = nil } }
                     .onTapGesture { withAnimation(Motion.panel) { tab = item } }
             }
         }
-        .padding(3)
-        .background(Capsule().fill(Color.primary.opacity(0.06)))
         .animation(Motion.fade, value: hovered)
     }
 }
