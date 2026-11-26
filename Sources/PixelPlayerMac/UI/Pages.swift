@@ -864,10 +864,10 @@ struct SearchPage: View {
     let term: String
 
     private var songs: [Song] {
-        Library.shared.songs.filter { [$0.title, $0.artist, $0.album.title].contains { $0.localizedCaseInsensitiveContains(term) } }
+        Library.shared.songs.filter { [$0.title, $0.artist, $0.album.title].contains { $0.looselyContains(term) } }
     }
     private var albums: [Album] {
-        Library.shared.albums.filter { [$0.title, $0.artist].contains { $0.localizedCaseInsensitiveContains(term) } }
+        Library.shared.albums.filter { [$0.title, $0.artist].contains { $0.looselyContains(term) } }
     }
 
     var body: some View {
@@ -1067,7 +1067,7 @@ enum Shelves {
             let album = library.albums.first { $0.artist == value } ?? library.album(at: 0)
             return library.albums.filter { ($0.artist == value || $0.genre == album.genre) && $0.id != album.id }.map(ShelfItem.album)
         case "albums":
-            return library.albums.filter { [$0.title, $0.artist].contains { $0.localizedCaseInsensitiveContains(value) } }.map(ShelfItem.album)
+            return library.albums.filter { [$0.title, $0.artist].contains { $0.looselyContains(value) } }.map(ShelfItem.album)
         default:
             return []
         }
@@ -1126,6 +1126,13 @@ struct ShelfPage: View {
     }
 }
 
+extension String {
+    /// A search that ignores capitals and accents, so "stenstrom" finds "Stenström" and "cafe" finds "Café".
+    func looselyContains(_ other: String) -> Bool {
+        range(of: other, options: [.caseInsensitive, .diacriticInsensitive]) != nil
+    }
+}
+
 extension Song {
     /// The genres in the song's tags; several in one tag are split at a semicolon, comma or bar.
     var genres: [String] {
@@ -1134,7 +1141,7 @@ extension Song {
 
     /// Whether the search in a list finds it: in the title, the artist or the album.
     func matches(_ text: String) -> Bool {
-        title.localizedCaseInsensitiveContains(text) || artist.localizedCaseInsensitiveContains(text) || album.title.localizedCaseInsensitiveContains(text)
+        title.looselyContains(text) || artist.looselyContains(text) || album.title.looselyContains(text)
     }
 }
 
@@ -1572,7 +1579,7 @@ struct AddToPlaylistView: View {
                     Text("Saved in").font(.subheadline.weight(.semibold)).foregroundStyle(.secondary).padding(.top, 2)
                     row(title: "Liked Songs", subtitle: songCount(model.likedIDs.count), art: .liked,
                         on: model.likedIDs.contains(song.id), busy: false) { model.setLiked(song, !model.likedIDs.contains(song.id)) }
-                    let lists = library.playlists.filter { search.isEmpty || $0.title.localizedCaseInsensitiveContains(search) }
+                    let lists = library.playlists.filter { search.isEmpty || $0.title.looselyContains(search) }
                     if !lists.isEmpty {
                         Text("Playlists").font(.subheadline.weight(.semibold)).foregroundStyle(.secondary).padding(.top, 8)
                     }

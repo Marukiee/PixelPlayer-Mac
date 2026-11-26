@@ -4,6 +4,7 @@ Alles wat Mark vroeg, met wat klaar is en wat nog moet. Bijgewerkt bij elke rond
 `ROADMAP.md`.
 
 ## Nog te doen
+- Uit de Android-sessie (MARK-FEEDBACK.md, 2026-11-26), ook voor de Mac: recente zoekopdrachten op de zoekpagina zoals Spotify; nummermenu in Marks volgorde (Add to Liked Songs met Liked-hoesje, Add to playlist, Add to queue, Go to album, Go to artist, Share, Sleep timer) met een echte slaaptimer; shuffle op een lijst als schakelaar met groen bolletje zonder dat het icoon verschuift.
 
 - **Sonos wisselt snel door veel nummers bij verbinden.** Serverbibliotheek laadt goed (970 nummers); hi-res wordt nu omgezet voor Sonos (waarschijnlijke oorzaak); logboek in 0.2.3 om het zeker te weten.
 - **Apps laten samenwerken.** Mac en Android zien wat er op een Sonos-speaker speelt en kunnen het pauzeren; overnemen met een vraag; meerdere mensen in huis (eigen Navidrome-account). Voorstel, nog niet gebouwd.
@@ -30,6 +31,7 @@ Alles wat Mark vroeg, met wat klaar is en wat nog moet. Bijgewerkt bij elke rond
 - Wachtrij exact als Spotify: Now playing als gewone rij (titel groen), koppen vet wit, Next from:, hover met grijs, play op de hoes en drie puntjes, geen speelduur.
 - Venster zoals Spotify: zwarte bovenbalk met pijltjes, Home en zoekbalk; drie afgeronde panelen; speler blijft zweven.
 - Your Library zoals Spotify: inklapknop schuift in bij hover, plus, breder maken, chips, vergrootglas naar zoekpagina, Recents-menu (Sort by, View as in vier soorten), ingeklapt een strook met hoezen, sleepbaar.
+- Zoeken ongevoelig voor accenten (stenstrom vindt Stenström), ook in lijsten.
 - Inklappen gemeten op open.spotify.com: kop schuift 0,1 s, icoon volgt na 0,1 s (eruit andersom); in- en uitklappen zelf zonder animatie; strook 72 px met hoezen van 48.
 
 ## In 0.2.7 (uitgebracht)
