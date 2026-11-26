@@ -1283,7 +1283,7 @@ extension TrackListPage {
     fileprivate var genres: [String] {
         var counts: [String: Int] = [:]
         for song in songs { for genre in song.genres { counts[genre, default: 0] += 1 } }
-        return counts.sorted { $0.value != $1.value ? $0.value > $1.value : $0.key < $1.key }.prefix(30).map(\.key)
+        return counts.sorted { $0.value != $1.value ? $0.value > $1.value : $0.key < $1.key }.prefix(15).map(\.key)
     }
 }
 
@@ -1348,49 +1348,25 @@ struct ListSearch: View {
     }
 }
 
-/// The genres of a list as chips that filter it, as on Spotify's Liked Songs: one tap filters, a second shows all again.
-/// When they do not fit they scroll sideways, with a round white arrow at the end and the last chip fading out.
+/// The genres under the buttons, as Spotify's: one row of at most 15, the most common first, and only as many as fit whole,
+/// without scrolling or an arrow (Mark, 2026-11-26). A click filters the list to that genre; again shows all.
 struct GenreChips: View {
     let genres: [String]
     @Binding var chosen: String?
-    @LocalState private var position = ScrollPosition(edge: .leading)
-    @LocalState private var offset: CGFloat = 0
-    @LocalState private var overflow: CGFloat = 0
 
     var body: some View {
-        let more = offset < overflow - 1, back = offset > 1
-        ScrollView(.horizontal) {
-            HStack(spacing: 6) {
-                ForEach(genres, id: \.self) { genre in
-                    GenreChip(title: genre, chosen: chosen == genre) {
-                        withAnimation(Motion.fade) { chosen = chosen == genre ? nil : genre }
-                    }
+        ChipRow(spacing: 8) {
+            ForEach(genres.prefix(15), id: \.self) { genre in
+                GenreChip(title: genre, chosen: chosen == genre) {
+                    withAnimation(Motion.fade) { chosen = chosen == genre ? nil : genre }
                 }
             }
         }
-        .scrollIndicators(.never)
-        .scrollPosition($position)
-        .onScrollGeometryChange(for: [CGFloat].self) { [$0.contentOffset.x, $0.contentSize.width - $0.containerSize.width] } action: { _, value in
-            offset = value[0]; overflow = value[1]
-        }
-        .mask {
-            HStack(spacing: 0) {
-                LinearGradient(colors: [.black.opacity(back ? 0 : 1), .black], startPoint: .leading, endPoint: .trailing).frame(width: 60)
-                Color.black
-                LinearGradient(colors: [.black, .black.opacity(more ? 0 : 1)], startPoint: .leading, endPoint: .trailing).frame(width: 60)
-            }
-        }
-        .overlay(alignment: .leading) {
-            if back { ScrollArrow(forward: false) { withAnimation(Motion.panel) { position.scrollTo(x: max(0, offset - 320)) } } }
-        }
-        .overlay(alignment: .trailing) {
-            if more { ScrollArrow(forward: true) { withAnimation(Motion.panel) { position.scrollTo(x: min(overflow, offset + 320)) } } }
-        }
-        .animation(Motion.fade, value: more)
-        .animation(Motion.fade, value: back)
+        .clipped()
     }
 }
 
+/// Measured on Mark's screenshot against the play button (56 pt in both): 32 high, 12 at the sides, text 14.
 private struct GenreChip: View {
     let title: String
     let chosen: Bool
@@ -1399,10 +1375,12 @@ private struct GenreChip: View {
 
     var body: some View {
         Text(title)
-            .font(.system(size: 12))
+            .font(.system(size: 14))
+            .lineLimit(1)
+            .fixedSize()
             .foregroundStyle(chosen ? Color.black : Color.primary)
-            .padding(.horizontal, 10)
-            .frame(height: 26)
+            .padding(.horizontal, 12)
+            .frame(height: 32)
             .background(Capsule().fill(chosen ? AnyShapeStyle(Color.white) : AnyShapeStyle(Color.primary.opacity(hovering ? 0.16 : 0.1))))
             .contentShape(Capsule())
             .onTapGesture(perform: action)
@@ -1411,24 +1389,31 @@ private struct GenreChip: View {
     }
 }
 
-/// The round white button with an arrow at the end of a row that scrolls sideways, as on Spotify.
-struct ScrollArrow: View {
-    let forward: Bool
-    let action: () -> Void
+/// One row, left to right, that leaves out whatever does not fit whole at the end instead of cutting it off or scrolling.
+struct ChipRow: Layout {
+    var spacing: CGFloat = 8
 
-    var body: some View {
-        Button(action: action) {
-            Image(systemName: forward ? "chevron.right" : "chevron.left")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(Color.black)
-                .frame(width: 26, height: 26)
-                .background(Circle().fill(Color.white))
-                .shadow(color: .black.opacity(0.35), radius: 6, y: 2)
-                .contentShape(Circle())
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let sizes = subviews.map { $0.sizeThatFits(.unspecified) }
+        let natural = sizes.reduce(0) { $0 + $1.width } + spacing * CGFloat(max(0, sizes.count - 1))
+        let width = proposal.width.map { $0.isFinite ? $0 : natural } ?? natural
+        return CGSize(width: width, height: sizes.map(\.height).max() ?? 0)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var x = bounds.minX
+        var full = false
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if !full && x + size.width <= bounds.maxX + 0.5 {
+                subview.place(at: CGPoint(x: x, y: bounds.midY), anchor: .leading, proposal: ProposedViewSize(size))
+                x += size.width + spacing
+            } else {
+                // Out of sight, past the clipped end of the row.
+                full = true
+                subview.place(at: CGPoint(x: bounds.maxX + 10_000, y: bounds.midY), anchor: .leading, proposal: ProposedViewSize(size))
+            }
         }
-        .buttonStyle(PressStyle())
-        .transition(.opacity)
-        .help(forward ? "More" : "Back")
     }
 }
 

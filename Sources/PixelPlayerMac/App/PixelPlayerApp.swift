@@ -145,7 +145,7 @@ struct PlaybackCommands: Commands {
             Divider()
             Button("Search") { model.go(.search); model.searchRequest += 1 }
                 .keyboardShortcut("l", modifiers: .command)
-            Button("Queue") { model.showQueue.toggle() }
+            Button("Queue") { withAnimation(Motion.panel) { model.showQueue.toggle() } }
                 .keyboardShortcut("q", modifiers: [.option, .shift])
             Button("Lyrics") { model.setFullPlayer(!model.fullPlayer) }
                 .keyboardShortcut("l", modifiers: [.option, .shift])

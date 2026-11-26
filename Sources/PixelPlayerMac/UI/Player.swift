@@ -71,8 +71,7 @@ struct PlayerSideButtons: View {
             BarIcon(symbol: RemoteController.shared.isActive ? "iphone" : "hifispeaker", label: "Connect · \(model.groupName)", active: model.showDevices || !model.group.isEmpty || RemoteController.shared.isActive || SonosOutput.shared.controlsPlayback) { model.showDevices.toggle() }
                 .popover(isPresented: $model.showDevices, arrowEdge: .top) { DevicesPopover() }
             BarIcon(symbol: "list.bullet", label: "Up Next", active: model.showQueue) {
-                // At once, as Spotify opens its queue.
-                model.showQueue.toggle()
+                withAnimation(Motion.panel) { model.showQueue.toggle() }
             }
             if volume { BarVolume().padding(.horizontal, 4) }
             BarIcon(symbol: "arrow.up.left.and.arrow.down.right", label: "Full screen") { model.setFullScreen(true) }
@@ -425,7 +424,7 @@ struct QueueInspector: View {
                     }
                     .disabled(model.userQueue.isEmpty && model.upNext.isEmpty)
                 }
-                BarIcon(symbol: "xmark", label: "Close") { model.showQueue = false }
+                BarIcon(symbol: "xmark", label: "Close") { withAnimation(Motion.panel) { model.showQueue = false } }
             }
         }
         .padding(.leading, 20).padding(.trailing, 12)

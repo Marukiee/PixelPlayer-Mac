@@ -38,6 +38,12 @@ Alles wat Mark vroeg, met wat klaar is en wat nog moet. Bijgewerkt bij elke rond
 - Plus slaat op in Liked Songs met een pop, het groene vinkje opent Saved in; "Made for" met je eigen naam.
 - Standaard donker zoals Spotify, ook overdag; licht alleen via Instellingen › Appearance (heeft nu ook panelen).
 - Bovenbalk op Spotify's maat: 48 pt, Home en zoekveld 36 pt met hun kleuren, hover en focusrand; verkeerslichtjes in het midden.
+- Bibliotheek en wachtrij glijden weer in en uit (Spotify doet het direct, maar Mark vindt de animatie mooi).
+- Genrechips zoals Spotify: één rij van hooguit 15, alleen wat past, geen pijltje; 32 hoog, tekst 14.
+- Home-, zoek- en bibliotheekicoon heel (onderkant ontbrak), Browse-icoon in het zoekveld nagetekend.
+- Zijbalk-hover zoals Spotify: geopende lijst grijs, hover op een andere eigen grijs, op de geopende lichter.
+- Zoekveld: klik opent de zoekpagina, witte rand meteen en blijft staan zolang die open is.
+- Titelletter: afstand per letter gemeten op Spotify's eigen titelletter, Figtree's kerning uit.
 
 ## In 0.2.7 (uitgebracht)
 

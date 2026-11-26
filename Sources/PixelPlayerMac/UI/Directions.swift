@@ -26,12 +26,13 @@ struct RootView: View {
                     detail
                         .background(PP.page)
                         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    // The queue opens and closes at once, as Spotify's (measured: its width changes in one frame).
+                    // The queue slides in from the right. Spotify opens it in one frame, but Mark likes the slide (2026-11-26).
                     if model.showQueue {
                         QueueInspector()
                             .frame(width: 320)
                             .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                             .padding(.leading, 8)
+                            .transition(.move(edge: .trailing).combined(with: .opacity))
                     }
                 }
                 .padding(.horizontal, 8)
@@ -154,10 +155,14 @@ struct SearchField: View {
     var focused: FocusState<Bool>.Binding
     @Environment(PlayerModel.self) private var model
     @LocalState private var hovering = false
+    /// Only a focus after launch opens the search page; the window hands the field focus by itself when it opens.
+    @LocalState private var armed = false
 
     var body: some View {
         @Bindable var model = model
-        let active = focused.wrappedValue
+        // The white ring stays while the search page is open or something is typed, also after a click elsewhere, as in
+        // Spotify on the Mac (Mark, 2026-11-26).
+        let active = focused.wrappedValue || model.route == .search || !model.searchText.isEmpty
         HStack(spacing: 0) {
             SpotifyIcon(name: "search")
                 .fill(style: FillStyle(eoFill: true))
@@ -190,8 +195,18 @@ struct SearchField: View {
         .contentShape(Capsule())
         .onTapGesture { focused.wrappedValue = true }
         .onHover { hovering = $0 }
-        .animation(.easeIn(duration: 0.22 * Motion.slow), value: hovering)
-        .animation(.easeIn(duration: 0.22 * Motion.slow), value: active)
+        // Lighter under the pointer in 0.05 s (Spotify's hover); the white ring comes at once.
+        .animation(.easeIn(duration: (hovering ? 0.05 : 0.22) * Motion.slow), value: hovering)
+        .animation(nil, value: active)
+        // A click in the field opens the search page with the recent searches, as in Spotify.
+        .onChange(of: focused.wrappedValue) { _, now in
+            guard now, armed, model.searchText.isEmpty, model.route != .search else { return }
+            model.go(.search)
+        }
+        .task {
+            try? await Task.sleep(for: .seconds(1.5))
+            armed = true
+        }
     }
 }
 
@@ -203,8 +218,8 @@ private struct BrowseButton: View {
     var body: some View {
         let open = model.route == .search && model.searchText.isEmpty
         Button { model.go(.search) } label: {
-            Image(systemName: open ? "square.grid.2x2.fill" : "square.grid.2x2")
-                .font(.system(size: 15, weight: .regular))
+            BrowseGlyph()
+                .fill(style: FillStyle(eoFill: true))
                 .foregroundStyle(open || hovering ? AnyShapeStyle(.primary) : AnyShapeStyle(PP.icon))
                 .frame(width: 18, height: 18)
                 .contentShape(Rectangle())
@@ -213,6 +228,39 @@ private struct BrowseButton: View {
         .onHover { hovering = $0 }
         .animation(Motion.fade, value: hovering)
         .help("Browse")
+    }
+}
+
+/// Spotify's browse icon, drawn after it on a 24 grid: a tray (a trapezoid two units thick with round outer corners), the
+/// top of a card behind it, and an oval in the tray.
+struct BrowseGlyph: Shape {
+    func path(in rect: CGRect) -> Path {
+        let s = min(rect.width, rect.height) / 24
+        let ox = rect.midX - 12 * s, oy = rect.midY - 12 * s
+        func p(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: ox + x * s, y: oy + y * s) }
+        var path = Path()
+        // The tray: round outer corners, a sharp cut-out inside.
+        let outer = [p(1.056, 9), p(22.944, 9), p(20.18, 22), p(3.82, 22)]
+        path.move(to: p(12, 9))
+        for index in 1...4 {
+            path.addArc(tangent1End: outer[index % 4], tangent2End: outer[(index + 1) % 4], radius: s)
+        }
+        path.closeSubpath()
+        path.addLines([p(3.525, 11), p(20.475, 11), p(18.561, 20), p(5.438, 20)])
+        path.closeSubpath()
+        // The card behind it: up from the tray, across, and down again.
+        path.move(to: p(4, 6))
+        path.addArc(tangent1End: p(4, 1), tangent2End: p(20, 1), radius: s)
+        path.addArc(tangent1End: p(20, 1), tangent2End: p(20, 6), radius: s)
+        path.addLine(to: p(20, 6))
+        path.addLine(to: p(18, 6))
+        path.addLine(to: p(18, 3))
+        path.addLine(to: p(6, 3))
+        path.addLine(to: p(6, 6))
+        path.closeSubpath()
+        // The oval in the tray.
+        path.addEllipse(in: CGRect(x: ox + 9 * s, y: oy + 13.5 * s, width: 6 * s, height: 4 * s))
+        return path
     }
 }
 
@@ -227,10 +275,12 @@ struct LibraryColumn: View {
     var body: some View {
         HStack(spacing: 0) {
             Group {
+                // Folding and opening glide, the panel and the strip fading into each other. Spotify does it in one frame,
+                // but Mark likes the animation (2026-11-26).
                 if model.libraryCollapsed {
-                    LibraryRail().frame(width: 58)
+                    LibraryRail().frame(width: 58).transition(.opacity)
                 } else {
-                    LibraryPanel().frame(width: wide ? 460 : width)
+                    LibraryPanel().frame(width: wide ? 460 : width).transition(.opacity)
                 }
             }
             .animation(Motion.panel, value: wide)
@@ -246,9 +296,9 @@ struct LibraryColumn: View {
                             if dragStart == nil { dragStart = start }
                             let target = start + value.translation.width
                             if target < 180 {
-                                if !model.libraryCollapsed { model.libraryCollapsed = true }
+                                if !model.libraryCollapsed { withAnimation(Motion.panel) { model.libraryCollapsed = true } }
                             } else {
-                                if model.libraryCollapsed { model.libraryCollapsed = false }
+                                if model.libraryCollapsed { withAnimation(Motion.panel) { model.libraryCollapsed = false } }
                                 wide = false
                                 width = min(480, max(240, target))
                             }
@@ -297,7 +347,7 @@ private struct RailCover: View {
             .frame(width: 38, height: 38)
             .clipShape(item.kind == .artists ? AnyShape(Circle()) : AnyShape(RoundedRectangle(cornerRadius: 4, style: .continuous)))
             .padding(6.5)
-            .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Color.primary.opacity(selected ? 0.1 : hovering ? 0.06 : 0)))
+            .background(RowHighlight(selected: selected, hovering: hovering))
             .contentShape(Rectangle())
             .onTapGesture { model.go(item.route) }
             .simultaneousGesture(TapGesture(count: 2).onEnded { model.play(Library.shared.songs(for: item.route)) })
@@ -750,7 +800,7 @@ struct LibraryTitleButton: View {
 
     var body: some View {
         Button {
-            model.libraryCollapsed = true
+            withAnimation(Motion.panel) { model.libraryCollapsed = true }
         } label: {
             HStack(spacing: 10) {
                 FoldGlyph()
@@ -805,8 +855,7 @@ struct LibraryToggleButton: View {
 
     var body: some View {
         Button {
-            // At once, without a slide: Spotify folds and opens its library in one frame.
-            model.libraryCollapsed = collapse
+            withAnimation(Motion.panel) { model.libraryCollapsed = collapse }
         } label: {
             // Folding: a small panel with an arrow; opening again from the strip: Spotify's library icon.
             Group {
@@ -987,8 +1036,7 @@ struct LibraryRow: View {
         }
         .padding(.vertical, compact ? 6 : 6.5)
         .padding(.horizontal, 6.5)
-        .background(RoundedRectangle(cornerRadius: 6, style: .continuous)
-            .fill(Color.primary.opacity(selected ? 0.1 : hovering ? 0.06 : 0)).animation(nil, value: hovering))
+        .background(RowHighlight(selected: selected, hovering: hovering))
         .contentShape(Rectangle())
         .onTapGesture { model.go(item.route) }
         // A double click plays it from the top; the first click already opened it.
@@ -996,6 +1044,27 @@ struct LibraryRow: View {
         .onHover { inside in SidebarHoverState.shared.set(item.route, inside) }
         .onAppear { if Debug.hovered(item.title) { SidebarHoverState.shared.route = item.route } }
         .contextMenu { LibraryItemMenu(item: item) }
+    }
+}
+
+/// Behind an item of Your Library, as Spotify's (measured on open.spotify.com): the open one tinted white 10%; under the
+/// pointer another one gets #1F1F1F, growing in from 3 pt inside its edge, and the open one 14% lighter on top of its tint.
+/// So the open one and the one under the pointer are two grey areas at once. In 0.05 s, out in 0.15 s.
+struct RowHighlight: View {
+    let selected: Bool
+    let hovering: Bool
+    var radius: CGFloat = 6
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
+        ZStack {
+            shape.fill(Color.primary.opacity(selected ? 0.1 : 0))
+            shape.fill(selected ? AnyShapeStyle(Color.primary.opacity(0.14)) : AnyShapeStyle(PP.rowHover))
+                .padding(hovering || selected ? 0 : 3)
+                .opacity(hovering ? 1 : 0)
+        }
+        .animation(.timingCurve(0.25, 0.1, 0.25, 1, duration: (hovering ? 0.05 : 0.15) * Motion.slow), value: hovering)
+        .animation(nil, value: selected)
     }
 }
 
@@ -1015,8 +1084,7 @@ struct LibraryTile: View {
             Text(item.subtitle).font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(1)
         }
         .padding(6)
-        .background(RoundedRectangle(cornerRadius: 6, style: .continuous)
-            .fill(Color.primary.opacity(selected ? 0.1 : hovering ? 0.06 : 0)).animation(nil, value: hovering))
+        .background(RowHighlight(selected: selected, hovering: hovering))
         .contentShape(Rectangle())
         .onTapGesture { model.go(item.route) }
         .simultaneousGesture(TapGesture(count: 2).onEnded { model.play(Library.shared.songs(for: item.route)) })

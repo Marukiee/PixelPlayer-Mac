@@ -15,8 +15,36 @@ enum TitleFont {
         guard let url = Bundle.main.url(forResource: "FigtreeVariable", withExtension: "ttf", subdirectory: "Fonts"),
               let found = CTFontManagerCreateFontDescriptorsFromURL(url as CFURL) as? [CTFontDescriptor] else { return nil }
         let axes: [Int: Double] = [0x7767_6874: 800]  // wght
-        return CTFontDescriptorCreateCopyWithAttributes(found[0], [kCTFontVariationAttribute: axes] as CFDictionary)
+        // Figtree's own kerning off: the spacing below takes its place.
+        let kerning: [[CFString: Any]] = [[kCTFontOpenTypeFeatureTag: "kern", kCTFontOpenTypeFeatureValue: 0]]
+        return CTFontDescriptorCreateCopyWithAttributes(found[0], [kCTFontVariationAttribute: axes, kCTFontFeatureSettingsAttribute: kerning] as CFDictionary)
     }()
+
+    /// Spotify's title letters sit closer or wider per letter than Figtree's. Fitted on every pair of these letters drawn in
+    /// Spotify's own title font on open.spotify.com (Mark, 2026-11-26): what each letter takes off on its right and adds or
+    /// takes off on its left, in em. The gaps then differ 3.1 px on 142 px capitals over all pairs, against 4.5 px with one
+    /// spacing for every letter. Letters not in the list take the average.
+    private static let spacedLetters = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789åäöéü&'.,-!?")
+    private static let rightSide: [Double] = [
+        -0.034, -0.021, -0.001, -0.02, -0.044, -0.029, 0.01, -0.027, -0.027, -0.022, -0.048, -0.028, -0.026,
+        -0.027, -0.021, -0.014, -0.022, -0.04, -0.028, -0.057, -0.025, -0.049, -0.037, -0.049, -0.075, -0.025,
+        -0.027, -0.019, 0.001, -0.017, -0.01, -0.014, -0.022, -0.019, -0.027, -0.029, -0.035, -0.017, -0.018,
+        -0.018, -0.022, -0.019, -0.019, -0.027, -0.021, -0.028, -0.02, -0.023, -0.026, -0.039, -0.024, -0.013,
+        -0.009, -0.038, -0.013, -0.014, -0.029, -0.017, -0.013, -0.04, -0.017, -0.013, -0.024, -0.023, -0.022,
+        -0.011, -0.021, 0.004, -0.05, -0.041, -0.011, -0.034, -0.041, -0.021,
+    ]
+    private static let leftSide: [Double] = [
+        -0.009, 0, 0.003, 0, 0, 0, 0.003, 0, 0, 0.008, 0, 0, 0,
+        0, 0.002, 0, 0.002, 0, 0.012, -0.023, 0.002, -0.019, -0.008, -0.016, -0.042, 0,
+        0.002, 0.007, -0.002, 0.001, -0.002, -0.002, 0.001, 0.006, -0.004, 0.045, 0.007, 0.007, 0.002,
+        0.002, -0.002, -0.003, 0.001, 0.002, 0.007, -0.003, 0.004, -0.003, -0.004, -0.01, -0.008, 0.008,
+        0.014, -0.021, 0.019, 0.02, 0.013, 0.008, 0.011, -0.001, 0.008, 0.012, 0.002, 0.004, -0.001,
+        -0.002, 0.005, -0.004, -0.026, -0.018, 0.015, -0.011, -0.016, 0.001,
+    ]
+    private static let spacing: [Character: (right: Double, left: Double)] = Dictionary(
+        uniqueKeysWithValues: spacedLetters.indices.map { (spacedLetters[$0], (rightSide[$0], leftSide[$0])) })
+    /// A space is this much narrower than Figtree's.
+    private static let spaceSide = -0.081
 
     /// How high the capitals are, as a share of the size, so a title can be sized by its capitals as Spotify's are.
     static let capHeight: CGFloat = base.map { CTFontGetCapHeight(CTFontCreateWithFontDescriptor($0, 100, nil)) / 100 } ?? 0.705
@@ -27,19 +55,19 @@ enum TitleFont {
         return Font(CTFontCreateWithFontDescriptor(base, size, nil))
     }
 
-    /// A title in that font with the measured spacing. Without the file it falls back to the system font, unspaced.
+    /// A title in that font with Spotify's spacing per letter. Without the file it falls back to the system font, unspaced.
     static func text(_ string: String, size: CGFloat) -> Text {
         guard base != nil else { return Text(string).font(.system(size: size, weight: .heavy)) }
+        let letters = Array(string)
         var title = AttributedString()
-        for (index, word) in string.split(separator: " ", omittingEmptySubsequences: false).enumerated() {
-            if index > 0 {
-                var space = AttributedString(" ")
-                space.tracking = -0.069 * size
-                title += space
-            }
-            var part = AttributedString(String(word))
-            part.tracking = -0.019 * size
-            title += part
+        for (index, letter) in letters.enumerated() {
+            let next = index + 1 < letters.count ? letters[index + 1] : nil
+            // What follows a letter: its own right side, and the left side of the next one (a space carries that itself).
+            var em = letter == " " ? spaceSide : (spacing[letter]?.right ?? -0.023)
+            if let next, next != " " { em += spacing[next]?.left ?? 0 }
+            var piece = AttributedString(String(letter))
+            piece.tracking = em * size
+            title += piece
         }
         title.font = font(size)
         return Text(title)
@@ -63,6 +91,8 @@ enum PP {
     /// Home and the search field in the band: #1F1F1F, and #2A2A2A under the pointer or while typing (measured on Spotify).
     static let field = adaptive(0xFFFFFF, 0x1F1F1F)
     static let fieldHover = adaptive(0xF7F7F7, 0x2A2A2A)
+    /// Under the pointer in Your Library: #1F1F1F on the #121212 panel (Spotify's --background-highlight).
+    static let rowHover = adaptive(0xEDEDED, 0x1F1F1F)
     /// The thin line before the browse button in the search field (measured #7C7C7C).
     static let fieldDivider = adaptive(0xB8B8B8, 0x7C7C7C)
     /// The queue column: the same as the sidebar beside the page, near black in dark and the sidebar's grey in light.
