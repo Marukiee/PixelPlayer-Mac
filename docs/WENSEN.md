@@ -46,6 +46,7 @@ Alles wat Mark vroeg, met wat klaar is en wat nog moet. Bijgewerkt bij elke rond
 - Breedte van Your Library slepen volgt de muis soepel (werd gemeten op de sleeplijn zelf, die meeschoof).
 - Zoekveld: klik opent de zoekpagina, witte rand meteen en blijft staan zolang die open is.
 - Zoekveld zoals Spotify (gemeten): witte rand alleen tijdens typen, klik ergens anders haalt de cursor eruit, cursor wit.
+- Sonos: na het opstarten skipte de speaker door de hele wachtrij (de wachtrij was geladen voor Navidrome antwoordde, dus zonder servercopie). Nu staat de serverlijst op schijf zoals op Android, krijgt de wachtrij de nieuwe nummers na elke update, en verbindt hij niet als het nummer echt alleen op de Mac staat (geen skipreeks, wachtrij blijft heel).
 - Titelletter: afstand per letter gemeten op Spotify's eigen titelletter, Figtree's kerning uit.
 - Lettertype Mix (Spotify's eigen letter) via Instellingen › Appearance › Font: Import Font… slikt de zip, de map of losse bestanden, ook door te slepen; Get the Font en Use Default. Niet in de repo of de release; zonder import Figtree en de systeemletter. Vervangt de tabel per letter hierboven.
 - Mix zoals Spotify het tekent: 0,967 zo breed (SpotifyMixUI), titels 0,015 em (800) en 0,019 em (700) krapper; per onderdeel Spotify's dikte (400, 700, 800) en maat, tracklijst en pagina's op Spotify's maat (titel 16, tweede regel 14, koppen 24).

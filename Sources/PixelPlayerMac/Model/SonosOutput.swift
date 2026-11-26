@@ -136,6 +136,19 @@ final class SonosOutput {
 
     private func start(groupID: String, controller: SonosController) {
         guard !model.current.id.isEmpty else { note = "Play a song first."; return }
+        model.refreshFromLibrary()
+        // The speaker fetches the music from Navidrome. Without the server's copy of the song that plays it would skip
+        // song after song (as it did through 25 songs on 2026-11-26), so it does not take over: the Mac plays on.
+        if track(model.current).streamURL == nil {
+            if case .loading = Library.shared.status {
+                waitForLibrary(groupID: groupID, controller: controller)
+            } else {
+                SonosLog.write("connect refused: \(model.current.title) has no server copy, library=\(Library.shared.status)")
+                note = Library.shared.client == nil ? "Sign in to Navidrome first: the speaker plays from your server."
+                    : "\(model.current.title) is only on this Mac, so the speaker can't play it. Pick a song from your server."
+            }
+            return
+        }
         // One place at a time: a phone that played lets go first, and the music carries on here.
         let wasPlaying = model.isPlaying
         RemoteController.shared.disconnect()
@@ -145,8 +158,9 @@ final class SonosOutput {
         setAnchor(Int(model.position * 1000), running: model.isPlaying)
         Playback.shared.handOff()
         startClock()
-        let withoutServer = ([model.current] + model.userQueue + model.upNext).prefix(50).filter { $0.source.serverID == nil }.count
-        SonosLog.write("connect \(groupID) current=\(model.current.title) server=\(model.current.source.serverID ?? "none") notOnServerInNext50=\(withoutServer) login=\(Library.shared.client != nil)")
+        let withoutServer = ([model.current] + model.userQueue + model.upNext).prefix(50).filter { Library.shared.fresh($0).source.serverID == nil }.count
+        let first = Library.shared.fresh(model.current)
+        SonosLog.write("connect \(groupID) current=\(model.current.title) server=\(first.source.serverID ?? "none") notOnServerInNext50=\(withoutServer) login=\(Library.shared.client != nil) library=\(Library.shared.status) at=\(Int(model.position))s playing=\(model.isPlaying) format=\(first.source.suffix ?? "?")/\(first.source.sampleRate ?? 0) converted=\(Self.needsConverting(first) ? (Self.losslessHiRes ? "flac" : "mp3") : "no")")
         Task {
             await controller.setSettings(addressSettings)
             let ok = await controller.connect(groupID: groupID)
@@ -157,6 +171,26 @@ final class SonosOutput {
                 ended()
                 if model.isPlaying { Playback.shared.setPlaying(true) }
             }
+        }
+    }
+
+    /// Right after a launch the server's list may still be coming: wait for it (at most half a minute), then connect.
+    private func waitForLibrary(groupID: String, controller: SonosController) {
+        connecting = true
+        note = "Loading your library…"
+        SonosLog.write("connect waits for the library")
+        Task {
+            for _ in 0..<60 {
+                guard case .loading = Library.shared.status else { break }
+                try? await Task.sleep(for: .milliseconds(500))
+            }
+            connecting = false
+            note = nil
+            if case .loading = Library.shared.status {
+                note = "Your library is still loading. Try again in a moment."
+                return
+            }
+            start(groupID: groupID, controller: controller)
         }
     }
 
@@ -331,9 +365,12 @@ final class SonosOutput {
 
     // MARK: The Mac's queue as the controller sees it (SonosLocalPlayer, through SonosBridge)
 
-    private func track(_ song: Song) -> SonosTrackInput {
+    private func track(_ queued: Song) -> SonosTrackInput {
         if tracksClient?.config != Library.shared.client?.config { tracks = [:]; tracksClient = Library.shared.client }
-        if let known = tracks[song.id] { return known }
+        // Always the library's newest copy: one kept in the queue from before the server's list came in has no server id.
+        let song = Library.shared.fresh(queued)
+        // A song without a stream is looked up again next time, once the server's list may be in.
+        if let known = tracks[song.id], known.streamURL != nil { return known }
         // Built once per song: the stream URL has a fresh salt each time, and the speaker compares it.
         let client = Library.shared.client
         let input = SonosTrackInput(id: song.id, title: song.title, artist: song.artist, album: song.album.title, durationMs: song.seconds * 1000,

@@ -175,6 +175,8 @@ final class Library {
     private(set) var sharedMixIDs: [String]?
     /// A server song's local copy, for playlists that should play from this Mac.
     private var localByServerID: [String: String] = [:]
+    /// Every song by its id, rebuilt with the library.
+    private var songByID: [String: Song] = [:]
 
     private static var today: Int { Calendar.current.ordinality(of: .day, in: .era, for: .now) ?? 1 }
     static let mixName = "Your Mix"
@@ -265,7 +267,13 @@ final class Library {
         albums.isEmpty ? Sample.albums[index % Sample.albums.count] : albums[index % albums.count]
     }
 
-    func song(id: String) -> Song? { songs.first { $0.id == id } }
+    func song(id: String) -> Song? { songByID[id] ?? songs.first { $0.id == id } }
+
+    /// The library's own, newest copy of a song: a song kept from before the server's list came in (the queue restored at
+    /// launch) then knows its server copy. A server song that now plays from a local copy becomes that copy.
+    func fresh(_ song: Song) -> Song {
+        songByID[song.id] ?? localByServerID[song.id].flatMap { songByID[$0] } ?? song
+    }
 
     init() {
         let env = ProcessInfo.processInfo.environment
@@ -273,7 +281,7 @@ final class Library {
             // A scripted run against a fake server: the login comes from the run, not the keychain.
             client = SubsonicClient(config: SubsonicConfig(server: url, user: env["PP_LIVE_USER"] ?? "test", password: env["PP_LIVE_PASSWORD"] ?? "test"))
             FavoritesSync.shared.use(account: "\(server)|test")
-            Task { await scanLocal(); await reload() }
+            Task { await loadServerCache(account: "\(server)|test"); await scanLocal(); await reload() }
         } else if Debug.active, env["PP_MUSIC_FOLDER"] != nil {
             // A scripted run against a music folder and no server: the live app as it is with only local files.
             Task { await scanLocal() }
@@ -282,7 +290,7 @@ final class Library {
         } else if let settings = ServerSettings.saved, let config = settings.config {
             client = SubsonicClient(config: config)
             FavoritesSync.shared.use(account: "\(settings.server)|\(settings.user)")
-            Task { await scanLocal(); await reload() }
+            Task { await loadServerCache(account: "\(settings.server)|\(settings.user)"); await scanLocal(); await reload() }
         } else if !Debug.active {
             Task { await scanLocal() }
         }
@@ -367,6 +375,7 @@ final class Library {
         guard let client else { status = .notConnected; return }
         Task { await loadAccount() }
         status = .loading("Loading your library")
+        let started = Date()
         do {
             var serverAlbums: [SubsonicAlbum] = []
             while true {
@@ -416,6 +425,8 @@ final class Library {
             _ = starred
             rebuild()
             status = .ready
+            SonosLog.write(String(format: "library ready: %d server songs in %.1f s", serverSongs.count, Date().timeIntervalSince(started)))
+            saveServerCache(account: client.config.server.absoluteString + "|" + client.config.user)
             await FavoritesSync.shared.sync()
             refreshDailyMix()
             await syncYourMix()
@@ -423,6 +434,59 @@ final class Library {
         } catch {
             status = .failed(error.localizedDescription)
         }
+    }
+
+    // MARK: The server's list on disk
+
+    /// The server's albums, songs and playlists from the last load, as the Android app keeps them in its database: read at
+    /// launch, before the local files, so every song knows its server copy from the first second instead of after the
+    /// whole library has been fetched again (Mark, 2026-11-26: the Sonos skipped through the queue right after a launch).
+    private struct ServerCache: Codable {
+        var account: String
+        var albums: [SubsonicAlbum]
+        var songs: [SubsonicSong]
+        var playlists: [SubsonicPlaylist]
+        var recent: [SubsonicAlbum]
+    }
+
+    private static var serverCacheURL: URL {
+        Debug.directory?.appendingPathComponent("server-library.json")
+            ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("PixelPlayer/server-library.json")
+    }
+
+    /// Only for the same server and account; read off the main thread.
+    private func loadServerCache(account: String) async {
+        guard serverSongs.isEmpty else { return }
+        let url = Self.serverCacheURL
+        let cache = await Task.detached { () -> ServerCache? in
+            guard let data = try? Data(contentsOf: url) else { return nil }
+            return try? JSONDecoder().decode(ServerCache.self, from: data)
+        }.value
+        guard let cache, Self.sameAccount(cache.account, account), serverSongs.isEmpty else { return }
+        serverAlbums = cache.albums
+        serverSongs = cache.songs
+        serverPlaylists = cache.playlists
+        serverRecent = cache.recent
+        SonosLog.write("library from disk: \(cache.songs.count) server songs")
+    }
+
+    private func saveServerCache(account: String) {
+        let cache = ServerCache(account: account, albums: serverAlbums, songs: serverSongs, playlists: serverPlaylists, recent: serverRecent)
+        let url = Self.serverCacheURL
+        Task.detached(priority: .utility) {
+            guard let data = try? JSONEncoder().encode(cache) else { return }
+            try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try? data.write(to: url, options: .atomic)
+        }
+    }
+
+    /// The saved login and the one in use name the same account, with or without http:// and a trailing slash.
+    private static func sameAccount(_ a: String, _ b: String) -> Bool {
+        func plain(_ text: String) -> String {
+            text.lowercased().replacingOccurrences(of: "https://", with: "").replacingOccurrences(of: "http://", with: "")
+                .replacingOccurrences(of: "/|", with: "|")
+        }
+        return plain(a) == plain(b)
     }
 
     /// Builds the one library: local files first, each knowing its server twin, and the server songs that have no local copy.
@@ -483,6 +547,7 @@ final class Library {
         hiddenServer = Dictionary(server.filter { hidden.contains($0.id) }.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         let visibleServer = server.filter { !hidden.contains($0.id) }
         songs = locals + visibleServer
+        songByID = Dictionary(songs.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         songKeys = localKeys + visibleServer.map { TrackKey(id: $0.id, title: $0.title, artist: $0.artist, album: $0.album.title,
                                                             durationMs: $0.seconds * 1000, serverID: $0.id) }
         // A server song with a local copy plays from the copy, also inside a playlist.
@@ -515,6 +580,7 @@ final class Library {
         playlistSongIDs = Set(playlists.flatMap { $0.songs.map(\.id) })
         collectionItems = LibraryItem.collections(of: self)
         PlayerModel.shared.restoreIfEmpty()
+        PlayerModel.shared.refreshFromLibrary()
     }
 
     /// The songs behind a place in the library, in the order its page shows them first.

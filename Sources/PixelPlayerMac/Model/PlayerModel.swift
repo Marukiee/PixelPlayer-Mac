@@ -292,6 +292,21 @@ final class PlayerModel {
         }
     }
 
+    /// After the library is rebuilt: the songs in the player become the library's newest copies, so a queue restored from
+    /// the local files alone learns where each song is on the server once that list is in (Mark, 2026-11-26: the Sonos
+    /// skipped through the whole queue because none of it seemed to be on the server). Only what changed is set, so the
+    /// phone and the speakers are not told about a queue that stayed the same.
+    func refreshFromLibrary() {
+        guard !current.id.isEmpty else { return }
+        let library = Library.shared
+        let freshCurrent = library.fresh(current)
+        if freshCurrent.id == current.id && freshCurrent.source.serverID != current.source.serverID { current = freshCurrent }
+        let freshUser = userQueue.map(library.fresh)
+        if freshUser.map(\.source.serverID) != userQueue.map(\.source.serverID) { userQueue = freshUser }
+        let freshNext = upNext.map(library.fresh)
+        if freshNext.map(\.source.serverID) != upNext.map(\.source.serverID) { upNext = freshNext }
+    }
+
     /// Which list of the library a set of songs is, in any order (sorted or shuffled).
     static func source(of context: [Song]) -> String {
         let ids = Set(context.map(\.id))
