@@ -149,6 +149,10 @@ final class PlayerModel {
         didSet { Playback.shared.setVolume(volume) }
     }
     var showQueue = false
+    /// Your Library folded away with the button that slides in at its title, as in Spotify. Remembered.
+    var libraryCollapsed = UserDefaults.standard.bool(forKey: "library.collapsed") {
+        didSet { UserDefaults.standard.set(libraryCollapsed, forKey: "library.collapsed") }
+    }
     var showDevices = false
     var fullPlayer = false
     var searchText = ""

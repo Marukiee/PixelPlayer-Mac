@@ -100,6 +100,9 @@ enum Debug {
         case "playsong":
             // `playsong:<title>` starts that song with the whole library after it.
             if let song = Library.shared.songs.first(where: { $0.title == value }) { model.play(song, in: Library.shared.songs) }
+        case "library":
+            // `library:folded` folds Your Library away, `library:open` brings it back (remembered, so end a run open).
+            withAnimation(Motion.panel) { model.libraryCollapsed = value == "folded" }
         case "playlist":
             // `playlist:<id>` presses the green button of that playlist, as on its tile on Home.
             if let list = Library.shared.playlists.first(where: { $0.id == value }) {

@@ -62,6 +62,8 @@ enum PP {
         appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? NSColor(hex: 0x060606, alpha: 1) : .clear
     })
     /// The queue column: the same as the sidebar beside the page, near black in dark and the sidebar's grey in light.
+    /// The panels in the sidebar (Home and Search, Your Library), as Spotify's: dark grey on the black window.
+    static let libraryPanel = adaptive(0xFFFFFF, 0x121212)
     static let panel = Color(nsColor: NSColor(name: nil) { appearance in
         NSColor(hex: appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? 0x060606 : 0xF0F0F2, alpha: 1)
     })

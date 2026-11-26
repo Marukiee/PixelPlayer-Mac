@@ -24,6 +24,8 @@ if [ "$MODE" = release ]; then
 fi
 # The title font (Figtree, SIL Open Font License), with its licence.
 cp -R Resources/Fonts "$APP/Contents/Resources/Fonts"
+# The sidebar icons, traced from Spotify by the SpotCopy session (only an outline path each).
+cp -R Resources/Icons "$APP/Contents/Resources/Icons"
 # The icon, drawn in code (scripts/make-icon.swift), in every size macOS asks for.
 ICONSET="$(mktemp -d)/AppIcon.iconset"
 mkdir -p "$ICONSET"

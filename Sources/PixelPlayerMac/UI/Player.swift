@@ -227,7 +227,7 @@ struct NowPlayingView: View {
         // One column, left aligned inside but in the middle of the window, as in Spotify; on a narrow window it fills it.
         .frame(maxWidth: 820, alignment: .leading)
         .padding(.horizontal, sidebarHidden ? 56 : 28)
-        .padding(.top, sidebarHidden ? 52 : 28)
+        .padding(.top, 28)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .ignoresSafeArea(.container, edges: .top)
         .background { CoverBackdrop(album: model.current.album).ignoresSafeArea(.all, edges: [.top, .bottom]) }
@@ -377,8 +377,7 @@ struct QueueInspector: View {
             }
             .transition(.opacity)
         }
-        .background(PP.panel.ignoresSafeArea())
-        .ignoresSafeArea(.container, edges: .top)
+        .background(PP.libraryPanel)
         .animation(Motion.fade, value: tab)
     }
 
@@ -400,7 +399,7 @@ struct QueueInspector: View {
             }
         }
         .padding(.leading, 20).padding(.trailing, 12)
-        .padding(.top, 24)
+        .padding(.top, 10)
         .padding(.bottom, 10)
     }
 

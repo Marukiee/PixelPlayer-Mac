@@ -109,6 +109,20 @@ final class Library {
         }
     }
 
+    /// A new, empty playlist on Navidrome, from the plus beside Your Library.
+    func createPlaylist(named name: String) async {
+        guard let client else { return }
+        do {
+            try await client.createPlaylist(name: name, songIDs: [])
+            var lists: [SubsonicPlaylist] = []
+            for list in try await client.playlists() { lists.append((try? await client.playlist(id: list.id)) ?? list) }
+            serverPlaylists = lists
+            rebuild()
+        } catch {
+            status = .failed(error.localizedDescription)
+        }
+    }
+
     /// A new playlist on Navidrome with this song in it.
     func createPlaylist(named name: String, with song: Song) async {
         guard let client, let serverID = song.source.serverID else { return }
@@ -232,7 +246,7 @@ final class Library {
 
     /// "12 songs, 1 hr 4 min", as Spotify writes it.
     static func summary(_ songs: [Song]) -> String {
-        "\(songCount(songs.count)), \(duration(songs.reduce(0) { $0 + $1.seconds }))"
+        songs.isEmpty ? songCount(0) : "\(songCount(songs.count)), \(duration(songs.reduce(0) { $0 + $1.seconds }))"
     }
 
     /// "1 hr 4 min", or "38 min 12 sec" under an hour, as on Spotify's list pages.

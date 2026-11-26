@@ -28,6 +28,9 @@ Alles wat Mark vroeg, met wat klaar is en wat nog moet. Bijgewerkt bij elke rond
 - Home-tegels zoals Spotify: 47 hoog, vet, lichter grijs, artiest vierkant, groene balkjes als hij speelt.
 - Lijstpagina's: genre-chips uit de eigen tags (filteren), zoeken in de lijst, Sort by plus View as in een menu, download-icoon groen gevuld als alles lokaal staat.
 - Wachtrij exact als Spotify: Now playing als gewone rij (titel groen), koppen vet wit, Next from:, hover met grijs, play op de hoes en drie puntjes, geen speelduur.
+- Venster zoals Spotify: zwarte bovenbalk met pijltjes, Home en zoekbalk; drie afgeronde panelen; speler blijft zweven.
+- Your Library zoals Spotify: inklapknop schuift in bij hover, plus, breder maken, chips, vergrootglas naar zoekpagina, Recents-menu (Sort by, View as in vier soorten), ingeklapt een strook met hoezen, sleepbaar.
+- Open: inklap-animatie nog afstemmen op de echte (Mark moet in de browser inloggen op open.spotify.com).
 
 ## In 0.2.7 (uitgebracht)
 
