@@ -311,7 +311,33 @@ final class Library {
         recentSearches = Sample.recentSearches
         collectionItems = LibraryItem.collections(of: self)
         recentAlbums = Sample.albums
+        // A scripted run can show an account: PP_ACCOUNT=<user name>.
+        account = ProcessInfo.processInfo.environment["PP_ACCOUNT"].map { SubsonicUser(username: $0) }
         status = .sample
+    }
+
+    /// The account signed in on the server, and its photo when it has a real one. Likes, playlists and plays belong to it,
+    /// so everyone with their own account keeps their own.
+    var account: SubsonicUser?
+    var avatar: NSImage?
+
+    func loadAccount() async {
+        guard let client else { account = nil; avatar = nil; return }
+        account = (try? await client.account()) ?? SubsonicUser(username: client.config.user)
+        avatar = await Self.photo(from: client.avatarURL())
+    }
+
+    /// Only a real photo. Navidrome sends a stand-in of its own unless its admin turned on Gravatar; then it sends the
+    /// Gravatar of the account's email, asked again here with d=404 so an email without one gives no picture rather than
+    /// Gravatar's logo.
+    nonisolated static func photo(from url: URL) async -> NSImage? {
+        guard let (_, response) = try? await URLSession.shared.data(for: URLRequest(url: url, timeoutInterval: 8)),
+              let final = response.url, final.host?.contains("gravatar") == true,
+              var parts = URLComponents(url: final, resolvingAgainstBaseURL: false) else { return nil }
+        parts.queryItems = (parts.queryItems ?? []).filter { $0.name != "d" } + [URLQueryItem(name: "d", value: "404")]
+        guard let gravatar = parts.url, let (data, answer) = try? await URLSession.shared.data(from: gravatar),
+              (answer as? HTTPURLResponse)?.statusCode == 200 else { return nil }
+        return NSImage(data: data)
     }
 
     /// Tries the server and, when it answers, keeps the settings and loads the library.
@@ -339,6 +365,7 @@ final class Library {
     /// Reads the whole library from the server. Only reads: nothing on the server changes here.
     func reload() async {
         guard let client else { status = .notConnected; return }
+        Task { await loadAccount() }
         status = .loading("Loading your library")
         do {
             var serverAlbums: [SubsonicAlbum] = []

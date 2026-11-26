@@ -147,6 +147,23 @@ public struct SubsonicStructuredLyrics: Codable, Sendable, Hashable {
     public var line: [Line]?
 }
 
+/// The account that is signed in (getUser). Each person on the server has their own: likes (stars), playlists and plays.
+public struct SubsonicUser: Codable, Sendable, Hashable {
+    public var username: String
+    public var email: String?
+
+    public init(username: String, email: String? = nil) {
+        self.username = username
+        self.email = email
+    }
+
+    /// A name to greet with: the user name up to its first dot, dash, underscore or space, with a capital ("mark.d" is "Mark").
+    public var firstName: String {
+        let first = username.split(whereSeparator: { ".-_ @".contains($0) }).first.map(String.init) ?? username
+        return first.prefix(1).uppercased() + first.dropFirst()
+    }
+}
+
 /// The older getLyrics: one block of text found by artist and title.
 public struct SubsonicLyrics: Codable, Sendable, Hashable {
     public var artist: String?
@@ -316,6 +333,15 @@ public struct SubsonicClient: Sendable {
     public func lyrics(artist: String, title: String) async throws -> SubsonicLyrics {
         try await get("getLyrics", [.init(name: "artist", value: artist), .init(name: "title", value: title)], key: "lyrics", as: SubsonicLyrics.self)
     }
+
+    /// Who is signed in, as the server knows the account. Only reads.
+    public func account() async throws -> SubsonicUser {
+        try await get("getUser", [.init(name: "username", value: config.user)], key: "user", as: SubsonicUser.self)
+    }
+
+    /// The account's picture (getAvatar). Navidrome sends the Gravatar of the account's email when its admin turned that on,
+    /// otherwise a stand-in of its own.
+    public func avatarURL() -> URL { url("getAvatar", [.init(name: "username", value: config.user)]) }
 
     public func streamURL(id: String) -> URL { url("stream", [.init(name: "id", value: id)]) }
 

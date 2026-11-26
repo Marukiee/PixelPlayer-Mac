@@ -117,11 +117,71 @@ struct TopBar: View {
                     .frame(maxWidth: 356)
             }
             .padding(.horizontal, 160)
+            HStack(spacing: 0) {
+                Spacer(minLength: 0)
+                ProfileButton().padding(.trailing, 6)
+            }
         }
         // As tall as the band the traffic lights are moved into, so all of them share one centre line.
         .frame(height: TrafficLights.band)
         .frame(maxWidth: .infinity)
         .background(TrafficLightsPlacer().frame(width: 0, height: 0))
+    }
+}
+
+/// The account in a round button at the right of the band, as Spotify's (measured: 48 px round in #1F1F1F with a 32 px
+/// picture, 8 px from the edge; here at the band's 0.75). A click says who is signed in and opens the settings.
+struct ProfileButton: View {
+    @Environment(PlayerModel.self) private var model
+    @LocalState private var hovering = false
+
+    var body: some View {
+        let account = Library.shared.account
+        Menu {
+            Text(account.map { "Signed in as \($0.username)" } ?? "Not signed in")
+            Divider()
+            Button(account == nil ? "Connect to Navidrome…" : "Account…") { open(.sources) }
+            Button("Settings…") { open(.general) }
+        } label: {
+            AccountPicture(size: 24)
+                .frame(width: 36, height: 36)
+                .background(Circle().fill(hovering ? PP.fieldHover : PP.field))
+                .scaleEffect(hovering ? 1.04 : 1)
+                .contentShape(Circle())
+        }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .onHover { hovering = $0 && !Debug.active }
+        .animation(.easeInOut(duration: 0.2 * Motion.slow), value: hovering)
+        .help(account?.username ?? "Account")
+    }
+
+    private func open(_ tab: SettingsTab) {
+        model.settingsTab = tab
+        model.settingsRequest += 1
+    }
+}
+
+/// The account's photo when the server has a real one, otherwise its first letter on a colour, as Spotify shows an account
+/// without a photo. The colour comes from the name, so it stays the same.
+struct AccountPicture: View {
+    let size: CGFloat
+    private static let colours: [UInt32] = [0xF59B23, 0x509BF5, 0xAF2896, 0x1ED760, 0xE8115B, 0x27856A, 0xE1118C]
+
+    var body: some View {
+        if let photo = Library.shared.avatar {
+            Image(nsImage: photo).resizable().scaledToFill().frame(width: size, height: size).clipShape(Circle())
+        } else {
+            let name = Owner.firstName
+            let colour = Self.colours[name.unicodeScalars.reduce(0) { $0 + Int($1.value) } % Self.colours.count]
+            Text(String(name.prefix(1)).uppercased())
+                .font(.mix(size * 0.55, .bold))
+                .foregroundStyle(.black)
+                .frame(width: size, height: size)
+                .background(Circle().fill(Color(hex: colour)))
+        }
     }
 }
 

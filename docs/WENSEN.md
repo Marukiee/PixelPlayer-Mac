@@ -49,6 +49,9 @@ Alles wat Mark vroeg, met wat klaar is en wat nog moet. Bijgewerkt bij elke rond
 - Lettertype Mix (Spotify's eigen letter) via Instellingen › Appearance › Font: Import Font… slikt de zip, de map of losse bestanden, ook door te slepen; Get the Font en Use Default. Niet in de repo of de release; zonder import Figtree en de systeemletter. Vervangt de tabel per letter hierboven.
 - Mix zoals Spotify het tekent: 0,967 zo breed (SpotifyMixUI), titels 0,015 em (800) en 0,019 em (700) krapper; per onderdeel Spotify's dikte (400, 700, 800) en maat, tracklijst en pagina's op Spotify's maat (titel 16, tweede regel 14, koppen 24).
 - Songtekst eerst van LRCLIB zoals de Android-app, op duur gekozen; daarna het bestand en Navidrome.
+- Home: Your Mix als kop zoals een playlist (variant A), kleur uit de hoezen, dezelfde hoezen als de tegel; collages met vier verschillende hoezen.
+- Naam uit het Navidrome-account ("Made for ..."), geen naam in de code; profielknop rechtsboven met foto (Gravatar via Navidrome) of letter.
+- Shuffle-icoon hetzelfde als in de Android-app.
 
 ## In 0.2.7 (uitgebracht)
 

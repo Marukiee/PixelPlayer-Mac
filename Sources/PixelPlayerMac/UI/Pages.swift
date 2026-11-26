@@ -85,23 +85,15 @@ struct HomePage: View {
     }
 
     var body: some View {
-        let style = HeroStyle.chosen
         ScrollView {
             VStack(alignment: .leading, spacing: 36) {
-                switch style {
-                case .current: MixHero()
-                case .header: MixHeader()
-                case .card: MixCard()
-                case .shelf: EmptyView()
-                }
+                MixHeader()
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: width > 940 ? 4 : 2), spacing: 8) {
                     ForEach(quick) { QuickTile(item: $0) }
                 }
                 .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
-                if style == .shelf {
-                    MadeForShelf()
-                } else if !Shelves.items("mixes").isEmpty {
-                    // A shelf with nothing on it is left out.
+                // A shelf with nothing on it is left out.
+                if !Shelves.items("mixes").isEmpty {
                     Shelf(title: Shelves.title("mixes"), showAll: .shelf("mixes")) {
                         FittingRow(items: Shelves.items("mixes"), minWidth: 160) { ShelfCell(item: $0) }
                     }
@@ -117,40 +109,11 @@ struct HomePage: View {
             .padding(.horizontal, margin)
             .padding(.top, margin)
             .padding(.bottom, 24)
-            // Variant A: the covers' colour behind the top of the page, edge to edge, fading into it.
-            .background(alignment: .top) {
-                if style == .header { MixWash().frame(height: 380) }
-            }
+            // The covers' colour behind the top of the page, edge to edge, fading into it.
+            .background(alignment: .top) { MixWash().frame(height: 380) }
         }
         // The same margin above as at the sides, whatever the title bar's safe area is at that moment.
         .ignoresSafeArea(.container, edges: .top)
-    }
-}
-
-/// Your Mix across the whole width, so nothing beside it has to match its height.
-struct MixHero: View {
-    var body: some View {
-        HStack(alignment: .center, spacing: 28) {
-            Collage(albums: [Library.shared.album(at: 0), Library.shared.album(at: 2), Library.shared.album(at: 4), Library.shared.album(at: 1)], radius: 8)
-                .frame(width: 184, height: 184)
-                .shadow(color: .black.opacity(0.3), radius: 16, y: 8)
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Made for \(Owner.firstName)").font(.mix(14)).foregroundStyle(.white.opacity(0.8))
-                TitleFont.text("Your Mix", size: 52).foregroundStyle(.white)
-                Text(Library.shared.yourMixSummary).foregroundStyle(.white.opacity(0.8)).lineLimit(1)
-                Spacer(minLength: 8)
-                HStack(spacing: 18) {
-                    PlayCircle(title: "Your Mix", songs: { Library.shared.yourMix })
-                    PlainIconButton(symbol: "shuffle", label: "Shuffle", onColour: true) { PlayerModel.shared.play(Library.shared.yourMix, shuffled: true) }
-                    RoundMenu(songs: Library.shared.yourMix, share: "Your Mix: \(Library.shared.yourMixSummary)", onColour: true)
-                }
-            }
-            .frame(height: 184)
-            Spacer(minLength: 0)
-        }
-        .padding(24)
-        .background(LinearGradient(colors: [Color(hex: 0x23408F), Color(hex: 0x5B2A86)], startPoint: .topLeading, endPoint: .bottomTrailing),
-                    in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 }
 
@@ -522,9 +485,12 @@ struct TrackHeader {
 
 /// Whose music this is, for the lists the app makes ("Made for Mark"), as Spotify and SpotCopy name them. SpotCopy asks at
 /// the first start; the Mac knows the name of whoever is logged in.
+@MainActor
 enum Owner {
+    /// Never a name in the code: the Navidrome account's, otherwise the first name of this Mac's user.
     static var firstName: String {
         if let set = UserDefaults.standard.string(forKey: "owner.name"), !set.isEmpty { return set }
+        if let account = Library.shared.account { return account.firstName }
         return NSFullUserName().split(separator: " ").first.map(String.init) ?? "you"
     }
 }
