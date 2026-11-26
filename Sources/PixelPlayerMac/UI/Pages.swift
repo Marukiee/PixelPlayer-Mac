@@ -504,13 +504,21 @@ struct TrackListPage: View {
     @LocalState private var width: CGFloat = 900
     /// List rows with covers, or compact lines without them (View as, as in Spotify). Remembered for every list.
     @AppStorage("tracks.view") private var viewMode = "list"
+    /// A genre chip that filters the list, and the search in it, as on Spotify's Liked Songs.
+    @LocalState private var genre: String?
+    @LocalState private var filterText = ""
+    @LocalState private var searching = false
 
     var body: some View {
         let wide = width > 760
         let compact = viewMode == "compact"
         let order = model.trackOrders[model.route] ?? firstOrder
         let reversed = model.trackReversed[model.route] ?? false
-        let songs = showSort ? order.sorted(self.songs, reversed: reversed, fields: \.orderFields) : self.songs
+        let sorted = showSort ? order.sorted(self.songs, reversed: reversed, fields: \.orderFields) : self.songs
+        // What a genre chip and the search leave of it; play and shuffle take that part, as on Spotify.
+        let songs = sorted.filter { song in
+            (genre.map { song.genres.contains($0) } ?? true) && (filterText.isEmpty || song.matches(filterText))
+        }
         // As on Spotify, the cover grows with the page, at the size Mark sees Spotify: his runs zoomed to three quarters, so
         // its 128 to 232 pixels are 96 to 174 points here (measured against his screenshots side by side).
         let zoom: CGFloat = 0.75
@@ -566,13 +574,26 @@ struct TrackListPage: View {
                 HStack(spacing: 18) {
                     PlayCircle(title: header.title, songs: { songs })
                     PlainIconButton(symbol: "shuffle", label: "Shuffle") { PlayerModel.shared.play(songs, shuffled: true) }
+                    DownloadedMark(songs: self.songs)
                     RoundMenu(songs: songs, share: share)
                     Spacer()
-                    // How the list looks; sorting is done with the column titles below, as in Spotify.
-                    ViewAsMenu(viewMode: $viewMode)
+                    ListSearch(text: $filterText, open: $searching, placeholder: "Search in \(header.kind.lowercased())")
+                    // Sort by and View as in one menu, as in Spotify; the column titles sort too.
+                    ViewAsMenu(viewMode: $viewMode, orders: showSort ? orders : [], order: order) { key in
+                        withAnimation(Motion.panel) {
+                            model.trackOrders[model.route] = key
+                            model.trackReversed[model.route] = false
+                        }
+                    }
                 }
                 .padding(.horizontal, margin)
-                .padding(.vertical, 24)
+                .padding(.top, 24)
+                .padding(.bottom, genres.count > 1 ? 16 : 24)
+                if genres.count > 1 {
+                    GenreChips(genres: genres, chosen: $genre)
+                        .padding(.horizontal, margin)
+                        .padding(.bottom, 14)
+                }
                 TrackColumns(showAlbum: showAlbum, showAdded: showAdded && wide, compact: compact,
                              order: showSort ? order : nil, reversed: reversed) { key in
                     withAnimation(Motion.panel) { model.sortTracks(by: key, current: order, default: firstOrder) }
@@ -585,6 +606,9 @@ struct TrackListPage: View {
                     ForEach(Array(songs.enumerated()), id: \.element.id) { index, song in
                         TrackRow(index: index + 1, song: song, context: songs, showAlbum: showAlbum, showAdded: showAdded && wide, showCover: showCover,
                                  compact: compact)
+                    }
+                    if songs.isEmpty && (genre != nil || !filterText.isEmpty) {
+                        Text("No songs match").font(.callout).foregroundStyle(.secondary).padding(.vertical, 32)
                     }
                 }
                 .padding(.horizontal, margin - 12)
@@ -678,11 +702,21 @@ private struct SortHeader: View {
 /// View as, as in Spotify: List (rows with covers) or Compact (plain lines), in a small grey menu.
 struct ViewAsMenu: View {
     @Binding var viewMode: String
+    /// The orders it offers under Sort by; none where the list keeps its own order (an album).
+    var orders: [TrackOrder] = []
+    var order: TrackOrder = .custom
+    var onSort: (TrackOrder) -> Void = { _ in }
     @LocalState private var hovering = false
 
     var body: some View {
         let compact = viewMode == "compact"
         Menu {
+            if !orders.isEmpty {
+                Picker("Sort by", selection: Binding(get: { order }, set: { onSort($0) })) {
+                    ForEach(orders, id: \.self) { Text($0.label).tag($0) }
+                }
+                .pickerStyle(.inline)
+            }
             Picker("View as", selection: $viewMode) {
                 Label { Text("Compact") } icon: { Image(nsImage: GlyphImage.compactView) }.tag("compact")
                 Label { Text("List") } icon: { Image(nsImage: GlyphImage.listView) }.tag("list")
@@ -690,7 +724,8 @@ struct ViewAsMenu: View {
             .pickerStyle(.inline)
         } label: {
             HStack(spacing: 8) {
-                Text(compact ? "Compact" : "List").font(.callout.weight(.medium))
+                // As on Spotify: the order the list is in, or how it looks where it cannot be sorted.
+                Text(orders.isEmpty ? (compact ? "Compact" : "List") : order.label).font(.callout.weight(.medium))
                 ViewModeGlyph(compact: compact)
                     .stroke(style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
                     .frame(width: 15, height: 12)
@@ -1088,6 +1123,172 @@ struct ShelfPage: View {
         }
         // The same margin above as at the sides, whatever the title bar's safe area is at that moment.
         .ignoresSafeArea(.container, edges: .top)
+    }
+}
+
+extension Song {
+    /// The genres in the song's tags; several in one tag are split at a semicolon, comma or bar.
+    var genres: [String] {
+        album.genre.split(whereSeparator: { ";,|".contains($0) }).map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+    }
+
+    /// Whether the search in a list finds it: in the title, the artist or the album.
+    func matches(_ text: String) -> Bool {
+        title.localizedCaseInsensitiveContains(text) || artist.localizedCaseInsensitiveContains(text) || album.title.localizedCaseInsensitiveContains(text)
+    }
+}
+
+extension TrackListPage {
+    /// The genres in the list from the songs' own tags, the one with most songs first.
+    fileprivate var genres: [String] {
+        var counts: [String: Int] = [:]
+        for song in songs { for genre in song.genres { counts[genre, default: 0] += 1 } }
+        return counts.sorted { $0.value != $1.value ? $0.value > $1.value : $0.key < $1.key }.prefix(30).map(\.key)
+    }
+}
+
+/// Spotify's download button, filled green: every song in the list is on this Mac. Empty and grey while some still come
+/// from the server only.
+struct DownloadedMark: View {
+    let songs: [Song]
+
+    var body: some View {
+        let streaming = songs.filter { !$0.isLocal }.count
+        Group {
+            if streaming == 0 && !songs.isEmpty {
+                Image(systemName: "arrow.down.circle.fill")
+                    .symbolRenderingMode(.palette)
+                    .foregroundStyle(Color.black, PP.primary)
+            } else {
+                Image(systemName: "arrow.down.circle").foregroundStyle(PP.icon)
+            }
+        }
+        .font(.system(size: 27, weight: .light))
+        .frame(width: 36, height: 56)
+        .help(streaming == 0 ? "Downloaded: every song is on this Mac" : streaming == 1 ? "1 song plays from your server" : "\(streaming) songs play from your server")
+    }
+}
+
+/// The magnifier beside the sort menu: it opens a field that searches the list, as on Spotify. Esc or the magnifier again
+/// closes it and shows the whole list.
+struct ListSearch: View {
+    @Binding var text: String
+    @Binding var open: Bool
+    var placeholder = "Search in playlist"
+    @FocusState private var focused: Bool
+    @LocalState private var hovering = false
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Button {
+                withAnimation(Motion.panel) { open.toggle() }
+                if open { focused = true } else { text = "" }
+            } label: {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(hovering || open ? PP.iconHover : PP.icon)
+                    .frame(width: 30, height: 30)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .onHover { hovering = $0 }
+            .help(open ? "Close search" : placeholder)
+            if open {
+                TextField(placeholder, text: $text)
+                    .textFieldStyle(.plain)
+                    .font(.callout)
+                    .frame(width: 170)
+                    .focused($focused)
+                    .onExitCommand { withAnimation(Motion.panel) { open = false }; text = "" }
+                    .transition(.move(edge: .leading).combined(with: .opacity))
+            }
+        }
+        .padding(.trailing, open ? 10 : 0)
+        .background(RoundedRectangle(cornerRadius: 4, style: .continuous).fill(Color.primary.opacity(open ? 0.1 : 0)))
+    }
+}
+
+/// The genres of a list as chips that filter it, as on Spotify's Liked Songs: one tap filters, a second shows all again.
+/// When they do not fit they scroll sideways, with a round white arrow at the end and the last chip fading out.
+struct GenreChips: View {
+    let genres: [String]
+    @Binding var chosen: String?
+    @LocalState private var position = ScrollPosition(edge: .leading)
+    @LocalState private var offset: CGFloat = 0
+    @LocalState private var overflow: CGFloat = 0
+
+    var body: some View {
+        let more = offset < overflow - 1, back = offset > 1
+        ScrollView(.horizontal) {
+            HStack(spacing: 6) {
+                ForEach(genres, id: \.self) { genre in
+                    GenreChip(title: genre, chosen: chosen == genre) {
+                        withAnimation(Motion.fade) { chosen = chosen == genre ? nil : genre }
+                    }
+                }
+            }
+        }
+        .scrollIndicators(.never)
+        .scrollPosition($position)
+        .onScrollGeometryChange(for: [CGFloat].self) { [$0.contentOffset.x, $0.contentSize.width - $0.containerSize.width] } action: { _, value in
+            offset = value[0]; overflow = value[1]
+        }
+        .mask {
+            HStack(spacing: 0) {
+                LinearGradient(colors: [.black.opacity(back ? 0 : 1), .black], startPoint: .leading, endPoint: .trailing).frame(width: 60)
+                Color.black
+                LinearGradient(colors: [.black, .black.opacity(more ? 0 : 1)], startPoint: .leading, endPoint: .trailing).frame(width: 60)
+            }
+        }
+        .overlay(alignment: .leading) {
+            if back { ScrollArrow(forward: false) { withAnimation(Motion.panel) { position.scrollTo(x: max(0, offset - 320)) } } }
+        }
+        .overlay(alignment: .trailing) {
+            if more { ScrollArrow(forward: true) { withAnimation(Motion.panel) { position.scrollTo(x: min(overflow, offset + 320)) } } }
+        }
+        .animation(Motion.fade, value: more)
+        .animation(Motion.fade, value: back)
+    }
+}
+
+private struct GenreChip: View {
+    let title: String
+    let chosen: Bool
+    let action: () -> Void
+    @LocalState private var hovering = false
+
+    var body: some View {
+        Text(title)
+            .font(.system(size: 12))
+            .foregroundStyle(chosen ? Color.black : Color.primary)
+            .padding(.horizontal, 10)
+            .frame(height: 26)
+            .background(Capsule().fill(chosen ? AnyShapeStyle(Color.white) : AnyShapeStyle(Color.primary.opacity(hovering ? 0.16 : 0.1))))
+            .contentShape(Capsule())
+            .onTapGesture(perform: action)
+            .onHover { hovering = $0 }
+            .animation(Motion.fade, value: hovering)
+    }
+}
+
+/// The round white button with an arrow at the end of a row that scrolls sideways, as on Spotify.
+struct ScrollArrow: View {
+    let forward: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: forward ? "chevron.right" : "chevron.left")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(Color.black)
+                .frame(width: 26, height: 26)
+                .background(Circle().fill(Color.white))
+                .shadow(color: .black.opacity(0.35), radius: 6, y: 2)
+                .contentShape(Circle())
+        }
+        .buttonStyle(PressStyle())
+        .transition(.opacity)
+        .help(forward ? "More" : "Back")
     }
 }
 
