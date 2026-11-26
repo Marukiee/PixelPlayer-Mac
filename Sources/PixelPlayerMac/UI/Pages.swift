@@ -177,7 +177,7 @@ struct GreenPlayButton: View {
                 .contentShape(Circle())
         }
         .buttonStyle(PressStyle())
-        .scaleEffect(hovering ? 1.05 : 1)
+        .scaleEffect(hovering ? 1.04 : 1)
         .onHover { hovering = $0 }
         .animation(Motion.fade, value: hovering)
         .help(playing ? "Pause \(label)" : "Play \(label)")
@@ -319,7 +319,10 @@ struct QuickTile: View {
     var body: some View {
         let active = model.isPlaying(from: item.title) { Library.shared.songs(for: item.route) }
         HStack(spacing: 8) {
-            ArtworkView(art: item.art, radius: 0)
+            // Square for an artist too, as Spotify's shortcuts are.
+            Group {
+                if case .artist(let album) = item.art { CoverArt(album: album, radius: 0) } else { ArtworkView(art: item.art, radius: 0) }
+            }
                 .frame(width: 47, height: 47)
             Text(item.title).fontWeight(.bold).lineLimit(2)
             Spacer(minLength: 10)
@@ -438,6 +441,7 @@ struct CoverCell: View {
                         .opacity(showButton ? 1 : 0)
                         .offset(y: showButton ? 0 : 8)
                         .allowsHitTesting(showButton)
+                        .animation(Motion.card, value: showButton)
                     }
                 }
             VStack(alignment: round ? .center : .leading, spacing: 2) {
@@ -455,7 +459,6 @@ struct CoverCell: View {
         .contentShape(Rectangle())
         .onHover { hovering = $0 && !Debug.active }
         .onAppear { if Debug.hovered(title) { hovering = true } }
-        .animation(Motion.fade, value: hovering)
     }
 }
 
@@ -878,7 +881,7 @@ struct TrackRow: View {
                 showPlaylists = true
             }
         }
-        .animation(Motion.fade, value: hovering)
+        .animation(nil, value: hovering)
         .contextMenu { SongMenu(song: song) }
     }
 }

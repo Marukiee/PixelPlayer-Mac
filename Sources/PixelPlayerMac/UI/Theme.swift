@@ -132,8 +132,10 @@ enum Motion {
     static var lens: Animation { .spring(response: 0.4 * slow, dampingFraction: 0.76) }
     /// What the pointer sets going.
     static var hover: Animation { .spring(response: 0.24 * slow, dampingFraction: 0.74) }
-    /// Colour and opacity only.
-    static var fade: Animation { .easeOut(duration: 0.2 * slow) }
+    /// Colour, opacity and small presses, as Spotify's buttons and chips (open.spotify.com: 0.15 s, cubic-bezier(0.3, 0, 0, 1)).
+    static var fade: Animation { .timingCurve(0.3, 0, 0, 1, duration: 0.15 * slow) }
+    /// The play button rising on a card, as Spotify's (0.3 s, the browser's own ease).
+    static var card: Animation { .timingCurve(0.25, 0.1, 0.25, 1, duration: 0.3 * slow) }
 }
 
 let pressedScale: CGFloat = 0.96

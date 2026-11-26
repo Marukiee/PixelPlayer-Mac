@@ -4,7 +4,6 @@ Alles wat Mark vroeg, met wat klaar is en wat nog moet. Bijgewerkt bij elke rond
 `ROADMAP.md`.
 
 ## Nog te doen
-- Uit de Android-sessie (MARK-FEEDBACK.md, 2026-11-26), ook voor de Mac: recente zoekopdrachten op de zoekpagina zoals Spotify; nummermenu in Marks volgorde (Add to Liked Songs met Liked-hoesje, Add to playlist, Add to queue, Go to album, Go to artist, Share, Sleep timer) met een echte slaaptimer; shuffle op een lijst als schakelaar met groen bolletje zonder dat het icoon verschuift.
 
 - **Sonos wisselt snel door veel nummers bij verbinden.** Serverbibliotheek laadt goed (970 nummers); hi-res wordt nu omgezet voor Sonos (waarschijnlijke oorzaak); logboek in 0.2.3 om het zeker te weten.
 - **Apps laten samenwerken.** Mac en Android zien wat er op een Sonos-speaker speelt en kunnen het pauzeren; overnemen met een vraag; meerdere mensen in huis (eigen Navidrome-account). Voorstel, nog niet gebouwd.
@@ -32,6 +31,9 @@ Alles wat Mark vroeg, met wat klaar is en wat nog moet. Bijgewerkt bij elke rond
 - Venster zoals Spotify: zwarte bovenbalk met pijltjes, Home en zoekbalk; drie afgeronde panelen; speler blijft zweven.
 - Your Library zoals Spotify: inklapknop schuift in bij hover, plus, breder maken, chips, vergrootglas naar zoekpagina, Recents-menu (Sort by, View as in vier soorten), ingeklapt een strook met hoezen, sleepbaar.
 - Zoeken ongevoelig voor accenten (stenstrom vindt Stenström), ook in lijsten.
+- Recent searches op de zoekpagina (zoals SpotCopy), nummermenu in Marks volgorde met echte slaaptimer (maan in de speler), shuffle werkt echt en is op lijsten een schakelaar met bolletje.
+- Wachtrij slepen: groen lijntje waar het landt, klein sleepbeeld, korte beweging bij neerzetten.
+- Animaties op Spotify's maat (gemeten): knoppen en chips 0,15 s, play op kaarten 0,3 s omhoog, rijen direct, wachtrij direct open en dicht; bibliotheek sorteert niet meer bij elke hover.
 - Inklappen gemeten op open.spotify.com: kop schuift 0,1 s, icoon volgt na 0,1 s (eruit andersom); in- en uitklappen zelf zonder animatie; strook 72 px met hoezen van 48.
 
 ## In 0.2.7 (uitgebracht)

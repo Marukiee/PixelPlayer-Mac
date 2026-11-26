@@ -71,7 +71,8 @@ struct PlayerSideButtons: View {
             BarIcon(symbol: RemoteController.shared.isActive ? "iphone" : "hifispeaker", label: "Connect · \(model.groupName)", active: model.showDevices || !model.group.isEmpty || RemoteController.shared.isActive || SonosOutput.shared.controlsPlayback) { model.showDevices.toggle() }
                 .popover(isPresented: $model.showDevices, arrowEdge: .top) { DevicesPopover() }
             BarIcon(symbol: "list.bullet", label: "Up Next", active: model.showQueue) {
-                withAnimation(Motion.panel) { model.showQueue.toggle() }
+                // At once, as Spotify opens its queue.
+                model.showQueue.toggle()
             }
             if volume { BarVolume().padding(.horizontal, 4) }
             BarIcon(symbol: "arrow.up.left.and.arrow.down.right", label: "Full screen") { model.setFullScreen(true) }
@@ -386,6 +387,9 @@ struct FullScreenPlayer: View {
 struct QueueInspector: View {
     @Environment(PlayerModel.self) private var model
     @LocalState private var tab: Tab = .upNext
+    /// Where a dragged song would land, for the green line Spotify shows there: "user:<id>" or "next:<id>" before that
+    /// song, "user:end" or "next:end" at the end of that part.
+    @LocalState private var dropTarget: String?
 
     enum Tab: String, CaseIterable, Identifiable {
         case upNext = "Queue", history = "Recently played"
@@ -421,7 +425,7 @@ struct QueueInspector: View {
                     }
                     .disabled(model.userQueue.isEmpty && model.upNext.isEmpty)
                 }
-                BarIcon(symbol: "xmark", label: "Close") { withAnimation(Motion.panel) { model.showQueue = false } }
+                BarIcon(symbol: "xmark", label: "Close") { model.showQueue = false }
             }
         }
         .padding(.leading, 20).padding(.trailing, 12)
@@ -436,8 +440,11 @@ struct QueueInspector: View {
         // with the same animation as everything else. Drag a song onto another to put it there.
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 2) {
-                QueueHeading(text: "Now playing")
-                NowPlayingCard()
+                // Nothing to show until something plays, as in Spotify.
+                if !model.current.id.isEmpty {
+                    QueueHeading(text: "Now playing")
+                    NowPlayingCard()
+                }
                 if !model.userQueue.isEmpty {
                     QueueHeading(text: "Next in queue") {
                         ShowAllButton(title: "Clear") { withAnimation(Motion.panel) { model.userQueue = [] } }
@@ -445,17 +452,23 @@ struct QueueInspector: View {
                     }
                     ForEach(model.userQueue) { song in
                         QueueRow(song: song) { remove(song, from: \.userQueue) }
-                            .draggable("user:" + song.id)
+                            .draggable("user:" + song.id) { QueueDragPreview(song: song) }
                             .dropDestination(for: String.self) { items, _ in move(items.first, before: song, in: \.userQueue) }
+                                isTargeted: { target("user:" + song.id, $0) }
+                            .overlay(alignment: .top) { DropLine(visible: dropTarget == "user:" + song.id) }
                     }
+                    dropEnd("user:end", list: \.userQueue)
                 }
                 if !model.upNext.isEmpty {
                     QueueHeading(text: model.playingFrom.isEmpty ? "Next up" : "Next from: \(model.playingFrom)")
                     ForEach(model.upNext) { song in
                         QueueRow(song: song) { remove(song, from: \.upNext) }
-                            .draggable("next:" + song.id)
+                            .draggable("next:" + song.id) { QueueDragPreview(song: song) }
                             .dropDestination(for: String.self) { items, _ in move(items.first, before: song, in: \.upNext) }
+                                isTargeted: { target("next:" + song.id, $0) }
+                            .overlay(alignment: .top) { DropLine(visible: dropTarget == "next:" + song.id) }
                     }
+                    dropEnd("next:end", list: \.upNext)
                 }
                 if model.userQueue.isEmpty && model.upNext.isEmpty {
                     QueueEmpty(symbol: "text.line.last.and.arrowtriangle.forward", title: "Nothing up next",
@@ -470,18 +483,34 @@ struct QueueInspector: View {
         .animation(Motion.panel, value: model.upNext)
     }
 
-    /// A dragged song lands before the song it was dropped on, in that part of the queue.
-    private func move(_ payload: String?, before target: Song, in list: ReferenceWritableKeyPath<PlayerModel, [Song]>) -> Bool {
+    /// A dragged song lands before the song it was dropped on, in that part of the queue, or at its end.
+    private func move(_ payload: String?, before target: Song?, in list: ReferenceWritableKeyPath<PlayerModel, [Song]>) -> Bool {
+        dropTarget = nil
         guard let payload, let colon = payload.firstIndex(of: ":") else { return false }
         let from: ReferenceWritableKeyPath<PlayerModel, [Song]> = payload.hasPrefix("user:") ? \.userQueue : \.upNext
         let id = String(payload[payload.index(after: colon)...])
-        guard id != target.id, let song = model[keyPath: from].first(where: { $0.id == id }) else { return false }
-        withAnimation(Motion.panel) {
+        guard id != target?.id, let song = model[keyPath: from].first(where: { $0.id == id }) else { return false }
+        // A short, firm move into place: a slow spring here made the drop feel sluggish.
+        withAnimation(.easeOut(duration: 0.18)) {
             model[keyPath: from].removeAll { $0.id == id }
-            let index = model[keyPath: list].firstIndex { $0.id == target.id } ?? model[keyPath: list].count
+            let index = target.flatMap { t in model[keyPath: list].firstIndex { $0.id == t.id } } ?? model[keyPath: list].count
             model[keyPath: list].insert(song, at: index)
         }
         return true
+    }
+
+    /// The line follows the pointer from row to row; leaving a row only clears it when no other row took it over.
+    private func target(_ key: String, _ inside: Bool) {
+        if inside { dropTarget = key } else if dropTarget == key { dropTarget = nil }
+    }
+
+    /// Room under the last song of a part to drop a song at its end, with the line at its top.
+    private func dropEnd(_ key: String, list: ReferenceWritableKeyPath<PlayerModel, [Song]>) -> some View {
+        Color.clear
+            .frame(height: 14)
+            .contentShape(Rectangle())
+            .dropDestination(for: String.self) { items, _ in move(items.first, before: nil, in: list) } isTargeted: { target(key, $0) }
+            .overlay(alignment: .top) { DropLine(visible: dropTarget == key) }
     }
 
     private func remove(_ song: Song, from list: ReferenceWritableKeyPath<PlayerModel, [Song]>) {
@@ -574,7 +603,8 @@ struct NowPlayingCard: View {
         .background(RoundedRectangle(cornerRadius: 4, style: .continuous).fill(Color.primary.opacity(hovering ? 0.1 : 0)))
         .contentShape(Rectangle())
         .onHover { hovering = $0 && !Debug.active }
-        .animation(Motion.fade, value: hovering)
+        // At once under the pointer, as Spotify's rows.
+        .animation(nil, value: hovering)
         .contextMenu { if !song.id.isEmpty { SongMenu(song: song) } }
         .animation(Motion.fade, value: song.id)
         .listRowSeparator(.hidden)
@@ -624,7 +654,8 @@ struct QueueRow: View {
         .onTapGesture(count: 2, perform: playIt)
         .onHover { hovering = $0 && !Debug.active }
         .onAppear { if Debug.hovered(song.title) { hovering = true } }
-        .animation(Motion.fade, value: hovering)
+        // At once under the pointer, as Spotify's rows.
+        .animation(nil, value: hovering)
         .contextMenu {
             SongMenu(song: song)
             if let remove {
@@ -641,6 +672,38 @@ struct QueueRow: View {
     /// A song in the queue plays from its place in the queue, so what lies before it counts as passed.
     private func playIt() {
         if let play { play() } else { Playback.shared.jump(to: song.id) }
+    }
+}
+
+/// Spotify's green line between the rows where a dragged song will land.
+struct DropLine: View {
+    let visible: Bool
+
+    var body: some View {
+        Capsule()
+            .fill(PP.primary)
+            .frame(height: 2)
+            .padding(.horizontal, 8)
+            .offset(y: -1)
+            .opacity(visible ? 1 : 0)
+            .animation(.easeOut(duration: 0.08), value: visible)
+            .allowsHitTesting(false)
+    }
+}
+
+/// What hangs under the pointer while a song is dragged in the queue: small and light, as Spotify's, instead of a picture
+/// of the whole row.
+struct QueueDragPreview: View {
+    let song: Song
+
+    var body: some View {
+        HStack(spacing: 8) {
+            CoverArt(album: song.album, radius: 3).frame(width: 24, height: 24)
+            Text(song.title).font(.system(size: 12, weight: .semibold)).lineLimit(1)
+        }
+        .padding(.leading, 5).padding(.trailing, 10).padding(.vertical, 5)
+        .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Color(white: 0.16)))
+        .foregroundStyle(.white)
     }
 }
 

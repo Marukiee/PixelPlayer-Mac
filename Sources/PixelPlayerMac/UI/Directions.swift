@@ -26,12 +26,12 @@ struct RootView: View {
                     detail
                         .background(PP.page)
                         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    // The queue opens and closes at once, as Spotify's (measured: its width changes in one frame).
                     if model.showQueue {
                         QueueInspector()
                             .frame(width: 320)
                             .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                             .padding(.leading, 8)
-                            .transition(.move(edge: .trailing).combined(with: .opacity))
                     }
                 }
                 .padding(.horizontal, 8)
@@ -487,14 +487,13 @@ struct LibraryPanel: View {
     @LocalState private var scrolled = false
 
     var body: some View {
-        let shown = LibraryItem.all.filter { model.filter == .all || $0.kind == model.filter }
-        let items = LibraryItem.sorted(shown, by: LibrarySort(rawValue: sort) ?? .recents)
         VStack(alignment: .leading, spacing: 0) {
             header
             chips.padding(.horizontal, 12)
             tools.padding(.leading, 8).padding(.trailing, 12).padding(.top, 6).padding(.bottom, 2)
             ScrollView {
-                LibraryList(items: items, view: LibraryView(rawValue: view) ?? .list)
+                // Its own view, so the hover over the panel never sorts the library again.
+                LibraryItems(sort: sort, view: view)
                     .padding(.horizontal, 6)
                     .padding(.bottom, 8)
             }
@@ -568,6 +567,19 @@ struct LibraryPanel: View {
     }
 }
 
+/// The library, filtered and sorted, in the chosen view. Worked out only when the library, the filter, the order or the
+/// view change, not on every hover over the panel around it.
+struct LibraryItems: View {
+    let sort: String
+    let view: String
+    @Environment(PlayerModel.self) private var model
+
+    var body: some View {
+        let shown = LibraryItem.all.filter { model.filter == .all || $0.kind == model.filter }
+        LibraryList(items: LibraryItem.sorted(shown, by: LibrarySort(rawValue: sort) ?? .recents), view: LibraryView(rawValue: view) ?? .list)
+    }
+}
+
 /// The library in the chosen view.
 struct LibraryList: View {
     let items: [LibraryItem]
@@ -599,9 +611,22 @@ extension LibraryItem {
         case .recents:
             ordered = rest
         case .added:
-            let added = Dictionary(rest.map { ($0.route, library.songs(for: $0.route).compactMap(\.addedAt).max() ?? 0) },
-                                   uniquingKeysWith: { first, _ in first })
-            ordered = rest.sorted { (added[$0.route] ?? 0) > (added[$1.route] ?? 0) }
+            // One pass over the songs for every album and artist, instead of searching all songs for each item.
+            var byAlbum: [String: Double] = [:], byArtist: [String: Double] = [:]
+            for song in library.songs {
+                guard let added = song.addedAt else { continue }
+                byAlbum[song.album.id] = max(byAlbum[song.album.id] ?? 0, added)
+                byArtist[song.artist] = max(byArtist[song.artist] ?? 0, added)
+            }
+            func added(_ item: LibraryItem) -> Double {
+                switch item.route {
+                case .album(let id): byAlbum[id] ?? 0
+                case .artist(let name): byArtist[name] ?? 0
+                default: library.songs(for: item.route).compactMap(\.addedAt).max() ?? 0
+                }
+            }
+            let keys = Dictionary(rest.map { ($0.route, added($0)) }, uniquingKeysWith: { first, _ in first })
+            ordered = rest.sorted { (keys[$0.route] ?? 0) > (keys[$1.route] ?? 0) }
         case .alphabetical:
             ordered = rest.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
         case .creator:
