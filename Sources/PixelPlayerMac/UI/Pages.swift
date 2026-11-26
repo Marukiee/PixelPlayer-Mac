@@ -123,7 +123,7 @@ struct MixHero: View {
                 .frame(width: 184, height: 184)
                 .shadow(color: .black.opacity(0.3), radius: 16, y: 8)
             VStack(alignment: .leading, spacing: 4) {
-                Text("Made for you").font(.subheadline.weight(.semibold)).foregroundStyle(.white.opacity(0.8))
+                Text("Made for \(Owner.firstName)").font(.subheadline.weight(.semibold)).foregroundStyle(.white.opacity(0.8))
                 TitleFont.text("Your Mix", size: 52).foregroundStyle(.white)
                 Text(Library.shared.yourMixSummary).foregroundStyle(.white.opacity(0.8)).lineLimit(1)
                 Spacer(minLength: 8)
@@ -506,6 +506,15 @@ struct TrackHeader {
     let tint: Color
     /// A name at the start of the meta line that opens its artist, as on an album page.
     var artist: String? = nil
+}
+
+/// Whose music this is, for the lists the app makes ("Made for Mark"), as Spotify and SpotCopy name them. SpotCopy asks at
+/// the first start; the Mac knows the name of whoever is logged in.
+enum Owner {
+    static var firstName: String {
+        if let set = UserDefaults.standard.string(forKey: "owner.name"), !set.isEmpty { return set }
+        return NSFullUserName().split(separator: " ").first.map(String.init) ?? "you"
+    }
 }
 
 /// "1 song", "12 songs".

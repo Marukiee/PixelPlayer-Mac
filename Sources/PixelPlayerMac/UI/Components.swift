@@ -357,21 +357,32 @@ struct TransportIcon: View {
 
 /// Save the song that plays, as in Spotify: a plus that saves it to Liked Songs and opens the list of playlists, or a green
 /// check when it is saved, which opens that list to change where.
+/// As in Spotify and SpotCopy: the plus saves the song to Liked Songs with a little pop; the green check opens Saved in,
+/// to change where it is kept.
 struct LikeButton: View {
     @Environment(PlayerModel.self) private var model
     @LocalState private var showPlaylists = false
+    @LocalState private var pop = false
 
     var body: some View {
         let song = model.current
         let saved = model.likedIDs.contains(song.id) || Library.shared.inPlaylist(song)
         Button {
             guard !song.id.isEmpty else { return }
-            if !saved { model.setLiked(song, true) }
-            showPlaylists = true
+            if saved {
+                showPlaylists = true
+            } else {
+                model.setLiked(song, true)
+                withAnimation(.spring(response: 0.22, dampingFraction: 0.45)) { pop = true }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.16) {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) { pop = false }
+                }
+            }
         } label: {
             Image(systemName: saved ? "checkmark.circle.fill" : "plus.circle")
                 .foregroundStyle(saved ? AnyShapeStyle(PP.primary) : AnyShapeStyle(.secondary))
                 .contentTransition(.opacity)
+                .scaleEffect(pop ? 1.3 : 1)
         }
         .buttonStyle(PressStyle())
         .disabled(song.id.isEmpty)
