@@ -85,15 +85,23 @@ struct HomePage: View {
     }
 
     var body: some View {
+        let style = HeroStyle.chosen
         ScrollView {
             VStack(alignment: .leading, spacing: 36) {
-                MixHero()
+                switch style {
+                case .current: MixHero()
+                case .header: MixHeader()
+                case .card: MixCard()
+                case .shelf: EmptyView()
+                }
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: width > 940 ? 4 : 2), spacing: 8) {
                     ForEach(quick) { QuickTile(item: $0) }
                 }
                 .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
-                // A shelf with nothing on it is left out.
-                if !Shelves.items("mixes").isEmpty {
+                if style == .shelf {
+                    MadeForShelf()
+                } else if !Shelves.items("mixes").isEmpty {
+                    // A shelf with nothing on it is left out.
                     Shelf(title: Shelves.title("mixes"), showAll: .shelf("mixes")) {
                         FittingRow(items: Shelves.items("mixes"), minWidth: 160) { ShelfCell(item: $0) }
                     }
@@ -109,6 +117,10 @@ struct HomePage: View {
             .padding(.horizontal, margin)
             .padding(.top, margin)
             .padding(.bottom, 24)
+            // Variant A: the covers' colour behind the top of the page, edge to edge, fading into it.
+            .background(alignment: .top) {
+                if style == .header { MixWash().frame(height: 380) }
+            }
         }
         // The same margin above as at the sides, whatever the title bar's safe area is at that moment.
         .ignoresSafeArea(.container, edges: .top)

@@ -147,7 +147,12 @@ struct Collage: View {
     var radius: CGFloat = Metrics.cover
 
     var body: some View {
-        let picks = (0..<4).map { albums[$0 % max(albums.count, 1)] }
+        // Four different covers when there are four, as Spotify's mosaics: a list of songs often has one album several
+        // times. Fewer than four keep the order given (a mix's two covers crosswise).
+        var seen = Set<String>()
+        let different = albums.filter { seen.insert($0.id).inserted }
+        let source = different.count >= 4 ? different : albums
+        let picks = (0..<4).map { source[$0 % max(source.count, 1)] }
         Grid(horizontalSpacing: 0, verticalSpacing: 0) {
             GridRow { CoverArt(album: picks[0], radius: 0); CoverArt(album: picks[1], radius: 0) }
             GridRow { CoverArt(album: picks[2], radius: 0); CoverArt(album: picks[3], radius: 0) }
