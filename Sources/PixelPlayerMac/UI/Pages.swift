@@ -1278,11 +1278,13 @@ struct DownloadedMark: View {
     var body: some View {
         let streaming = songs.filter { !$0.isLocal }.count
         Group {
+            // Spotify's size, measured: a 32 box with the circle 22 of 24 across (29.3), so the traced icon (circle 57.5 of 59)
+            // is 30 across.
             if streaming == 0 && !songs.isEmpty {
                 // Downloaded: Spotify's green disc with the arrow cut out of it.
-                SpotifyIcon(name: "downloaded").fill(PP.primary, style: FillStyle(eoFill: true)).frame(width: 27 * 1.05, height: 27 * 1.05)
+                SpotifyIcon(name: "downloaded").fill(PP.primary, style: FillStyle(eoFill: true)).frame(width: 30, height: 30)
             } else {
-                PlayerIconImage(symbol: "arrow.down.circle", size: 27).foregroundStyle(PP.icon)
+                PlayerIconImage(symbol: "arrow.down.circle", size: 30 / 1.05).foregroundStyle(PP.icon)
             }
         }
         .font(.system(size: 27, weight: .light))

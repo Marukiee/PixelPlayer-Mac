@@ -3,6 +3,7 @@ import SwiftUI
 /// The window: the system sidebar as the library, the content beside it, the queue in the inspector,
 /// and the player as a glass capsule floating at the bottom (Mark's pick from round 2).
 struct RootView: View {
+    private static var screen: CGSize { NSScreen.main?.visibleFrame.size ?? CGSize(width: 1440, height: 900) }
     @Environment(PlayerModel.self) private var model
     @Environment(\.openSettings) private var openSettings
     /// The lyrics get the whole width: the library steps aside while they show (Settings › General).
@@ -59,7 +60,8 @@ struct RootView: View {
         // Room for the library, the content and the queue side by side, so none of them is ever pushed aside.
         // The zoom of View › Zoom In and Out: laid out at a larger or smaller size, then scaled to the window.
         .zoomed(ZoomLevel.shared.value)
-        .frame(minWidth: 1100 * ZoomLevel.shared.value, minHeight: 640 * ZoomLevel.shared.value)
+        // Never larger than the screen: zoomed in far, the window would not fit a laptop.
+        .frame(minWidth: min(1100 * ZoomLevel.shared.value, Self.screen.width), minHeight: min(640 * ZoomLevel.shared.value, Self.screen.height))
         .onAppear {
             model.startClock()
             Debug.windowAppeared()
