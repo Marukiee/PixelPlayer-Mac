@@ -45,6 +45,8 @@ struct RootView: View {
                     .transition(.opacity.combined(with: .scale(scale: 1.02)))
                     .zIndex(10)
             }
+            // Spotify's menus, over everything.
+            MenuLayer().zIndex(20)
         }
         .animation(Motion.panel, value: hideLibrary)
         // Spotify's letter for everything without a font of its own, at the size the system used (sheets keep the system's).
@@ -142,21 +144,19 @@ struct ProfileButton: View {
 
     var body: some View {
         let account = Library.shared.account
-        Menu {
-            Text(account.map { "Signed in as \($0.username)" } ?? "Not signed in")
-            Divider()
-            Button(account == nil ? "Connect to Navidrome…" : "Account…") { open(.sources) }
-            Button("Settings…") { open(.general) }
-        } label: {
+        MenuButton(entries: {
+            [
+                .header(account.map { "Signed in as \($0.username)" } ?? "Not signed in"),
+                .item(account == nil ? "Connect to Navidrome…" : "Account…", icon: .svg("account")) { open(.sources) },
+                .item("Settings…", icon: .svg("settings")) { open(.general) },
+            ]
+        }) {
             AccountPicture(size: 32)
                 .frame(width: 48, height: 48)
                 .background(Circle().fill(hovering ? PP.fieldHover : PP.field))
                 .scaleEffect(hovering ? 1.04 : 1)
                 .contentShape(Circle())
         }
-        .menuStyle(.button)
-        .buttonStyle(.plain)
-        .menuIndicator(.hidden)
         .fixedSize()
         .onHover { hovering = $0 && !Debug.active }
         .animation(.easeInOut(duration: 0.2 * Motion.slow), value: hovering)
@@ -431,7 +431,7 @@ private struct RailCover: View {
             .simultaneousGesture(TapGesture(count: 2).onEnded { model.play(Library.shared.songs(for: item.route)) })
             .onHover { inside in SidebarHoverState.shared.set(item.route, inside) }
             .help("\(item.title) • \(item.subtitle)")
-            .contextMenu { LibraryItemMenu(item: item) }
+            .spotContextMenu(owner: "library:\(item.id)") { LibraryItemMenu.entries(for: item) }
     }
 }
 
@@ -791,18 +791,7 @@ struct LibraryOptionsMenu: View {
 
     var body: some View {
         let order = LibrarySort(rawValue: sort) ?? .recents
-        Menu {
-            Picker("Sort by", selection: $sort) {
-                ForEach(LibrarySort.allCases) { Text($0.title).tag($0.rawValue) }
-            }
-            .pickerStyle(.inline)
-            Picker("View as", selection: $view) {
-                ForEach(LibraryView.allCases) { option in
-                    Label(option.title, systemImage: option.symbol).tag(option.rawValue)
-                }
-            }
-            .pickerStyle(.palette)
-        } label: {
+        MenuButton(entries: { entries }) {
             HStack(spacing: 6) {
                 Text(order.title).font(.mix(14))
                 Image(systemName: (LibraryView(rawValue: view) ?? .list).symbol).font(.system(size: 15, weight: .medium))
@@ -810,12 +799,23 @@ struct LibraryOptionsMenu: View {
             .foregroundStyle(hovering ? PP.iconHover : PP.icon)
             .contentShape(Rectangle())
         }
-        .menuStyle(.button)
-        .buttonStyle(.plain)
-        .menuIndicator(.hidden)
         .fixedSize()
         .onHover { hovering = $0 }
         .help("Sort and view")
+    }
+
+    /// As Spotify's: Sort by and View as under small grey headings, the chosen one green with a check.
+    private var entries: [MenuEntry] {
+        var entries: [MenuEntry] = [.header("Sort by")]
+        for option in LibrarySort.allCases {
+            entries.append(.item(option.title, checked: option.rawValue == sort) { sort = option.rawValue })
+        }
+        entries += [.divider, .header("View as")]
+        for option in LibraryView.allCases {
+            entries.append(.item(option.title, icon: .custom(AnyView(Image(systemName: option.symbol).font(.system(size: 12, weight: .medium)))),
+                                 checked: option.rawValue == view) { view = option.rawValue })
+        }
+        return entries
     }
 }
 
@@ -958,19 +958,16 @@ struct CreateButton: View {
     @LocalState private var hovering = false
 
     var body: some View {
-        Menu {
-            Button("Playlist", systemImage: "music.note.list") { CreateButton.askForName() }
-                .disabled(Library.shared.client == nil)
-        } label: {
+        MenuButton(entries: {
+            [.item("Playlist", icon: .svg("m_addplaylist"), disabled: Library.shared.client == nil,
+                   help: Library.shared.client == nil ? "Playlists are made on your Navidrome server." : nil) { CreateButton.askForName() }]
+        }) {
             PlayerIconImage(symbol: "plus", size: 16)
                 .foregroundStyle(hovering ? PP.iconHover : PP.icon)
                 .frame(width: 35, height: 35)
                 .background(Circle().fill(Color.primary.opacity(hovering ? 0.16 : 0.1)))
                 .contentShape(Circle())
         }
-        .menuStyle(.button)
-        .buttonStyle(.plain)
-        .menuIndicator(.hidden)
         .fixedSize()
         .onHover { hovering = $0 }
         .animation(Motion.fade, value: hovering)
@@ -1120,7 +1117,7 @@ struct LibraryRow: View {
         .simultaneousGesture(TapGesture(count: 2).onEnded { model.play(Library.shared.songs(for: item.route)) })
         .onHover { inside in SidebarHoverState.shared.set(item.route, inside) }
         .onAppear { if Debug.hovered(item.title) { SidebarHoverState.shared.route = item.route } }
-        .contextMenu { LibraryItemMenu(item: item) }
+        .spotContextMenu(owner: "library:\(item.id)") { LibraryItemMenu.entries(for: item) }
     }
 }
 
@@ -1170,34 +1167,33 @@ struct LibraryTile: View {
         .onTapGesture { model.go(item.route) }
         .simultaneousGesture(TapGesture(count: 2).onEnded { model.play(Library.shared.songs(for: item.route)) })
         .onHover { inside in SidebarHoverState.shared.set(item.route, inside) }
-        .contextMenu { LibraryItemMenu(item: item) }
+        .spotContextMenu(owner: "library:\(item.id)") { LibraryItemMenu.entries(for: item) }
     }
 }
 
 /// The right click on something in the library.
-struct LibraryItemMenu: View {
-    let item: LibraryItem
-    @Environment(PlayerModel.self) private var model
-
-    var body: some View {
-        Button("Play", systemImage: "play.fill") { model.play(Library.shared.songs(for: item.route)) }
-        Button("Shuffle", systemImage: "shuffle") { model.play(Library.shared.songs(for: item.route), shuffled: true) }
-        Button {
-            model.userQueue.append(contentsOf: Library.shared.songs(for: item.route))
-        } label: {
-            Label { Text("Add to Queue") } icon: { Image(nsImage: GlyphImage.addToQueue) }
-        }
-        Divider()
+@MainActor
+enum LibraryItemMenu {
+    static func entries(for item: LibraryItem) -> [MenuEntry] {
+        let model = PlayerModel.shared
+        let songs = { Library.shared.songs(for: item.route) }
         let pinned = Library.shared.isPinned(item.route)
-        Button(pinned ? "Unpin" : "Pin to Your Library", systemImage: pinned ? "pin.slash" : "pin") {
-            withAnimation(Motion.panel) { Library.shared.togglePin(item.route) }
-        }
+        var entries: [MenuEntry] = [
+            .item("Play", icon: .svg("play")) { model.play(songs()) },
+            .item("Shuffle", icon: .svg("shuffle")) { model.play(songs(), shuffled: true) },
+            .item("Add to queue", icon: .svg("m_addqueue"), shortcut: "Q") { model.userQueue.append(contentsOf: songs()) },
+            .divider,
+            // Green while pinned, as Spotify's.
+            .item(pinned ? "Unpin" : "Pin to Your Library", icon: .svg("pin"), green: pinned) {
+                withAnimation(Motion.panel) { Library.shared.togglePin(item.route) }
+            },
+        ]
         if case .album(let id) = item.route {
-            Divider()
-            Button("Go to Artist", systemImage: "music.microphone") {
+            entries += [.divider, .item("Go to artist", icon: .svg("artist"), shortcut: "⌥A") {
                 model.go(.artist(Library.shared.albums.first { $0.id == id }?.artist ?? ""))
-            }
+            }]
         }
+        return entries
     }
 }
 

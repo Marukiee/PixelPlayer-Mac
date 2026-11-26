@@ -27,7 +27,7 @@ struct NowPlayingInfo: View {
         .id(model.current.id)
         .transition(.asymmetric(insertion: .move(edge: .trailing).combined(with: .opacity), removal: .opacity))
         .animation(Motion.panel, value: model.current.id)
-        .contextMenu { SongMenu(song: model.current) }
+        .spotContextMenu { SongMenu.entries(for: PlayerModel.shared.current) }
     }
 }
 
@@ -85,18 +85,12 @@ struct SleepTimerBadge: View {
 
     var body: some View {
         let timer = SleepTimer.shared
-        Menu {
-            SleepTimerMenu()
-            Button("Turn off timer", systemImage: "moon.zzz") { timer.off() }
-        } label: {
+        MenuButton(entries: { SleepTimerMenu.choices }) {
             PlayerIconImage(symbol: "moon.fill", size: 13)
                 .foregroundStyle(PP.primary)
                 .frame(width: 32, height: 32)
                 .contentShape(Rectangle())
         }
-        .menuStyle(.button)
-        .buttonStyle(.plain)
-        .menuIndicator(.hidden)
         .fixedSize()
         .help("Sleep timer: \(timer.label ?? "")")
         .transition(.opacity)
@@ -416,12 +410,14 @@ struct QueueInspector: View {
                 QueueTabs(tab: $tab)
                 Spacer()
                 BarMenu(symbol: "ellipsis", label: "More") {
-                    Button("Shuffle Up Next", systemImage: "shuffle") { withAnimation(Motion.panel) { model.upNext.shuffle() } }
-                        .disabled(model.upNext.count < 2)
-                    Button("Clear Queue", systemImage: "xmark.circle") {
-                        withAnimation(Motion.panel) { model.userQueue = []; model.upNext = [] }
-                    }
-                    .disabled(model.userQueue.isEmpty && model.upNext.isEmpty)
+                    [
+                        .item("Shuffle Up Next", icon: .svg("shuffle"), disabled: model.upNext.count < 2) {
+                            withAnimation(Motion.panel) { model.upNext.shuffle() }
+                        },
+                        .item("Clear queue", icon: .svg("trash"), disabled: model.userQueue.isEmpty && model.upNext.isEmpty) {
+                            withAnimation(Motion.panel) { model.userQueue = []; model.upNext = [] }
+                        },
+                    ]
                 }
                 BarIcon(symbol: "xmark", label: "Close") { withAnimation(Motion.panel) { model.showQueue = false } }
             }
@@ -449,7 +445,7 @@ struct QueueInspector: View {
                             .help("Remove the songs you added")
                     }
                     ForEach(model.userQueue) { song in
-                        QueueRow(song: song) { remove(song, from: \.userQueue) }
+                        QueueRow(song: song, remove: { remove(song, from: \.userQueue) })
                             .draggable("user:" + song.id) { QueueDragPreview(song: song) }
                             .dropDestination(for: String.self) { items, _ in move(items.first, before: song, in: \.userQueue) }
                                 isTargeted: { target("user:" + song.id, $0) }
@@ -460,7 +456,7 @@ struct QueueInspector: View {
                 if !model.upNext.isEmpty {
                     QueueHeading(text: model.playingFrom.isEmpty ? "Next up" : "Next from: \(model.playingFrom)")
                     ForEach(model.upNext) { song in
-                        QueueRow(song: song) { remove(song, from: \.upNext) }
+                        QueueRow(song: song, remove: { remove(song, from: \.upNext) })
                             .draggable("next:" + song.id) { QueueDragPreview(song: song) }
                             .dropDestination(for: String.self) { items, _ in move(items.first, before: song, in: \.upNext) }
                                 isTargeted: { target("next:" + song.id, $0) }
@@ -584,6 +580,8 @@ struct NowPlayingCard: View {
     /// As in Spotify: a row like the ones under it, the title green; the more button under the pointer.
     var body: some View {
         let song = model.current
+        // Lit under the pointer and while its menu is open.
+        let lit = hovering || MenuPresenter.shared.owner == "now:" + song.id
         HStack(spacing: 12) {
             CoverArt(album: song.album, radius: 4).frame(width: 48, height: 48)
             VStack(alignment: .leading, spacing: 2) {
@@ -592,18 +590,18 @@ struct NowPlayingCard: View {
             }
             .lineLimit(1)
             Spacer(minLength: 4)
-            if !song.id.isEmpty { QueueMore(song: song).opacity(hovering ? 1 : 0) }
+            if !song.id.isEmpty { QueueMore(song: song, owner: "now:" + song.id).opacity(lit ? 1 : 0) }
         }
         // Its own identity, so a song that plays and is also queued shows in both places instead of one blank row.
         .id("now-" + song.id)
         .transition(.opacity)
         .padding(.horizontal, 8).padding(.vertical, 8)
-        .background(RoundedRectangle(cornerRadius: 4, style: .continuous).fill(Color.primary.opacity(hovering ? 0.1 : 0)))
+        .background(RoundedRectangle(cornerRadius: 4, style: .continuous).fill(Color.primary.opacity(lit ? 0.1 : 0)))
         .contentShape(Rectangle())
         .onHover { hovering = $0 && !Debug.active }
         // At once under the pointer, as Spotify's rows.
-        .animation(nil, value: hovering)
-        .contextMenu { if !song.id.isEmpty { SongMenu(song: song) } }
+        .animation(nil, value: lit)
+        .spotContextMenu(owner: "now:" + song.id) { song.id.isEmpty ? [] : SongMenu.entries(for: song) }
         .animation(Motion.fade, value: song.id)
         .listRowSeparator(.hidden)
         .listRowBackground(Color.clear)
@@ -620,6 +618,10 @@ struct QueueRow: View {
     var play: (() -> Void)? = nil
     @Environment(PlayerModel.self) private var model
     @LocalState private var hovering = false
+
+    private var menuOwner: String { "queue:" + song.id }
+    /// Lit under the pointer and while its menu is open, as Spotify's rows.
+    private var lit: Bool { hovering || MenuPresenter.shared.owner == menuOwner }
 
     var body: some View {
         HStack(spacing: 12) {
@@ -644,23 +646,17 @@ struct QueueRow: View {
             }
             .lineLimit(1)
             Spacer(minLength: 4)
-            QueueMore(song: song, remove: remove).opacity(hovering ? 1 : 0)
+            QueueMore(song: song, remove: remove, owner: menuOwner).opacity(lit ? 1 : 0)
         }
         .padding(.horizontal, 8).padding(.vertical, 8)
-        .background(RoundedRectangle(cornerRadius: 4, style: .continuous).fill(Color.primary.opacity(hovering ? 0.1 : 0)))
+        .background(RoundedRectangle(cornerRadius: 4, style: .continuous).fill(Color.primary.opacity(lit ? 0.1 : 0)))
         .contentShape(Rectangle())
         .onTapGesture(count: 2, perform: playIt)
         .onHover { hovering = $0 && !Debug.active }
         .onAppear { if Debug.hovered(song.title) { hovering = true } }
         // At once under the pointer, as Spotify's rows.
         .animation(nil, value: hovering)
-        .contextMenu {
-            SongMenu(song: song)
-            if let remove {
-                Divider()
-                Button("Remove from Queue", systemImage: "minus.circle", action: remove)
-            }
-        }
+        .spotContextMenu(owner: menuOwner) { SongMenu.entries(for: song, remove: remove) }
         .transition(.move(edge: .trailing).combined(with: .opacity))
         .listRowSeparator(.hidden)
         .listRowBackground(Color.clear)
@@ -709,24 +705,16 @@ struct QueueDragPreview: View {
 struct QueueMore: View {
     let song: Song
     var remove: (() -> Void)? = nil
+    var owner: String? = nil
     @LocalState private var hovering = false
 
     var body: some View {
-        Menu {
-            SongMenu(song: song)
-            if let remove {
-                Divider()
-                Button("Remove from Queue", systemImage: "minus.circle", action: remove)
-            }
-        } label: {
+        MenuButton(owner: owner, entries: { SongMenu.entries(for: song, remove: remove) }) {
             PlayerIconImage(symbol: "ellipsis", size: 14)
                 .foregroundStyle(hovering ? PP.iconHover : PP.icon)
                 .frame(width: 26, height: 26)
                 .contentShape(Rectangle())
         }
-        .menuStyle(.button)
-        .buttonStyle(.plain)
-        .menuIndicator(.hidden)
         .fixedSize()
         .onHover { hovering = $0 }
         .help("More options for \(song.title)")
@@ -755,59 +743,70 @@ struct QueueEmpty: View {
 
 // MARK: Right click and song info
 
-/// What you can do with a song, on a right click anywhere a song is shown.
-struct SongMenu: View {
-    let song: Song
-    @Environment(PlayerModel.self) private var model
-
+/// What you can do with a song, on a right click anywhere a song is shown and behind its three dots.
+@MainActor
+enum SongMenu {
     /// Mark's order, the same as SpotCopy's on Android: Liked Songs, a playlist, the queue, the album, the artist, Share
-    /// and the sleep timer. Song Info, which only the Mac has, comes last.
-    var body: some View {
+    /// and the sleep timer. Song Info, which only the Mac has, comes last, then Remove from Queue in the queue. Spotify's
+    /// letters on the right.
+    static func entries(for song: Song, remove: (() -> Void)? = nil) -> [MenuEntry] {
+        let model = PlayerModel.shared
         let liked = model.likedIDs.contains(song.id)
-        Button { model.setLiked(song, !liked) } label: {
-            Label { Text(liked ? "Remove from Liked Songs" : "Add to Liked Songs") } icon: { Image(nsImage: GlyphImage.likedCover) }
+        let onServer = song.source.serverID != nil && Library.shared.client != nil
+        var entries: [MenuEntry] = [
+            .item(liked ? "Remove from Liked Songs" : "Add to Liked Songs", icon: .likedCover, shortcut: "L") { model.setLiked(song, !liked) },
+            // Shown, but greyed: adding would change the playlists on the server.
+            .submenu("Add to playlist", icon: .svg("add"), shortcut: "P", disabled: !onServer,
+                     help: song.source.serverID == nil ? "This song is only on this Mac, so it can't go into a Navidrome playlist." : nil) {
+                playlists(for: song)
+            },
+            .item("Add to queue", icon: .svg("m_addqueue"), shortcut: "Q") { model.userQueue.append(song) },
+            .item("Go to album", icon: .svg("album"), shortcut: "A") { model.go(.album(song.album.id)) },
+            .item("Go to artist", icon: .svg("artist"), shortcut: "⌥A") { model.go(.artist(song.artist)) },
+            .item("Share", icon: .svg("share"), shortcut: "S") { Share.text(Share.text(for: song)) },
+            SleepTimerMenu.entry,
+            .divider,
+            .item("Song Info", icon: .svg("info")) { model.infoSong = song },
+        ]
+        if let remove {
+            entries += [.divider, .item("Remove from queue", icon: .svg("trash"), action: remove)]
         }
-        // Shown, but greyed: adding would change the playlists on the server.
-        Menu("Add to playlist", systemImage: "plus.circle") {
-            ForEach(Library.shared.playlists) { list in
-                Button(list.title) { Task { await Library.shared.setInPlaylist(song, playlistID: list.id, on: true) } }
-                    .disabled(list.songs.contains { $0.id == song.id })
-            }
-            Divider()
-            Button("New Playlist…") { NewPlaylistPrompt.ask(for: song) }
+        return entries
+    }
+
+    /// As Spotify's: New playlist first, then the playlists; one that has the song already is greyed.
+    private static func playlists(for song: Song) -> [MenuEntry] {
+        var entries: [MenuEntry] = [.item("New playlist", icon: .svg("plus")) { NewPlaylistPrompt.ask(for: song) }]
+        let lists = Library.shared.playlists
+        if !lists.isEmpty { entries.append(.divider) }
+        for list in lists {
+            entries.append(.item(list.title, disabled: list.songs.contains { $0.id == song.id }) {
+                Task { await Library.shared.setInPlaylist(song, playlistID: list.id, on: true) }
+            })
         }
-        .disabled(song.source.serverID == nil || Library.shared.client == nil)
-        .help(song.source.serverID == nil ? "This song is only on this Mac, so it can't go into a Navidrome playlist." : "")
-        Button { model.userQueue.append(song) } label: {
-            Label { Text("Add to queue") } icon: { Image(nsImage: GlyphImage.addToQueue) }
-        }
-        Button("Go to album", systemImage: "square.stack") { model.go(.album(song.album.id)) }
-        Button("Go to artist", systemImage: "person") { model.go(.artist(song.artist)) }
-        Button("Share", systemImage: "square.and.arrow.up") { Share.text(Share.text(for: song)) }
-        SleepTimerMenu()
-        Divider()
-        Button("Song Info", systemImage: "info.circle") { model.infoSong = song }
+        return entries
     }
 }
 
 /// The sleep timer's choices, in the song menu and behind the moon in the player: Spotify's minutes and End of track, and
 /// Turn off with the time left while it runs.
-struct SleepTimerMenu: View {
-    private var timer: SleepTimer { SleepTimer.shared }
+@MainActor
+enum SleepTimerMenu {
+    static var entry: MenuEntry {
+        .submenu(SleepTimer.shared.label.map { "Sleep timer: \($0)" } ?? "Sleep timer", icon: .svg("m_sleep")) { choices }
+    }
 
-    var body: some View {
-        Menu {
-            if let left = timer.label {
-                Button("Turn off timer (\(left))", systemImage: "moon.zzz") { timer.off() }
-                Divider()
-            }
-            ForEach(SleepTimer.minutes, id: \.self) { minutes in
-                Button(minutes == 60 ? "1 hour" : "\(minutes) minutes") { timer.start(minutes: minutes) }
-            }
-            Button("End of track") { timer.endOfTrack() }
-        } label: {
-            Label(timer.label.map { "Sleep timer: \($0)" } ?? "Sleep timer", systemImage: "moon")
+    static var choices: [MenuEntry] {
+        let timer = SleepTimer.shared
+        var entries: [MenuEntry] = []
+        if let left = timer.label {
+            entries += [.item("Turn off timer (\(left))") { timer.off() }, .divider]
         }
+        for minutes in SleepTimer.minutes {
+            entries.append(.item(minutes == 60 ? "1 hour" : "\(minutes) minutes") { timer.start(minutes: minutes) })
+        }
+        entries.append(.item("End of track") { timer.endOfTrack() })
+        return entries
     }
 }
 
@@ -1056,22 +1055,19 @@ struct QueueTabs: View {
 }
 
 /// A menu in the player's icon style: the same soft round under the pointer as the icon buttons beside it.
-struct BarMenu<Items: View>: View {
+struct BarMenu: View {
     let symbol: String
     let label: String
-    @ViewBuilder var items: Items
+    let entries: () -> [MenuEntry]
     @LocalState private var hovering = false
 
     var body: some View {
-        Menu { items } label: {
+        MenuButton(entries: entries) {
             PlayerIconImage(symbol: symbol, size: 15)
                 .frame(width: 32, height: 32)
                 .background(Circle().fill(Color.primary.opacity(hovering ? 0.1 : 0)))
                 .contentShape(Circle())
         }
-        .menuStyle(.button)
-        .buttonStyle(.plain)
-        .menuIndicator(.hidden)
         .fixedSize()
         .onHover { hovering = $0 && !Debug.active }
         .animation(Motion.fade, value: hovering)

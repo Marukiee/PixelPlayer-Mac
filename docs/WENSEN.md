@@ -54,6 +54,10 @@ Alles wat Mark vroeg, met wat klaar is en wat nog moet. Bijgewerkt bij elke rond
 - View › Actual Size, Zoom In en Zoom Out (⌘0, ⌘+, ⌘−) zoals Spotify, met zijn stappen; alle maten zijn nu Spotify's maten op 100% (bovenbalk 64, Your Library en wachtrij met hoezen van 48, tekst 16 en 14).
 - Tweede tekst en "Show all" in Spotify's grijs #B3B3B3 (was donkerder).
 - Iconen hetzelfde als in de Android-app: shuffle, play (ook de groene knop), pauze, vorige, volgende, herhalen, wachtrij, Connect, toevoegen aan wachtrij, meer, sluiten, omlaag, plus, opslaan (groen vinkje), toevoegen (ring met plus), downloaden, zoeken, punaise, slaaptimer.
+- Menu's zoals Spotify in plaats van de systeemmenu's: rechtsklik en drie puntjes overal (nummers, wachtrij, speler, Your Library, lijstkop, profiel, plus), donker paneel met Spotify's maten, elke regel een icoon uit de Android-app, Spotify's letters rechts (L, P, Q, A, ⌥A, S) die werken als het menu open is, submenu's ernaast, pijltjes en Esc; Sort by en View as met groene keuze en vinkje. Het zwarte icoontje is weg.
+- Gedownload: groen gevulde cirkel met uitgesneden pijl, zoals Spotify.
+- Standaard op 83%, dezelfde stap als Marks Spotify (zoom-level -100); zoomstappen zijn nu die van Spotify (telkens 1,2 keer).
+- Wachtrij: dubbelklik op een nummer in de wachtrij speelt het weer (haalde het weg), Remove from queue staat weer in het menu.
 
 ## In 0.2.7 (uitgebracht)
 

@@ -208,21 +208,20 @@ struct RoundMenu: View {
     @LocalState private var hovering = false
 
     var body: some View {
-        Menu {
-            Button("Add to queue", systemImage: "text.line.first.and.arrowtriangle.forward") { PlayerModel.shared.userQueue.append(contentsOf: songs) }
-                .disabled(songs.isEmpty)
-            if let share {
-                Button("Share", systemImage: "square.and.arrow.up") { Share.text(share) }
-            }
-        } label: {
+        MenuButton(entries: { entries }) {
             PlainIcon(symbol: "ellipsis", hovering: hovering, onColour: onColour)
         }
-        .menuStyle(.button)
-        .menuIndicator(.hidden)
-        .buttonStyle(.plain)
         .fixedSize()
         .onHover { hovering = $0 && !Debug.active }
         .help("More")
+    }
+
+    private var entries: [MenuEntry] {
+        var entries: [MenuEntry] = [
+            .item("Add to queue", icon: .svg("m_addqueue"), shortcut: "Q", disabled: songs.isEmpty) { PlayerModel.shared.userQueue.append(contentsOf: songs) },
+        ]
+        if let share { entries.append(.item("Share", icon: .svg("share"), shortcut: "S") { Share.text(share) }) }
+        return entries
     }
 }
 
@@ -730,19 +729,7 @@ struct ViewAsMenu: View {
 
     var body: some View {
         let compact = viewMode == "compact"
-        Menu {
-            if !orders.isEmpty {
-                Picker("Sort by", selection: Binding(get: { order }, set: { onSort($0) })) {
-                    ForEach(orders, id: \.self) { Text($0.label).tag($0) }
-                }
-                .pickerStyle(.inline)
-            }
-            Picker("View as", selection: $viewMode) {
-                Label { Text("Compact") } icon: { Image(nsImage: GlyphImage.compactView) }.tag("compact")
-                Label { Text("List") } icon: { Image(nsImage: GlyphImage.listView) }.tag("list")
-            }
-            .pickerStyle(.inline)
-        } label: {
+        MenuButton(entries: { entries }) {
             HStack(spacing: 8) {
                 // As on Spotify: the order the list is in, or how it looks where it cannot be sorted.
                 Text(orders.isEmpty ? (compact ? "Compact" : "List") : order.label).font(.mix(14))
@@ -753,12 +740,25 @@ struct ViewAsMenu: View {
             .foregroundStyle(hovering ? PP.iconHover : PP.icon)
             .contentShape(Rectangle())
         }
-        .menuStyle(.button)
-        .buttonStyle(.plain)
-        .menuIndicator(.hidden)
         .fixedSize()
         .onHover { hovering = $0 }
         .help("View as")
+    }
+
+    /// As Spotify's: Sort by and View as under small grey headings, the chosen one green with a check.
+    private var entries: [MenuEntry] {
+        var entries: [MenuEntry] = []
+        if !orders.isEmpty {
+            entries.append(.header("Sort by"))
+            for option in orders { entries.append(.item(option.label, checked: option == order) { onSort(option) }) }
+            entries.append(.divider)
+        }
+        entries.append(.header("View as"))
+        for (mode, title) in [("compact", "Compact"), ("list", "List")] {
+            entries.append(.item(title, icon: .custom(AnyView(ViewModeGlyph(compact: mode == "compact").stroke(style: StrokeStyle(lineWidth: 1.5, lineCap: .round)).padding(.vertical, 2))),
+                                 checked: viewMode == mode) { viewMode = mode })
+        }
+        return entries
     }
 }
 
@@ -845,14 +845,11 @@ struct TrackRow: View {
             .popover(isPresented: $showPlaylists, arrowEdge: .bottom) { AddToPlaylistView(song: song) }
             Text(song.duration).font(.mix(14, tabular: true)).foregroundStyle(PP.subdued).frame(width: 44, alignment: .center)
             ZStack {
-                if hovering {
-                    Menu { SongMenu(song: song) } label: {
+                if lit {
+                    MenuButton(owner: menuOwner, entries: { SongMenu.entries(for: song) }) {
                         PlayerIconImage(symbol: "ellipsis", size: 15).foregroundStyle(PP.subdued)
                             .frame(width: 24, height: 24).contentShape(Rectangle())
                     }
-                    .menuStyle(.button)
-                    .buttonStyle(.plain)
-                    .menuIndicator(.hidden)
                     .fixedSize()
                     .help("More for \(song.title)")
                 }
@@ -861,7 +858,7 @@ struct TrackRow: View {
         }
         .padding(.horizontal, 12)
         .frame(height: compact ? 34 : 56)
-        .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Color.primary.opacity(hovering ? 0.07 : 0)))
+        .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Color.primary.opacity(lit ? 0.07 : 0)))
         .contentShape(Rectangle())
         .onTapGesture(count: 2) { model.play(song, in: context) }
         .onHover { hovering = $0 && !Debug.active }
@@ -873,9 +870,13 @@ struct TrackRow: View {
                 showPlaylists = true
             }
         }
-        .animation(nil, value: hovering)
-        .contextMenu { SongMenu(song: song) }
+        .animation(nil, value: lit)
+        .spotContextMenu(owner: menuOwner) { SongMenu.entries(for: song) }
     }
+
+    private var menuOwner: String { "track:\(index):" + song.id }
+    /// Lit under the pointer and while its menu is open, as Spotify's rows.
+    private var lit: Bool { hovering || MenuPresenter.shared.owner == menuOwner }
 }
 
 // MARK: Search
@@ -1269,8 +1270,8 @@ extension TrackListPage {
     }
 }
 
-/// Spotify's download button, filled green: every song in the list is on this Mac. Empty and grey while some still come
-/// from the server only.
+/// Spotify's download button: a green disc with the arrow cut out once every song in the list is on this Mac (Mark,
+/// 2026-11-26: filled, not a green ring). The grey ring while some still come from the server only.
 struct DownloadedMark: View {
     let songs: [Song]
 
@@ -1278,7 +1279,8 @@ struct DownloadedMark: View {
         let streaming = songs.filter { !$0.isLocal }.count
         Group {
             if streaming == 0 && !songs.isEmpty {
-                PlayerIconImage(symbol: "arrow.down.circle", size: 27).foregroundStyle(PP.primary)
+                // Downloaded: Spotify's green disc with the arrow cut out of it.
+                SpotifyIcon(name: "downloaded").fill(PP.primary, style: FillStyle(eoFill: true)).frame(width: 27 * 1.05, height: 27 * 1.05)
             } else {
                 PlayerIconImage(symbol: "arrow.down.circle", size: 27).foregroundStyle(PP.icon)
             }

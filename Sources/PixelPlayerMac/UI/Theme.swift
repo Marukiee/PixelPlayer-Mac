@@ -55,6 +55,9 @@ enum PP {
     static let sidebar = adaptive(0xE6E6E8, 0x000000)
     /// Home and the search field in the band: #1F1F1F, and #2A2A2A under the pointer or while typing (measured on Spotify).
     static let field = adaptive(0xFFFFFF, 0x1F1F1F)
+    /// Spotify's menus (measured: #1F1F1F, the row under the pointer #2A2A2A).
+    static let menu = adaptive(0xFFFFFF, 0x1F1F1F)
+    static let menuHover = adaptive(0xEDEDED, 0x2A2A2A)
     static let fieldHover = adaptive(0xF7F7F7, 0x2A2A2A)
     /// Under the pointer in Your Library: #1F1F1F on the #121212 panel (Spotify's --background-highlight).
     static let rowHover = adaptive(0xEDEDED, 0x1F1F1F)

@@ -203,6 +203,41 @@ enum Debug {
             } else {
                 try? line.write(to: url, atomically: true, encoding: .utf8)
             }
+        case "menu":
+            // `menu:song:<title>:<x>:<y>`, `menu:library:<title>:<x>:<y>`, `menu:queue:<x>:<y>` or `menu:viewas:<x>:<y>` opens
+            // that menu as a right click or the button would, at that point of the window (in points at 100%).
+            let numbers = parts.compactMap { Double($0) }
+            let point = numbers.count >= 2 ? CGPoint(x: numbers[numbers.count - 2], y: numbers[numbers.count - 1]) : CGPoint(x: 600, y: 300)
+            var entries: [MenuEntry] = []
+            switch value {
+            case "song": if let song = Library.shared.songs.first(where: { $0.title == parts[2] }) { entries = SongMenu.entries(for: song) }
+            case "queuesong": if let song = Library.shared.songs.first(where: { $0.title == parts[2] }) { entries = SongMenu.entries(for: song, remove: {}) }
+            case "library": if let item = LibraryItem.all.first(where: { $0.title == parts[2] }) { entries = LibraryItemMenu.entries(for: item) }
+            default: break
+            }
+            MenuPresenter.shared.show(entries, at: point)
+            try? await Task.sleep(for: .seconds(0.4))
+        case "menuhover":
+            // `menuhover:<level>:<row>` lights that row of the open menu, as the pointer would; a row with a submenu opens it.
+            MenuPresenter.shared.hover(level: Int(value) ?? 0, index: parts.count > 2 ? Int(parts[2]) : nil)
+            try? await Task.sleep(for: .seconds(0.4))
+        case "menuclose":
+            MenuPresenter.shared.close()
+        case "rightclick", "leftclick":
+            // `rightclick:<x>:<y>` sends a real click through the window at that point (in points at 100%), as the mouse
+            // would: for checking what a right click opens and what a click outside a menu does.
+            if let window = mainWindow(), let content = window.contentView, parts.count > 2, let x = Double(parts[1]), let y = Double(parts[2]) {
+                let zoom = ZoomLevel.shared.value
+                let location = NSPoint(x: x * zoom, y: content.bounds.height - y * zoom)
+                let types: [NSEvent.EventType] = parts[0] == "rightclick" ? [.rightMouseDown, .rightMouseUp] : [.leftMouseDown, .leftMouseUp]
+                for type in types {
+                    if let event = NSEvent.mouseEvent(with: type, location: location, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                                      windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1) {
+                        NSApp.postEvent(event, atStart: false)
+                    }
+                }
+                try? await Task.sleep(for: .seconds(0.5))
+            }
         case "dump":
             // What the merged library looks like, for checks of the local-first rules.
             let lines = Library.shared.songs.map { "\($0.id)\t\($0.title)\t\($0.artist)\tlocal=\($0.isLocal)\tserver=\($0.source.serverID ?? "-")\tliked=\(Library.shared.likedIDs.contains($0.id))" }
