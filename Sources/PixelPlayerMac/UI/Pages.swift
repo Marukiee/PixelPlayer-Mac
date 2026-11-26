@@ -142,8 +142,15 @@ struct GreenPlayButton: View {
 
     var body: some View {
         Button(action: action) {
-            Image(systemName: playing ? "pause.fill" : "play.fill")
-                .font(.system(size: size * 0.36, weight: .bold))
+            // SpotCopy's green-button triangle from Android, a little right of the middle; pause as two bars.
+            ZStack {
+                if playing {
+                    PauseGlyph().frame(width: size * 0.25, height: size * 0.32)
+                } else {
+                    SpotifyIcon(name: "play_green").fill(style: FillStyle(eoFill: true))
+                        .frame(width: size * 0.32 * 39 / 45, height: size * 0.32).offset(x: size * 0.02)
+                }
+            }
                 .foregroundStyle(PP.onPrimary)
                 .contentTransition(.symbolEffect(.replace))
                 .frame(width: size, height: size)
@@ -272,9 +279,7 @@ struct PlainIcon: View {
                 // The same drawn shuffle as in the player: square, with a fine line, like Spotify's.
                 Glyph(kind: .shuffle).sized(height: 24).foregroundStyle(style)
             } else {
-                Image(systemName: symbol)
-                    .font(.system(size: 26, weight: .semibold))
-                    .foregroundStyle(style)
+                PlayerIconImage(symbol: symbol, size: 26).foregroundStyle(style)
             }
         }
             .frame(width: 44, height: 56)
@@ -781,7 +786,7 @@ struct TrackRow: View {
                     Button {
                         if playing { model.setPlaying(!model.isPlaying) } else { model.play(song, in: context) }
                     } label: {
-                        Image(systemName: playing && model.isPlaying ? "pause.fill" : "play.fill").font(.callout)
+                        PlayerIconImage(symbol: playing && model.isPlaying ? "pause.fill" : "play.fill", size: 14)
                             .frame(width: 24, height: 24)
                     }
                     .buttonStyle(PressStyle())
@@ -821,7 +826,7 @@ struct TrackRow: View {
             ZStack {
                 if saved {
                     Button { showPlaylists = true } label: {
-                        Image(systemName: "checkmark.circle.fill").font(.system(size: 17)).foregroundStyle(PP.primary)
+                        PlayerIconImage(symbol: "checkmark.circle.fill", size: 17).foregroundStyle(PP.primary)
                     }
                     .buttonStyle(PressStyle())
                     .help("Saved. Change where")
@@ -830,7 +835,7 @@ struct TrackRow: View {
                         model.setLiked(song, true)
                         showPlaylists = true
                     } label: {
-                        Image(systemName: "plus.circle").font(.system(size: 17)).foregroundStyle(.secondary)
+                        PlayerIconImage(symbol: "plus.circle", size: 17).foregroundStyle(.secondary)
                     }
                     .buttonStyle(PressStyle())
                     .help("Save to Liked Songs")
@@ -842,7 +847,7 @@ struct TrackRow: View {
             ZStack {
                 if hovering {
                     Menu { SongMenu(song: song) } label: {
-                        Image(systemName: "ellipsis").font(.system(size: 15, weight: .semibold)).foregroundStyle(.secondary)
+                        PlayerIconImage(symbol: "ellipsis", size: 15).foregroundStyle(.secondary)
                             .frame(width: 24, height: 24).contentShape(Rectangle())
                     }
                     .menuStyle(.button)
@@ -1030,8 +1035,7 @@ private struct RecentSearchCard: View {
         // The cross in the corner, under the pointer, takes it out of the list.
         .overlay(alignment: .topTrailing) {
             Button { withAnimation(Motion.panel) { SearchHistory.shared.forget(item.id) } } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 10, weight: .bold))
+                PlayerIconImage(symbol: "xmark", size: 10)
                     .foregroundStyle(.white)
                     .frame(width: 24, height: 24)
                     .background(Circle().fill(Color.black.opacity(0.7)))
@@ -1274,11 +1278,9 @@ struct DownloadedMark: View {
         let streaming = songs.filter { !$0.isLocal }.count
         Group {
             if streaming == 0 && !songs.isEmpty {
-                Image(systemName: "arrow.down.circle.fill")
-                    .symbolRenderingMode(.palette)
-                    .foregroundStyle(Color.black, PP.primary)
+                PlayerIconImage(symbol: "arrow.down.circle", size: 27).foregroundStyle(PP.primary)
             } else {
-                Image(systemName: "arrow.down.circle").foregroundStyle(PP.icon)
+                PlayerIconImage(symbol: "arrow.down.circle", size: 27).foregroundStyle(PP.icon)
             }
         }
         .font(.system(size: 27, weight: .light))
@@ -1302,8 +1304,7 @@ struct ListSearch: View {
                 withAnimation(Motion.panel) { open.toggle() }
                 if open { focused = true } else { text = "" }
             } label: {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 15, weight: .medium))
+                PlayerIconImage(symbol: "magnifyingglass", size: 15)
                     .foregroundStyle(hovering || open ? PP.iconHover : PP.icon)
                     .frame(width: 30, height: 30)
                     .contentShape(Rectangle())
@@ -1651,7 +1652,7 @@ struct AddToPlaylistView: View {
             Text("Add to playlist").font(.mix(14, .bold))
             // A plain field on a soft fill: no blue focus ring, and not focused before you click it.
             HStack(spacing: 6) {
-                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                PlayerIconImage(symbol: "magnifyingglass", size: 13).foregroundStyle(.secondary)
                 TextField("Find a playlist", text: $search).textFieldStyle(.plain)
             }
             .padding(.horizontal, 10).frame(height: 30)

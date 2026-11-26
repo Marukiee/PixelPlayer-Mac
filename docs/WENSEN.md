@@ -51,7 +51,7 @@ Alles wat Mark vroeg, met wat klaar is en wat nog moet. Bijgewerkt bij elke rond
 - Songtekst eerst van LRCLIB zoals de Android-app, op duur gekozen; daarna het bestand en Navidrome.
 - Home: Your Mix als kop zoals een playlist (variant A), kleur uit de hoezen, dezelfde hoezen als de tegel; collages met vier verschillende hoezen.
 - Naam uit het Navidrome-account ("Made for ..."), geen naam in de code; profielknop rechtsboven met foto (Gravatar via Navidrome) of letter.
-- Shuffle-icoon hetzelfde als in de Android-app.
+- Iconen hetzelfde als in de Android-app: shuffle, play (ook de groene knop), pauze, vorige, volgende, herhalen, wachtrij, Connect, toevoegen aan wachtrij, meer, sluiten, omlaag, plus, opslaan (groen vinkje), toevoegen (ring met plus), downloaden, zoeken, punaise, slaaptimer.
 
 ## In 0.2.7 (uitgebracht)
 

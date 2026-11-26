@@ -200,8 +200,7 @@ struct TransportButtons: View {
                         // A solid colour: the text colour on glass is blended with what lies under it and came out grey.
                         .background(Circle().fill(PP.adaptive(0x000000, 0xFFFFFF)))
                 } else {
-                    Image(systemName: model.isPlaying ? "pause.fill" : "play.fill")
-                        .font(.system(size: large ? 34 : 24))
+                    PlayerIconImage(symbol: model.isPlaying ? "pause.fill" : "play.fill", size: large ? 34 : 24)
                         // A quick swap, no bounce: the button answers at once.
                         .contentTransition(.opacity)
                         .frame(width: large ? 40 : 28)
@@ -253,9 +252,55 @@ struct PlayerIconImage: View {
             Glyph(kind: .connect).sized(height: size * 0.95)
         } else if symbol == "list.bullet" {
             Glyph(kind: .queue).sized(height: size * 0.92)
+        } else if symbol == "ellipsis" {
+            MoreDots().frame(width: size * 1.15, height: size * 1.15 * 10 / 52)
+        } else if symbol == "plus.circle" {
+            AddCircle().frame(width: size * 1.05, height: size * 1.05)
+        } else if symbol == "pause.fill" {
+            PauseGlyph().frame(width: size * 0.62, height: size * 0.8)
+        } else if let icon = AndroidIcon.byName[symbol] {
+            SpotifyIcon(name: icon.file).fill(style: FillStyle(eoFill: true))
+                .frame(width: size * icon.height * icon.aspect, height: size * icon.height)
         } else {
             Image(systemName: symbol).font(.system(size: size, weight: weight))
         }
+    }
+}
+
+/// SpotCopy's icons from Android (Resources/Icons, traced over Spotify's), by the system symbol each stands in for, so
+/// both apps show the same ones (Mark, 2026-11-26). Height is a share of the symbol's size; aspect is the file's own.
+enum AndroidIcon {
+    static let byName: [String: (file: String, aspect: CGFloat, height: CGFloat)] = [
+        "xmark": ("close", 47.0 / 48.0, 0.8),
+        "magnifyingglass": ("search_field", 1, 0.95),
+        "plus": ("plus", 56.0 / 58.0, 0.9),
+        "chevron.down": ("down", 51.0 / 29.0, 0.5),
+        "moon.fill": ("m_sleep", 53.0 / 63.0, 1),
+        "pin.fill": ("pin", 1, 1),
+        "arrow.down.circle": ("download", 1, 1.05),
+        "checkmark.circle.fill": ("like_on", 1, 1.05),
+        "play.fill": ("play", 49.0 / 57.0, 0.85),
+    ]
+}
+
+/// Spotify's three dots, laid on their side: SpotCopy's upright ones (more_vert) turned a quarter.
+struct MoreDots: Shape {
+    func path(in rect: CGRect) -> Path {
+        let upright = SpotifyIcon(name: "more_vert").path(in: CGRect(x: 0, y: 0, width: rect.height, height: rect.width))
+        return upright.applying(CGAffineTransform(a: 0, b: -1, c: 1, d: 0, tx: rect.minX, ty: rect.minY + rect.height))
+    }
+}
+
+/// Add as on Android: a ring with a plus in it, ring and plus 5 of 59 thick, the plus 24 of 59 long.
+struct AddCircle: Shape {
+    func path(in rect: CGRect) -> Path {
+        let side = min(rect.width, rect.height), unit = side / 59
+        let origin = CGPoint(x: rect.midX - side / 2, y: rect.midY - side / 2)
+        var lines = Path()
+        lines.addEllipse(in: CGRect(x: origin.x + 3 * unit, y: origin.y + 3 * unit, width: 53 * unit, height: 53 * unit))
+        lines.move(to: CGPoint(x: origin.x + 29.5 * unit, y: origin.y + 17.5 * unit)); lines.addLine(to: CGPoint(x: origin.x + 29.5 * unit, y: origin.y + 41.5 * unit))
+        lines.move(to: CGPoint(x: origin.x + 17.5 * unit, y: origin.y + 29.5 * unit)); lines.addLine(to: CGPoint(x: origin.x + 41.5 * unit, y: origin.y + 29.5 * unit))
+        return lines.strokedPath(StrokeStyle(lineWidth: 5 * unit))
     }
 }
 
@@ -280,20 +325,17 @@ struct ViewModeGlyph: Shape {
 
 /// Play in the round button, after Spotify's: a triangle with rounded corners, a little right of the middle.
 struct PlayGlyph: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        path.addRoundedTriangle([CGPoint(x: rect.minX, y: rect.minY), CGPoint(x: rect.maxX, y: rect.midY), CGPoint(x: rect.minX, y: rect.maxY)],
-                                radius: rect.width * 0.1)
-        return path
-    }
+    /// SpotCopy's play triangle from Android, as Spotify's.
+    func path(in rect: CGRect) -> Path { SpotifyIcon(name: "play").path(in: rect) }
 }
 
 /// Pause in the round button: two bars with rounded corners.
 struct PauseGlyph: Shape {
     func path(in rect: CGRect) -> Path {
+        // As SpotCopy's pause on Android: two bars 4 wide and 6 apart, on the grid of play.
         var path = Path()
-        let bar = rect.width * 0.32
-        let corner = CGSize(width: bar * 0.3, height: bar * 0.3)
+        let bar = rect.width * 4 / 14
+        let corner = CGSize(width: bar * 0.175, height: bar * 0.175)
         path.addRoundedRect(in: CGRect(x: rect.minX, y: rect.minY, width: bar, height: rect.height), cornerSize: corner)
         path.addRoundedRect(in: CGRect(x: rect.maxX - bar, y: rect.minY, width: bar, height: rect.height), cornerSize: corner)
         return path
@@ -360,6 +402,8 @@ struct TransportIcon: View {
 /// As in Spotify and SpotCopy: the plus saves the song to Liked Songs with a little pop; the green check opens Saved in,
 /// to change where it is kept.
 struct LikeButton: View {
+    /// The icon's size: 16 in the player, as Spotify's.
+    var size: CGFloat = 16
     @Environment(PlayerModel.self) private var model
     @LocalState private var showPlaylists = false
     @LocalState private var pop = false
@@ -379,7 +423,7 @@ struct LikeButton: View {
                 }
             }
         } label: {
-            Image(systemName: saved ? "checkmark.circle.fill" : "plus.circle")
+            PlayerIconImage(symbol: saved ? "checkmark.circle.fill" : "plus.circle", size: size)
                 .foregroundStyle(saved ? AnyShapeStyle(PP.primary) : AnyShapeStyle(.secondary))
                 .contentTransition(.opacity)
                 .scaleEffect(pop ? 1.3 : 1)

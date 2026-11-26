@@ -238,7 +238,7 @@ struct SearchField: View {
                 .onExitCommand { model.searchText = ""; focused.wrappedValue = false }
             if !model.searchText.isEmpty {
                 Button { model.searchText = "" } label: {
-                    Image(systemName: "xmark").font(.system(size: 11, weight: .semibold)).foregroundStyle(PP.icon)
+                    PlayerIconImage(symbol: "xmark", size: 11).foregroundStyle(PP.icon)
                         .frame(width: 22, height: 22).contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -826,7 +826,7 @@ struct FilterChip: View {
             if let title {
                 Text(title).font(.mix(12)).padding(.horizontal, 11)
             } else {
-                Image(systemName: "xmark").font(.system(size: 10, weight: .bold)).frame(width: 26)
+                PlayerIconImage(symbol: "xmark", size: 10).frame(width: 26)
             }
         }
         .foregroundStyle(chosen ? Color.black : Color.primary)
@@ -849,8 +849,7 @@ struct SidebarIconButton: View {
 
     var body: some View {
         Button(action: action) {
-            Image(systemName: symbol)
-                .font(.system(size: 13, weight: .semibold))
+            PlayerIconImage(symbol: symbol, size: 13)
                 .foregroundStyle(hovering ? PP.iconHover : PP.icon)
                 .frame(width: 28, height: 28)
                 .background(Circle().fill(Color.primary.opacity(hovering ? 0.08 : 0)))
@@ -958,8 +957,7 @@ struct CreateButton: View {
             Button("Playlist", systemImage: "music.note.list") { CreateButton.askForName() }
                 .disabled(Library.shared.client == nil)
         } label: {
-            Image(systemName: "plus")
-                .font(.system(size: 13, weight: .semibold))
+            PlayerIconImage(symbol: "plus", size: 13)
                 .foregroundStyle(hovering ? PP.iconHover : PP.icon)
                 .frame(width: 28, height: 28)
                 .background(Circle().fill(Color.primary.opacity(hovering ? 0.16 : 0.1)))
@@ -1096,7 +1094,7 @@ struct LibraryRow: View {
                     HStack(spacing: 4) {
                         // A pinned item carries a small green pin, as in Spotify.
                         if Library.shared.isPinned(item.route) {
-                            Image(systemName: "pin.fill").font(.system(size: 9)).foregroundStyle(PP.primary).rotationEffect(.degrees(45))
+                            PlayerIconImage(symbol: "pin.fill", size: 9).foregroundStyle(PP.primary)
                         }
                         Text(item.subtitle)
                     }

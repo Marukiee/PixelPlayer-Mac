@@ -89,8 +89,7 @@ struct SleepTimerBadge: View {
             SleepTimerMenu()
             Button("Turn off timer", systemImage: "moon.zzz") { timer.off() }
         } label: {
-            Image(systemName: "moon.fill")
-                .font(.system(size: 13, weight: .medium))
+            PlayerIconImage(symbol: "moon.fill", size: 13)
                 .foregroundStyle(PP.primary)
                 .frame(width: 32, height: 32)
                 .contentShape(Rectangle())
@@ -187,7 +186,7 @@ struct FloatingPlayer: View {
                 } else {
                     CoverArt(album: PlayerModel.shared.current.album, radius: 24).frame(width: 48, height: 48)
                 }
-                LikeButton().font(.title3)
+                LikeButton(size: 17)
             }
             .frame(minWidth: withTitle ? 170 : 0, maxWidth: 240, alignment: .leading)
             VStack(spacing: 2) {
@@ -221,7 +220,7 @@ struct NowPlayingView: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 14) {
                 Button { model.setFullPlayer(false) } label: {
-                    Image(systemName: "chevron.down").font(.system(size: 16, weight: .semibold)).foregroundStyle(.primary)
+                    PlayerIconImage(symbol: "chevron.down", size: 16).foregroundStyle(.primary)
                         .frame(width: 40, height: 40).contentShape(Circle())
                 }
                 .buttonStyle(.plain)
@@ -312,7 +311,7 @@ struct FullScreenPlayer: View {
                         }
                         .lineLimit(1)
                         Spacer()
-                        LikeButton().font(.system(size: 30))
+                        LikeButton(size: 30)
                     }
                     PositionSlider()
                     HStack {
@@ -720,8 +719,7 @@ struct QueueMore: View {
                 Button("Remove from Queue", systemImage: "minus.circle", action: remove)
             }
         } label: {
-            Image(systemName: "ellipsis")
-                .font(.system(size: 14, weight: .semibold))
+            PlayerIconImage(symbol: "ellipsis", size: 14)
                 .foregroundStyle(hovering ? PP.iconHover : PP.icon)
                 .frame(width: 26, height: 26)
                 .contentShape(Rectangle())
@@ -1066,8 +1064,7 @@ struct BarMenu<Items: View>: View {
 
     var body: some View {
         Menu { items } label: {
-            Image(systemName: symbol)
-                .font(.system(size: 15, weight: .medium))
+            PlayerIconImage(symbol: symbol, size: 15)
                 .frame(width: 32, height: 32)
                 .background(Circle().fill(Color.primary.opacity(hovering ? 0.1 : 0)))
                 .contentShape(Circle())
