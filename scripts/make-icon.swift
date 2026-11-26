@@ -35,7 +35,13 @@ ctx.addPath(tile); ctx.clip()
 linear([color(0xFFFFFF), color(0xDCE6FF)], from: CGPoint(x: 512, y: 100), to: CGPoint(x: 512, y: 924))
 ctx.restoreGState()
 
-// The play shape: a triangle with round corners, a little right of centre so it looks centred.
+// The play shape and its note sit a little right of the tile's centre: a play shape's weight lies left of its box
+// (centroid at 477 against a box centre of 509.5), so placed by its box it looks too far left.
+let nudge: CGFloat = 24
+ctx.saveGState()
+ctx.translateBy(x: nudge, y: 0)
+
+// The play shape: a triangle with round corners.
 func roundedTriangle(_ a: CGPoint, _ b: CGPoint, _ c: CGPoint, radius: CGFloat) -> CGPath {
     let path = CGMutablePath()
     let mid = CGPoint(x: (a.x + b.x) / 2, y: (a.y + b.y) / 2)
@@ -76,6 +82,7 @@ flag.addLine(to: CGPoint(x: center.x + 150, y: 432))
 flag.addCurve(to: CGPoint(x: center.x + 50, y: 392), control1: CGPoint(x: center.x + 128, y: 404), control2: CGPoint(x: center.x + 96, y: 392))
 flag.closeSubpath()
 ctx.addPath(flag); ctx.setFillColor(ink); ctx.fillPath()
+ctx.restoreGState()
 ctx.restoreGState()
 
 guard let image = ctx.makeImage() else { exit(1) }
