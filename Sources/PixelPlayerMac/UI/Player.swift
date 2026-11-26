@@ -895,25 +895,26 @@ struct DevicesPopover: View {
 
 /// Up Next and History: two tabs with a soft round under the pointer and a blue pill that slides to the chosen one,
 /// instead of the system's segmented control, which only lit up on a click and flashed grey before it turned blue.
-/// Queue and Recently played as Spotify shows them: bold words, the chosen one in full white with a green line under it
-/// that slides to the other, the other grey until the pointer is on it.
+/// Queue and Recently played as Spotify shows them: the chosen one in full white with a green line under it that slides to
+/// the other, the other grey until the pointer is on it. Sizes as in Mark's screenshot of Spotify, measured against the close
+/// button beside them: the words a little under four times its width, the line a sixth of it.
 struct QueueTabs: View {
     @Binding var tab: QueueInspector.Tab
     @Namespace private var line
     @LocalState private var hovered: QueueInspector.Tab?
 
     var body: some View {
-        HStack(spacing: 22) {
+        HStack(spacing: 26) {
             ForEach(QueueInspector.Tab.allCases) { item in
                 let chosen = item == tab
                 Text(item.rawValue)
-                    .font(.system(size: 15, weight: .bold))
+                    .font(.system(size: 14.5, weight: .semibold))
                     .foregroundStyle(chosen || hovered == item ? AnyShapeStyle(.primary) : AnyShapeStyle(PP.icon))
                     .padding(.top, 8)
-                    .padding(.bottom, 10)
+                    .padding(.bottom, 12)
                     .overlay(alignment: .bottom) {
                         if chosen {
-                            Capsule().fill(PP.primary).frame(height: 3).matchedGeometryEffect(id: "line", in: line)
+                            Capsule().fill(PP.primary).frame(height: 2).matchedGeometryEffect(id: "line", in: line)
                         }
                     }
                     .contentShape(Rectangle())
