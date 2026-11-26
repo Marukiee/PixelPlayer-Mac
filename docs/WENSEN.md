@@ -30,7 +30,7 @@ Alles wat Mark vroeg, met wat klaar is en wat nog moet. Bijgewerkt bij elke rond
 - Wachtrij exact als Spotify: Now playing als gewone rij (titel groen), koppen vet wit, Next from:, hover met grijs, play op de hoes en drie puntjes, geen speelduur.
 - Venster zoals Spotify: zwarte bovenbalk met pijltjes, Home en zoekbalk; drie afgeronde panelen; speler blijft zweven.
 - Your Library zoals Spotify: inklapknop schuift in bij hover, plus, breder maken, chips, vergrootglas naar zoekpagina, Recents-menu (Sort by, View as in vier soorten), ingeklapt een strook met hoezen, sleepbaar.
-- Open: inklap-animatie nog afstemmen op de echte (Mark moet in de browser inloggen op open.spotify.com).
+- Inklappen gemeten op open.spotify.com: kop schuift 0,1 s, icoon volgt na 0,1 s (eruit andersom); in- en uitklappen zelf zonder animatie; strook 72 px met hoezen van 48.
 
 ## In 0.2.7 (uitgebracht)
 

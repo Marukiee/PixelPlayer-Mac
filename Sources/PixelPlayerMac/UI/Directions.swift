@@ -217,12 +217,11 @@ struct LibraryColumn: View {
         HStack(spacing: 0) {
             Group {
                 if model.libraryCollapsed {
-                    LibraryRail().frame(width: 64).transition(.opacity)
+                    LibraryRail().frame(width: 58)
                 } else {
-                    LibraryPanel().frame(width: wide ? 460 : width).transition(.opacity)
+                    LibraryPanel().frame(width: wide ? 460 : width)
                 }
             }
-            .animation(Motion.panel, value: model.libraryCollapsed)
             .animation(Motion.panel, value: wide)
             // The thin black line between the library and the page; drag it to change the width.
             Color.clear
@@ -232,13 +231,13 @@ struct LibraryColumn: View {
                 .gesture(
                     DragGesture(minimumDistance: 1)
                         .onChanged { value in
-                            let start = dragStart ?? (model.libraryCollapsed ? 64 : (wide ? 460 : width))
+                            let start = dragStart ?? (model.libraryCollapsed ? 58 : (wide ? 460 : width))
                             if dragStart == nil { dragStart = start }
                             let target = start + value.translation.width
                             if target < 180 {
-                                if !model.libraryCollapsed { withAnimation(Motion.panel) { model.libraryCollapsed = true } }
+                                if !model.libraryCollapsed { model.libraryCollapsed = true }
                             } else {
-                                if model.libraryCollapsed { withAnimation(Motion.panel) { model.libraryCollapsed = false } }
+                                if model.libraryCollapsed { model.libraryCollapsed = false }
                                 wide = false
                                 width = min(480, max(240, target))
                             }
@@ -254,12 +253,13 @@ struct LibraryRail: View {
     @Environment(PlayerModel.self) private var model
 
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 6) {
             LibraryToggleButton(collapse: false)
-                .padding(.top, 10)
+                .padding(.top, 13)
             CreateButton()
+                .padding(.bottom, 6)
             ScrollView {
-                LazyVStack(spacing: 4) {
+                LazyVStack(spacing: 0) {
                     ForEach(LibraryItem.all) { item in
                         RailCover(item: item)
                     }
@@ -283,9 +283,9 @@ private struct RailCover: View {
     var body: some View {
         let selected = model.searchText.isEmpty && model.route == item.route
         ArtworkView(art: item.art, radius: 4)
-            .frame(width: 40, height: 40)
+            .frame(width: 38, height: 38)
             .clipShape(item.kind == .artists ? AnyShape(Circle()) : AnyShape(RoundedRectangle(cornerRadius: 4, style: .continuous)))
-            .padding(6)
+            .padding(6.5)
             .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Color.primary.opacity(selected ? 0.1 : hovering ? 0.06 : 0)))
             .contentShape(Rectangle())
             .onTapGesture { model.go(item.route) }
@@ -481,7 +481,9 @@ struct LibraryPanel: View {
     @Environment(PlayerModel.self) private var model
     @AppStorage("library.sort") private var sort = LibrarySort.recents.rawValue
     @AppStorage("library.view") private var view = LibraryView.list.rawValue
-    @LocalState private var hovering = false
+    /// The title slides right first and the fold icon comes in after it; leaving, the icon goes first and the title follows.
+    @LocalState private var titleIn = false
+    @LocalState private var iconIn = false
     @LocalState private var scrolled = false
 
     var body: some View {
@@ -509,25 +511,25 @@ struct LibraryPanel: View {
         }
         .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(PP.libraryPanel))
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-        // The fold button slides in and out with the pointer, smoothly, as in Spotify.
-        .onHover { inside in withAnimation(.easeInOut(duration: 0.22)) { hovering = inside && !Debug.active } }
-        .onAppear { if Debug.hovered("Your Library") { hovering = true } }
+        // Spotify's timing (open.spotify.com): in, the title moves in 0.1 s and the icon follows after 0.1 s; out, the
+        // icon leaves in 0.1 s and the title follows after 0.1 s. Both ease out.
+        .onHover { inside in
+            guard !Debug.active else { return }
+            withAnimation(.easeOut(duration: 0.1).delay(inside ? 0 : 0.1)) { titleIn = inside }
+            withAnimation(.easeOut(duration: 0.1).delay(inside ? 0.1 : 0)) { iconIn = inside }
+        }
+        .onAppear { if Debug.hovered("Your Library") { titleIn = true; iconIn = true } }
     }
 
+    /// As in Spotify the title is the fold button itself: under the pointer the whole of it slides right and the icon
+    /// comes in at its left, from further left and from nothing; a click on either folds the library.
     private var header: some View {
         HStack(spacing: 4) {
-            if hovering {
-                LibraryToggleButton(collapse: true)
-                    .transition(.move(edge: .leading).combined(with: .opacity))
-            }
-            Text("Your Library")
-                .font(.system(size: 13, weight: .bold))
-                .padding(.leading, hovering ? 2 : 8)
+            LibraryTitleButton(titleIn: titleIn, iconIn: iconIn)
             Spacer(minLength: 4)
             CreateButton()
             WidenButton()
         }
-        .padding(.leading, 6)
         .padding(.trailing, 8)
         .frame(height: 48)
     }
@@ -702,8 +704,64 @@ struct SidebarIconButton: View {
     }
 }
 
-/// The button that folds Your Library away, as in Spotify: a small panel with an arrow in it. On the page, when the library
-/// is folded, the same button with the arrow turned brings it back.
+/// "Your Library" with the fold icon before it, one button as in Spotify. Measured there: the icon 16 wide and 12 before the
+/// title; resting, the pair sits 24 further left with the icon 16 further still and see-through, out of the panel.
+struct LibraryTitleButton: View {
+    let titleIn: Bool
+    let iconIn: Bool
+    @Environment(PlayerModel.self) private var model
+    @LocalState private var hovering = false
+
+    var body: some View {
+        Button {
+            model.libraryCollapsed = true
+        } label: {
+            HStack(spacing: 10) {
+                FoldGlyph()
+                    .foregroundStyle(hovering ? PP.iconHover : PP.icon)
+                    .frame(width: 13, height: 13)
+                    .opacity(iconIn ? 1 : 0)
+                    .offset(x: iconIn ? 0 : -13)
+                Text("Your Library")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(.primary)
+            }
+            .padding(.leading, 13)
+            .frame(height: 30)
+            .offset(x: titleIn ? 0 : -19)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .help("Collapse Your Library")
+    }
+}
+
+/// The fold icon: a panel with a narrow column on its left and a small arrow pointing left in the rest.
+struct FoldGlyph: View {
+    var body: some View {
+        GeometryReader { geo in
+            let s = min(geo.size.width, geo.size.height), line = s * 0.094
+            ZStack(alignment: .topLeading) {
+                RoundedRectangle(cornerRadius: s * 0.08, style: .continuous).inset(by: line / 2).stroke(lineWidth: line)
+                Path { p in
+                    p.move(to: CGPoint(x: s * 0.36, y: line / 2))
+                    p.addLine(to: CGPoint(x: s * 0.36, y: s - line / 2))
+                }
+                .stroke(lineWidth: line)
+                Path { p in
+                    p.move(to: CGPoint(x: s * 0.72, y: s * 0.36))
+                    p.addLine(to: CGPoint(x: s * 0.57, y: s * 0.5))
+                    p.addLine(to: CGPoint(x: s * 0.72, y: s * 0.64))
+                }
+                .stroke(style: StrokeStyle(lineWidth: line, lineCap: .round, lineJoin: .round))
+            }
+            .frame(width: s, height: s)
+        }
+    }
+}
+
+/// The library icon at the top of the folded strip: it opens Your Library again.
 struct LibraryToggleButton: View {
     let collapse: Bool
     @Environment(PlayerModel.self) private var model
@@ -711,46 +769,25 @@ struct LibraryToggleButton: View {
 
     var body: some View {
         Button {
-            withAnimation(Motion.panel) { model.libraryCollapsed = collapse }
+            // At once, without a slide: Spotify folds and opens its library in one frame.
+            model.libraryCollapsed = collapse
         } label: {
             // Folding: a small panel with an arrow; opening again from the strip: Spotify's library icon.
             Group {
                 if collapse {
-                    PanelGlyph(pointsLeft: true).frame(width: 17, height: 15)
+                    FoldGlyph().frame(width: 13, height: 13)
                 } else {
                     SpotifyIcon(name: hovering ? "library_on" : "library").fill(style: FillStyle(eoFill: true)).frame(width: 20, height: 20)
                 }
             }
                 .foregroundStyle(hovering ? PP.iconHover : PP.icon)
-                .frame(width: 28, height: 28)
-                .background(Circle().fill(Color.primary.opacity(hovering ? 0.08 : 0)))
-                .contentShape(Circle())
+                .frame(width: 32, height: 32)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
         .animation(Motion.fade, value: hovering)
         .help(collapse ? "Collapse Your Library" : "Open Your Library")
-    }
-}
-
-/// A rounded panel with a small arrow in it, pointing the way the library goes.
-struct PanelGlyph: View {
-    let pointsLeft: Bool
-
-    var body: some View {
-        GeometryReader { geo in
-            let w = geo.size.width, h = geo.size.height, line: CGFloat = 1.5
-            ZStack {
-                RoundedRectangle(cornerRadius: 3, style: .continuous).inset(by: line / 2).stroke(lineWidth: line)
-                Path { p in
-                    let x = w * 0.5, half = h * 0.2, reach = w * 0.13
-                    p.move(to: CGPoint(x: pointsLeft ? x + reach : x - reach, y: h / 2 - half))
-                    p.addLine(to: CGPoint(x: pointsLeft ? x - reach : x + reach, y: h / 2))
-                    p.addLine(to: CGPoint(x: pointsLeft ? x + reach : x - reach, y: h / 2 + half))
-                }
-                .stroke(style: StrokeStyle(lineWidth: line, lineCap: .round, lineJoin: .round))
-            }
-        }
     }
 }
 
@@ -876,7 +913,7 @@ struct LibraryRow: View {
     var body: some View {
         HStack(spacing: 10) {
             if !compact {
-                ArtworkView(art: item.art, radius: 4).frame(width: 40, height: 40)
+                ArtworkView(art: item.art, radius: 4).frame(width: 38, height: 38)
                     .overlay {
                         // Hovering shows play on the cover, as in Spotify. Shown at once, like the grey behind the row.
                         ZStack {
@@ -912,8 +949,8 @@ struct LibraryRow: View {
             Spacer(minLength: 4)
             if playing { NowPlayingMark() }
         }
-        .padding(.vertical, compact ? 6 : 6)
-        .padding(.horizontal, 8)
+        .padding(.vertical, compact ? 6 : 6.5)
+        .padding(.horizontal, 6.5)
         .background(RoundedRectangle(cornerRadius: 6, style: .continuous)
             .fill(Color.primary.opacity(selected ? 0.1 : hovering ? 0.06 : 0)).animation(nil, value: hovering))
         .contentShape(Rectangle())
