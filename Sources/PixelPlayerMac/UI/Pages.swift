@@ -260,6 +260,31 @@ struct PlainIconButton: View {
     }
 }
 
+/// Shuffle on a list, as in Spotify and SpotCopy: a switch for shuffle, green with a dot under it while on and this list
+/// plays. The dot hangs below the icon, so the icon stays exactly where it is.
+struct ShuffleToggle: View {
+    let on: Bool
+    @Environment(PlayerModel.self) private var model
+    @LocalState private var hovering = false
+
+    var body: some View {
+        Button { model.shuffle.toggle() } label: {
+            Glyph(kind: .shuffle).sized(height: 24)
+                .foregroundStyle(on ? AnyShapeStyle(PP.primary) : AnyShapeStyle(hovering ? PP.iconHover : PP.icon))
+                .overlay(alignment: .bottom) {
+                    Circle().fill(PP.primary).frame(width: 4, height: 4).offset(y: 9).opacity(on ? 1 : 0)
+                }
+                .frame(width: 44, height: 56)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(PressStyle())
+        .onHover { hovering = $0 }
+        .animation(Motion.fade, value: on)
+        .animation(Motion.fade, value: hovering)
+        .help(model.shuffle ? "Disable shuffle" : "Enable shuffle")
+    }
+}
+
 struct PlainIcon: View {
     let symbol: String
     let hovering: Bool
@@ -573,7 +598,7 @@ struct TrackListPage: View {
                 }
                 HStack(spacing: 18) {
                     PlayCircle(title: header.title, songs: { songs })
-                    PlainIconButton(symbol: "shuffle", label: "Shuffle") { PlayerModel.shared.play(songs, shuffled: true) }
+                    ShuffleToggle(on: model.shuffle && model.isPlaying(from: header.title) { songs })
                     DownloadedMark(songs: self.songs)
                     RoundMenu(songs: songs, share: share)
                     Spacer()

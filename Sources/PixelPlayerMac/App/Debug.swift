@@ -102,8 +102,10 @@ enum Debug {
             if let song = Library.shared.songs.first(where: { $0.title == value }) { model.play(song, in: Library.shared.songs) }
         case "playstate":
             // `playstate:<name>` writes whether it plays, where and what, for checks of the sleep timer.
-            let line = "playing=\(model.isPlaying) position=\(String(format: "%.2f", model.position)) duration=\(String(format: "%.2f", model.duration)) song=\(model.current.title) timer=\(SleepTimer.shared.label ?? "off")"
+            let line = "playing=\(model.isPlaying) position=\(String(format: "%.2f", model.position)) duration=\(String(format: "%.2f", model.duration)) song=\(model.current.title) timer=\(SleepTimer.shared.label ?? "off") shuffle=\(model.shuffle) next=\(model.upNext.prefix(4).map(\.title).joined(separator: " | ")) count=\(model.upNext.count)"
             try? line.write(to: file("\(value).txt"), atomically: true, encoding: .utf8)
+        case "shuffle":
+            model.shuffle = value == "1"
         case "sleep":
             // `sleep:end` or `sleep:<minutes>` starts the sleep timer.
             if value == "end" { SleepTimer.shared.endOfTrack() } else if let minutes = Int(value) { SleepTimer.shared.start(minutes: minutes) }

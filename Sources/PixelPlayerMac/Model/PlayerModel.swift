@@ -141,7 +141,27 @@ final class PlayerModel {
     var onboardingStep = 0
     /// The song whose details are shown in a sheet.
     var infoSong: Song?
-    var shuffle = false
+    /// Shuffle as in Spotify and in SpotCopy (Media3's shuffle mode): on, what comes after the current song plays in a mixed
+    /// order; off, it goes back to the list's own order. A list started while it is on plays mixed from the start.
+    var shuffle = false {
+        didSet {
+            guard shuffle != oldValue, !applyingShuffle else { return }
+            if shuffle {
+                unshuffled = upNext
+                upNext.shuffle()
+            } else if let original = unshuffled {
+                // Back to the list's order, without what played since and keeping songs that came in meanwhile.
+                let left = Set(upNext.map(\.id))
+                let known = Set(original.map(\.id))
+                upNext = original.filter { left.contains($0.id) } + upNext.filter { !known.contains($0.id) }
+                unshuffled = nil
+            }
+            RemoteController.shared.modesChanged()
+        }
+    }
+    /// What comes next in the list's own order, kept while shuffle is on to go back to.
+    private var unshuffled: [Song]?
+    private var applyingShuffle = false
     var repeatAll = true {
         didSet { RemoteController.shared.modesChanged() }
     }
@@ -223,8 +243,14 @@ final class PlayerModel {
             current = song
             position = 0
             isPlaying = true
+            if let index = context.firstIndex(of: song) { upNext = Array(context[(index + 1)...]) }
         } else {
             Playback.shared.play(song, in: context)
+        }
+        // With shuffle on, the rest of the list follows in a mixed order, as in Spotify.
+        if shuffle, !context.isEmpty {
+            unshuffled = upNext
+            upNext.shuffle()
         }
     }
 
@@ -297,9 +323,15 @@ final class PlayerModel {
     /// Plays a whole list from the top, or in a shuffled order.
     /// `from` names the list for its play button and "Next from" in the queue, when the songs alone do not tell.
     func play(_ songs: [Song], shuffled: Bool = false, from title: String? = nil) {
-        let list = shuffled ? songs.shuffled() : songs
-        if let first = list.first { play(first, in: list) }
-        if let title, !list.isEmpty { playingFrom = title }
+        // Shuffle play turns shuffle on, as in Spotify; with shuffle on any list starts on a random song.
+        if shuffled && !shuffle {
+            applyingShuffle = true
+            shuffle = true
+            applyingShuffle = false
+        }
+        guard let first = shuffle ? songs.randomElement() : songs.first else { return }
+        play(first, in: songs)
+        if let title { playingFrom = title }
     }
 
     /// The order each list of songs is shown in, once it was changed from the sort menu.
