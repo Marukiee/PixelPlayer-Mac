@@ -111,11 +111,12 @@ struct BarVolume: View {
                 }
                 .frame(height: 3)
                 .overlay(alignment: .leading) {
+                    // As in Spotify: the knob shows as soon as the pointer is over the bar.
                     Circle().fill(.white)
                         .shadow(color: .black.opacity(0.3), radius: 1.5, y: 0.5)
-                        .frame(width: 11, height: 11)
-                        .offset(x: filled - 5.5)
-                        .opacity(dragging ? 1 : 0)
+                        .frame(width: 12, height: 12)
+                        .offset(x: filled - 6)
+                        .opacity(hovering || dragging ? 1 : 0)
                 }
                 .frame(maxHeight: .infinity)
                 .contentShape(Rectangle())
@@ -131,6 +132,8 @@ struct BarVolume: View {
             }
             .frame(width: 92, height: 16)
             .animation(.easeOut(duration: 0.12), value: hovering || dragging)
+            // `PP_VOLUME_HOVER=1` shows the bar as under the pointer, for screenshots.
+            .onAppear { if Debug.active, ProcessInfo.processInfo.environment["PP_VOLUME_HOVER"] != nil { hovering = true } }
         }
         .help("Volume")
     }

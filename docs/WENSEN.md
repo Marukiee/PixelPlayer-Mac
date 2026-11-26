@@ -21,6 +21,7 @@ Alles wat Mark vroeg, met wat klaar is en wat nog moet. Bijgewerkt bij elke rond
 - Lijstkoppen zoals Spotify: kop in eigen kleur (donker), grotere witte titel, hoes groeit mee, 4 pt hoek, meta als "576 songs, 31 hr 21 min".
 - Liked Songs-hoes in Spotify's verloop met hun hartje.
 - App-icoon een tikje naar rechts.
+- Wit bolletje bij hover op voortgangsbalk en volume, zoals Spotify.
 
 ## In 0.2.7 (uitgebracht)
 

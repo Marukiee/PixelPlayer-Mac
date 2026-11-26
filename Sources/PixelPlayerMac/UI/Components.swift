@@ -93,13 +93,13 @@ struct ScrubBar: View {
                 Capsule().fill(active ? AnyShapeStyle(PP.primary) : AnyShapeStyle(Color.primary.opacity(0.8))).frame(width: played, height: 3)
             }
             .frame(height: 3)
-            // The knob only while it is dragged, as in Spotify.
+            // The knob at the end of what played, while the pointer is over the bar or drags it, as in Spotify.
             .overlay(alignment: .leading) {
                 Circle().fill(.white)
                     .shadow(color: .black.opacity(0.3), radius: 1.5, y: 0.5)
-                    .frame(width: 11, height: 11)
-                    .offset(x: played - 5.5)
-                    .opacity(dragX != nil ? 1 : 0)
+                    .frame(width: 12, height: 12)
+                    .offset(x: played - 6)
+                    .opacity(active ? 1 : 0)
             }
             .frame(maxHeight: .infinity)
             .overlay(alignment: .topLeading) {
