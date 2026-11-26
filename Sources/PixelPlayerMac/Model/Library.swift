@@ -426,6 +426,7 @@ final class Library {
             rebuild()
             status = .ready
             SonosLog.write(String(format: "library ready: %d server songs in %.1f s", serverSongs.count, Date().timeIntervalSince(started)))
+            reloadRetries = 0
             saveServerCache(account: client.config.server.absoluteString + "|" + client.config.user)
             await FavoritesSync.shared.sync()
             refreshDailyMix()
@@ -433,7 +434,29 @@ final class Library {
             await ScrobbleQueue.shared.send()
         } catch {
             status = .failed(error.localizedDescription)
+            SonosLog.write("library failed: \(error.localizedDescription)")
+            // Right after a launch or an update macOS can report the network as offline for a moment (Mark's Mac,
+            // 2026-11-26): the library then stayed without the server all session. Try again a few times.
+            if Self.isTransient(error), reloadRetries < Self.retryDelays.count {
+                let delay = Self.retryDelays[reloadRetries]
+                reloadRetries += 1
+                Task {
+                    try? await Task.sleep(for: .seconds(delay))
+                    if case .failed = status { await reload() }
+                }
+            }
         }
+    }
+
+    private var reloadRetries = 0
+    private static let retryDelays: [Double] = [2, 5, 15, 30, 60]
+
+    /// A network that is away for a moment, not a wrong password or a server that says no.
+    private static func isTransient(_ error: Error) -> Bool {
+        let error = error as NSError
+        guard error.domain == NSURLErrorDomain else { return false }
+        return [NSURLErrorNotConnectedToInternet, NSURLErrorNetworkConnectionLost, NSURLErrorTimedOut, NSURLErrorCannotConnectToHost,
+                NSURLErrorCannotFindHost, NSURLErrorDNSLookupFailed, NSURLErrorInternationalRoamingOff, NSURLErrorDataNotAllowed].contains(error.code)
     }
 
     // MARK: The server's list on disk
