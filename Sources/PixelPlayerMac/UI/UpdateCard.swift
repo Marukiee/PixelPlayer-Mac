@@ -45,7 +45,7 @@ struct UpdateCard: View {
         HStack(spacing: 12) {
             icon(phase)
             VStack(alignment: .leading, spacing: 1) {
-                Text(title(phase, release)).font(.headline).lineLimit(1)
+                Text(title(phase, release)).font(.mix(14, .bold)).lineLimit(1)
                 HStack(spacing: 6) {
                     Text(subtitle(phase, release))
                         .monospacedDigit()
@@ -57,7 +57,7 @@ struct UpdateCard: View {
                             .popover(isPresented: $showNotes, arrowEdge: .bottom) { notes(release) }
                     }
                 }
-                .font(.callout)
+                .font(.mix(12))
                 .foregroundStyle(.secondary)
                 .clipped()
             }
@@ -146,7 +146,7 @@ struct UpdateCard: View {
     /// The accent capsule; Update and the progress bar have one size, so the one turns into the other in place.
     private func pill(_ label: Text) -> some View {
         label
-            .font(.callout.weight(.semibold))
+            .font(.mix(12, .bold))
             .foregroundStyle(PP.onPrimary)
             .frame(width: 96, height: 30)
             .background(PP.primary, in: Capsule())
@@ -159,7 +159,7 @@ struct UpdateCard: View {
             Capsule().fill(PP.primary)
                 .frame(width: max(30, 96 * fraction))
                 .frame(maxWidth: .infinity, alignment: .leading)
-            label.font(.callout.weight(.semibold)).foregroundStyle(PP.onPrimary)
+            label.font(.mix(12, .bold)).foregroundStyle(PP.onPrimary)
         }
         .frame(width: 96, height: 30)
         .animation(.easeOut(duration: 0.25), value: fraction)
@@ -167,11 +167,11 @@ struct UpdateCard: View {
 
     private func notes(_ release: Updater.Release) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("What's new in \(release.version)").font(.headline)
+            Text("What's new in \(release.version)").font(.mix(14, .bold))
             ForEach(release.notes.components(separatedBy: .newlines).filter { $0.hasPrefix("\u{2022} ") }, id: \.self) { line in
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Image(systemName: "checkmark").font(.caption.weight(.bold)).foregroundStyle(.tint)
-                    Text(String(line.dropFirst(2))).font(.callout).fixedSize(horizontal: false, vertical: true)
+                    Text(String(line.dropFirst(2))).font(.mix(13)).fixedSize(horizontal: false, vertical: true)
                 }
             }
         }

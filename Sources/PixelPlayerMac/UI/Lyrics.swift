@@ -16,8 +16,10 @@ let sampleLyrics = [
     "We don't need a song",
 ]
 
-/// Where the lyrics of a song come from: a .lrc file beside the local file, the lyrics inside the file, or the server
-/// (only read, never written). Looked up once per song while the app runs.
+/// Where the lyrics of a song come from, in PixelPlayer on Android's order: synced lyrics from LRCLIB that fit the song's
+/// length first (those in a file are often timed to another release), then a .lrc file beside the local file, the lyrics
+/// inside the file, the server (only read, never written), and plain lyrics from LRCLIB last. Looked up once per song while
+/// the app runs.
 @MainActor
 enum LyricsLoader {
     private static var known: [String: Lyrics?] = [:]
@@ -25,10 +27,13 @@ enum LyricsLoader {
     static func lyrics(for song: Song) async -> Lyrics? {
         if let lyrics = known[song.id] { return lyrics }
         var found: Lyrics?
-        if let file = song.source.localURL { found = await LocalLyrics.lyrics(for: file) }
+        let online = await LRCLib.lookup(title: song.title, artist: song.artist, seconds: Double(song.seconds))
+        if let online, let lyrics = Lyrics(lrclib: online), lyrics.isSynced { found = lyrics }
+        if found == nil, let file = song.source.localURL { found = await LocalLyrics.lyrics(for: file) }
         if found == nil, let id = song.source.serverID, let client = Library.shared.client {
             found = await fromServer(client, id: id, artist: song.artist, title: song.title)
         }
+        if found == nil, let online { found = Lyrics(lrclib: online) }
         known[song.id] = .some(found)
         return found
     }
@@ -86,7 +91,7 @@ struct LyricsLines: View {
 
     private var empty: some View {
         Text("No lyrics for this song")
-            .font(.system(size: size * 0.6, weight: .semibold))
+            .font(.mix(size * 0.6, .bold))
             .foregroundStyle(.secondary)
     }
 
@@ -137,7 +142,7 @@ private struct LyricLine: View {
     var body: some View {
         // A timed empty line is a pause in the singing.
         Text(line.text.isEmpty && line.time != nil ? "\u{266A}" : line.text)
-            .font(.system(size: size, weight: .bold))
+            .font(.mix(size, .bold))
             .foregroundStyle(color)
             .fixedSize(horizontal: false, vertical: true)
             .contentShape(Rectangle())

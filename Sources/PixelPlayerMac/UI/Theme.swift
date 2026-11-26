@@ -5,72 +5,37 @@ import AppKit
 /// The property wrapper underneath is still there, so this alias builds with the Command Line Tools.
 typealias LocalState<Value> = SwiftUI.State<Value>
 
-/// The big page titles: Figtree (Resources/Fonts, SIL Open Font License), of forty free fonts the one that lies closest over
-/// Spotify's title font. Measured on open.spotify.com: eight titles in Spotify's own font against each candidate at the same
-/// cap height, Figtree shares 78% of the pixels (its S nearly exactly), Inter Display 74%, SF Pro 69%. Weight 800, a step
-/// under the closest fit of 850, because Mark found 850 a touch too heavy. The
-/// closest fit has the letters 1.9% of the size closer and the spaces 6.9% narrower.
+/// The big page titles at 800. Spotify's own title letter when Mix is imported (see `FontStore`); otherwise Figtree
+/// (Resources/Fonts, SIL Open Font License), of forty free fonts the one that lies closest over Spotify's title letter
+/// (measured on open.spotify.com: Figtree shares 78% of the pixels, Inter Display 74%, SF Pro 69%), with its own kerning.
 enum TitleFont {
-    private static let base: CTFontDescriptor? = {
+    private static let figtreeBase: CTFontDescriptor? = {
         guard let url = Bundle.main.url(forResource: "FigtreeVariable", withExtension: "ttf", subdirectory: "Fonts"),
               let found = CTFontManagerCreateFontDescriptorsFromURL(url as CFURL) as? [CTFontDescriptor] else { return nil }
         let axes: [Int: Double] = [0x7767_6874: 800]  // wght
-        // Figtree's own kerning off: the spacing below takes its place.
-        let kerning: [[CFString: Any]] = [[kCTFontOpenTypeFeatureTag: "kern", kCTFontOpenTypeFeatureValue: 0]]
-        return CTFontDescriptorCreateCopyWithAttributes(found[0], [kCTFontVariationAttribute: axes, kCTFontFeatureSettingsAttribute: kerning] as CFDictionary)
+        return CTFontDescriptorCreateCopyWithAttributes(found[0], [kCTFontVariationAttribute: axes] as CFDictionary)
     }()
 
-    /// Spotify's title letters sit closer or wider per letter than Figtree's. Fitted on every pair of these letters drawn in
-    /// Spotify's own title font on open.spotify.com (Mark, 2026-11-26): what each letter takes off on its right and adds or
-    /// takes off on its left, in em. The gaps then differ 3.1 px on 142 px capitals over all pairs, against 4.5 px with one
-    /// spacing for every letter. Letters not in the list take the average.
-    private static let spacedLetters = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789åäöéü&'.,-!?")
-    private static let rightSide: [Double] = [
-        -0.034, -0.021, -0.001, -0.02, -0.044, -0.029, 0.01, -0.027, -0.027, -0.022, -0.048, -0.028, -0.026,
-        -0.027, -0.021, -0.014, -0.022, -0.04, -0.028, -0.057, -0.025, -0.049, -0.037, -0.049, -0.075, -0.025,
-        -0.027, -0.019, 0.001, -0.017, -0.01, -0.014, -0.022, -0.019, -0.027, -0.029, -0.035, -0.017, -0.018,
-        -0.018, -0.022, -0.019, -0.019, -0.027, -0.021, -0.028, -0.02, -0.023, -0.026, -0.039, -0.024, -0.013,
-        -0.009, -0.038, -0.013, -0.014, -0.029, -0.017, -0.013, -0.04, -0.017, -0.013, -0.024, -0.023, -0.022,
-        -0.011, -0.021, 0.004, -0.05, -0.041, -0.011, -0.034, -0.041, -0.021,
-    ]
-    private static let leftSide: [Double] = [
-        -0.009, 0, 0.003, 0, 0, 0, 0.003, 0, 0, 0.008, 0, 0, 0,
-        0, 0.002, 0, 0.002, 0, 0.012, -0.023, 0.002, -0.019, -0.008, -0.016, -0.042, 0,
-        0.002, 0.007, -0.002, 0.001, -0.002, -0.002, 0.001, 0.006, -0.004, 0.045, 0.007, 0.007, 0.002,
-        0.002, -0.002, -0.003, 0.001, 0.002, 0.007, -0.003, 0.004, -0.003, -0.004, -0.01, -0.008, 0.008,
-        0.014, -0.021, 0.019, 0.02, 0.013, 0.008, 0.011, -0.001, 0.008, 0.012, 0.002, 0.004, -0.001,
-        -0.002, 0.005, -0.004, -0.026, -0.018, 0.015, -0.011, -0.016, 0.001,
-    ]
-    private static let spacing: [Character: (right: Double, left: Double)] = Dictionary(
-        uniqueKeysWithValues: spacedLetters.indices.map { (spacedLetters[$0], (rightSide[$0], leftSide[$0])) })
-    /// A space is this much narrower than Figtree's.
-    private static let spaceSide = -0.081
+    private static let figtreeCapHeight: CGFloat =
+        figtreeBase.map { CTFontGetCapHeight(CTFontCreateWithFontDescriptor($0, 100, nil)) / 100 } ?? 0.705
 
     /// How high the capitals are, as a share of the size, so a title can be sized by its capitals as Spotify's are.
-    static let capHeight: CGFloat = base.map { CTFontGetCapHeight(CTFontCreateWithFontDescriptor($0, 100, nil)) / 100 } ?? 0.705
-
-    /// The title font; the system's heavy font when the file is missing.
-    static func font(_ size: CGFloat) -> Font {
-        guard let base else { return .system(size: size, weight: .heavy) }
-        return Font(CTFontCreateWithFontDescriptor(base, size, nil))
+    @MainActor static var capHeight: CGFloat {
+        FontStore.shared.font(size: 100, weight: .extrabold).map { CTFontGetCapHeight($0) / 100 } ?? figtreeCapHeight
     }
 
-    /// A title in that font with Spotify's spacing per letter. Without the file it falls back to the system font, unspaced.
-    static func text(_ string: String, size: CGFloat) -> Text {
-        guard base != nil else { return Text(string).font(.system(size: size, weight: .heavy)) }
-        let letters = Array(string)
-        var title = AttributedString()
-        for (index, letter) in letters.enumerated() {
-            let next = index + 1 < letters.count ? letters[index + 1] : nil
-            // What follows a letter: its own right side, and the left side of the next one (a space carries that itself).
-            var em = letter == " " ? spaceSide : (spacing[letter]?.right ?? -0.023)
-            if let next, next != " " { em += spacing[next]?.left ?? 0 }
-            var piece = AttributedString(String(letter))
-            piece.tracking = em * size
-            title += piece
+    /// Figtree at 800; the system's heavy font when the file is missing.
+    static func figtree(_ size: CGFloat) -> Font {
+        guard let figtreeBase else { return .system(size: size, weight: .heavy) }
+        return Font(CTFontCreateWithFontDescriptor(figtreeBase, size, nil))
+    }
+
+    /// A big title: Spotify's title letter with its closer letters, or Figtree.
+    @MainActor static func text(_ string: String, size: CGFloat) -> Text {
+        if let font = FontStore.shared.font(size: size, weight: .extrabold) {
+            return Text(string).font(Font(font)).tracking(FontStore.titleTracking(.extrabold) * size)
         }
-        title.font = font(size)
-        return Text(title)
+        return Text(string).font(figtree(size))
     }
 }
 

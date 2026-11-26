@@ -41,9 +41,9 @@ struct OnboardingView: View {
         VStack(spacing: 16) {
             Spacer(minLength: 0)
             Image(nsImage: NSApp.applicationIconImage).resizable().frame(width: 128, height: 128)
-            Text("Welcome to PixelPlayer").font(.largeTitle.weight(.bold))
+            Text("Welcome to PixelPlayer").titleFont(32)
             Text("Your music from this Mac and from your Navidrome server in one place, on your speakers and your phone too. A few steps and you are listening.")
-                .font(.title3).foregroundStyle(.secondary).multilineTextAlignment(.center).frame(maxWidth: 440)
+                .font(.mix(16)).foregroundStyle(.secondary).multilineTextAlignment(.center).frame(maxWidth: 440)
             Spacer(minLength: 0)
         }
         .padding(32)
@@ -133,7 +133,7 @@ struct OnboardingView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Your phone")
                             Text("Pair it with this Mac, then on the phone: \(Text("PixelPlayer › Settings › Play from › Use this phone as remote player").bold()).")
-                                .font(.caption).foregroundStyle(.secondary)
+                                .font(.mix(12)).foregroundStyle(.secondary)
                         }
                     } icon: { Image(systemName: "iphone") }
                 }
@@ -143,7 +143,7 @@ struct OnboardingView: View {
                     Label {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Spotify")
-                            Text("Comes in a later version of PixelPlayer.").font(.caption).foregroundStyle(.secondary)
+                            Text("Comes in a later version of PixelPlayer.").font(.mix(12)).foregroundStyle(.secondary)
                         }
                     } icon: { Image(systemName: "music.note.list") }
                 }
@@ -181,7 +181,7 @@ struct OnboardingView: View {
                 .frame(width: 64, height: 64)
                 .background(PP.primary.gradient, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                 .padding(.top, 36)
-            Text(title).font(.title.weight(.bold))
+            Text(title).titleFont(24)
             Text(text).foregroundStyle(.secondary).multilineTextAlignment(.center).frame(maxWidth: 440)
             content().frame(maxWidth: 520)
         }

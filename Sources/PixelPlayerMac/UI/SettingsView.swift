@@ -1,4 +1,5 @@
 import ServiceManagement
+import UniformTypeIdentifiers
 import SwiftUI
 import PixelPlayerKit
 
@@ -235,6 +236,7 @@ private struct AppearancePane: View {
                 .pickerStyle(.segmented)
                 .onChange(of: theme) { Appearance.apply(theme) }
             }
+            FontSection()
             Section {
                 Picker("Accent colour", selection: $accent) {
                     ForEach(["Green", "Blue", "Purple", "Pink"], id: \.self) { Text($0) }
@@ -246,7 +248,60 @@ private struct AppearancePane: View {
             .disabled(true)
         }
         .formStyle(.grouped)
-        .frame(height: 220)
+        .frame(height: 300)
+    }
+}
+
+/// Spotify's own letter, Mix, can't come with the app: it is imported here, as it downloads (a zip, the folder a browser
+/// unpacks it to, or font files), with the button or by dropping it on the row. Without it: Figtree and the system's font.
+private struct FontSection: View {
+    @LocalState private var store = FontStore.shared
+    @LocalState private var targeted = false
+
+    /// Where Mark gets the font (his choice, 2026-11-26).
+    private static let source = URL(string: "https://en.bestfonts.pro/font/spotify-mix")!
+
+    var body: some View {
+        Section {
+            LabeledContent("Font") {
+                HStack(spacing: 8) {
+                    if store.importing {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Text(store.name.map { "\($0), \(store.styleCount) styles" } ?? "Default").foregroundStyle(.secondary)
+                    }
+                    if store.available {
+                        Button("Use Default") { store.useDefault() }
+                    }
+                    Button("Import Font…") { choose() }
+                        .disabled(store.importing)
+                }
+            }
+            .padding(.vertical, 2)
+            .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Color.accentColor.opacity(targeted ? 0.15 : 0)).padding(-4))
+            .dropDestination(for: URL.self) { urls, _ in
+                store.importFonts(from: urls)
+                return !urls.isEmpty
+            } isTargeted: { targeted = $0 }
+        } footer: {
+            HStack(spacing: 6) {
+                if let problem = store.problem {
+                    Text(problem + ".").foregroundStyle(.secondary)
+                }
+                Link("Get the Font", destination: Self.source)
+            }
+        }
+    }
+
+    private func choose() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = true
+        panel.allowedContentTypes = [.zip, .font, .folder] + ["ttf", "otf", "woff", "woff2"].compactMap { UTType(filenameExtension: $0) }
+        panel.prompt = "Import"
+        panel.message = "Choose the font as it downloaded: the zip, its folder or the font files."
+        if panel.runModal() == .OK { store.importFonts(from: panel.urls) }
     }
 }
 

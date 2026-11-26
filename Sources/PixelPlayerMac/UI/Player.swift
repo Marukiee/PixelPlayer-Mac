@@ -18,8 +18,8 @@ struct NowPlayingInfo: View {
             .hoverLift(scale: 1.06)
             .help(model.fullPlayer ? "Close lyrics" : "Lyrics")
             VStack(alignment: .leading, spacing: 2) {
-                LinkText(model.current.title) { model.go(.album(model.current.album.id)) }.fontWeight(.semibold)
-                LinkText(model.current.artist) { model.go(.artist(model.current.artist)) }.foregroundStyle(.secondary)
+                LinkText(model.current.title) { model.go(.album(model.current.album.id)) }.font(.mix(14))
+                LinkText(model.current.artist) { model.go(.artist(model.current.artist)) }.font(.mix(12)).foregroundStyle(.secondary)
             }
             .lineLimit(1)
         }
@@ -229,8 +229,8 @@ struct NowPlayingView: View {
                 .help("Close lyrics")
                 // The song itself, title over artist, rather than the word Lyrics over both.
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(model.current.title).font(.headline)
-                    Text(model.current.artist).font(.callout).foregroundStyle(.secondary)
+                    Text(model.current.title).font(.mix(14))
+                    Text(model.current.artist).font(.mix(12)).foregroundStyle(.secondary)
                 }
                 .lineLimit(1)
             }
@@ -307,8 +307,8 @@ struct FullScreenPlayer: View {
                     // The check sits level with the artist, large like in Spotify's full screen player.
                     HStack(alignment: .bottom) {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(model.current.title).font(.system(size: 30, weight: .bold))
-                            Text(model.current.artist).font(.title3).foregroundStyle(.secondary)
+                            Text(model.current.title).titleFont(30)
+                            Text(model.current.artist).font(.mix(16)).foregroundStyle(.secondary)
                         }
                         .lineLimit(1)
                         Spacer()
@@ -560,9 +560,9 @@ struct QueueHeading<Trailing: View>: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline) {
             // As in Spotify: the headings bold and white.
-            Text(text).font(.system(size: 13, weight: .bold)).lineLimit(1)
+            Text(text).font(.mix(16, .bold)).lineLimit(1)
             Spacer(minLength: 8)
-            trailing.font(.subheadline)
+            trailing.font(.mix(14, .bold))
         }
         .padding(.top, 16).padding(.bottom, 6).padding(.horizontal, 8)
         .listRowSeparator(.hidden)
@@ -588,8 +588,8 @@ struct NowPlayingCard: View {
         HStack(spacing: 10) {
             CoverArt(album: song.album, radius: 4).frame(width: 36, height: 36)
             VStack(alignment: .leading, spacing: 2) {
-                Text(song.title).font(.system(size: 13)).foregroundStyle(.tint)
-                LinkText(song.artist) { model.go(.artist(song.artist)) }.font(.system(size: 11.5)).foregroundStyle(.secondary)
+                Text(song.title).font(.mix(13)).foregroundStyle(.tint)
+                LinkText(song.artist) { model.go(.artist(song.artist)) }.font(.mix(11.5)).foregroundStyle(.secondary)
             }
             .lineLimit(1)
             Spacer(minLength: 4)
@@ -640,8 +640,8 @@ struct QueueRow: View {
             .buttonStyle(PressStyle())
             .help("Play \(song.title)")
             VStack(alignment: .leading, spacing: 2) {
-                Text(song.title).font(.system(size: 13))
-                LinkText(song.artist) { model.go(.artist(song.artist)) }.font(.system(size: 11.5)).foregroundStyle(.secondary)
+                Text(song.title).font(.mix(13))
+                LinkText(song.artist) { model.go(.artist(song.artist)) }.font(.mix(11.5)).foregroundStyle(.secondary)
             }
             .lineLimit(1)
             Spacer(minLength: 4)
@@ -698,7 +698,7 @@ struct QueueDragPreview: View {
     var body: some View {
         HStack(spacing: 8) {
             CoverArt(album: song.album, radius: 3).frame(width: 24, height: 24)
-            Text(song.title).font(.system(size: 12, weight: .semibold)).lineLimit(1)
+            Text(song.title).font(.mix(12, .bold)).lineLimit(1)
         }
         .padding(.leading, 5).padding(.trailing, 10).padding(.vertical, 5)
         .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Color(white: 0.16)))
@@ -744,8 +744,8 @@ struct QueueEmpty: View {
     var body: some View {
         VStack(spacing: 8) {
             Image(systemName: symbol).font(.system(size: 26, weight: .medium)).foregroundStyle(.tertiary)
-            Text(title).font(.headline)
-            Text(text).font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
+            Text(title).font(.mix(16, .bold))
+            Text(text).font(.mix(14)).foregroundStyle(.secondary).multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 40).padding(.horizontal, 16)
@@ -1039,7 +1039,7 @@ struct QueueTabs: View {
             ForEach(QueueInspector.Tab.allCases) { item in
                 let chosen = item == tab
                 Text(item.rawValue)
-                    .font(.system(size: 14.5, weight: .semibold))
+                    .font(.mix(14.5, .bold))
                     .foregroundStyle(chosen || hovered == item ? AnyShapeStyle(.primary) : AnyShapeStyle(PP.icon))
                     .padding(.top, 8)
                     .padding(.bottom, 12)

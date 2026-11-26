@@ -70,6 +70,8 @@ matchingChecks()
 remoteChecks()
 mixChecks()
 libraryChecks()
+fontImportChecks()
+lrclibChecks()
 // The pure Sonos checks always run; the live part only with PP_FAKE_SONOS set.
 do {
     let done = DispatchSemaphore(value: 0)

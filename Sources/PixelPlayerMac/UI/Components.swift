@@ -34,8 +34,8 @@ struct SongLine: View {
         HStack(spacing: 10) {
             CoverArt(album: song.album, radius: 4).frame(width: cover, height: cover)
             VStack(alignment: .leading, spacing: 1) {
-                Text(song.title).fontWeight(playing ? .semibold : .regular)
-                Text(song.artist).font(.callout).foregroundStyle(.secondary)
+                Text(song.title).font(.mix(13))
+                Text(song.artist).font(.mix(12)).foregroundStyle(.secondary)
             }
             .lineLimit(1)
             Spacer(minLength: 4)
@@ -60,7 +60,7 @@ struct PositionSlider: View {
                 Spacer()
                 RemainingTime()
             }
-            .font(.caption.monospacedDigit())
+            .font(.mix(12, tabular: true))
             .foregroundStyle(.secondary)
         }
     }
@@ -105,7 +105,7 @@ struct ScrubBar: View {
             .overlay(alignment: .topLeading) {
                 if let pointer {
                     Text(timeString(Double(min(max(pointer, 0), width) / width) * duration))
-                        .font(.caption.monospacedDigit().weight(.medium))
+                        .font(.mix(12, .bold, tabular: true))
                         .foregroundStyle(.white)
                         .padding(.horizontal, 7)
                         .padding(.vertical, 3)
@@ -165,7 +165,7 @@ struct InlinePosition: View {
             ScrubBar()
             RemainingTime().frame(width: 40, alignment: .leading)
         }
-        .font(.caption.monospacedDigit())
+        .font(.mix(12, tabular: true))
         .foregroundStyle(.secondary)
     }
 }

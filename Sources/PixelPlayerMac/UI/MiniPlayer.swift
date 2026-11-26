@@ -11,8 +11,8 @@ struct MenuBarPanel: View {
             HStack(spacing: 12) {
                 CoverArt(album: model.current.album, radius: 6).frame(width: 52, height: 52)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(model.current.title).font(.headline)
-                    Text(model.current.artist).foregroundStyle(.secondary)
+                    Text(model.current.title).font(.mix(14))
+                    Text(model.current.artist).font(.mix(12)).foregroundStyle(.secondary)
                 }
                 .lineLimit(1)
                 Spacer(minLength: 0)
@@ -46,9 +46,9 @@ struct MenuBarPanel: View {
             Divider()
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
-                    Text("Up Next").font(.headline)
+                    Text("Up Next").font(.mix(14, .bold))
                     Spacer()
-                    Text("\(model.userQueue.count + model.upNext.count) songs").font(.caption).foregroundStyle(.secondary)
+                    Text("\(model.userQueue.count + model.upNext.count) songs").font(.mix(12)).foregroundStyle(.secondary)
                 }
                 ForEach(model.userQueue.prefix(2)) { song in
                     Button { Playback.shared.jump(to: song.id) } label: { SongLine(song: song, queued: true, cover: 28).contentShape(Rectangle()) }

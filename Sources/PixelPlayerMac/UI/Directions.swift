@@ -47,6 +47,8 @@ struct RootView: View {
             }
         }
         .animation(Motion.panel, value: hideLibrary)
+        // Spotify's letter for everything without a font of its own, at the size the system used (sheets keep the system's).
+        .font(.mix(13))
         // With keyboard navigation on in macOS, every button would get a square blue ring, also round covers and glass
         // buttons. The app's own buttons go without; Tab still moves between them.
         .focusEffectDisabled()
@@ -171,7 +173,7 @@ struct SearchField: View {
                 .padding(.trailing, 9)
             TextField("What do you want to play?", text: $model.searchText)
                 .textFieldStyle(.plain)
-                .font(.system(size: 12))
+                .font(.mix(12))
                 .focused(focused)
                 .onExitCommand { model.searchText = ""; focused.wrappedValue = false }
             if !model.searchText.isEmpty {
@@ -726,7 +728,7 @@ struct LibraryOptionsMenu: View {
             .pickerStyle(.palette)
         } label: {
             HStack(spacing: 6) {
-                Text(order.title).font(.system(size: 12, weight: .medium))
+                Text(order.title).font(.mix(12))
                 Image(systemName: (LibraryView(rawValue: view) ?? .list).symbol).font(.system(size: 12, weight: .medium))
             }
             .foregroundStyle(hovering ? PP.iconHover : PP.icon)
@@ -751,7 +753,7 @@ struct FilterChip: View {
     var body: some View {
         Group {
             if let title {
-                Text(title).font(.system(size: 12)).padding(.horizontal, 11)
+                Text(title).font(.mix(12)).padding(.horizontal, 11)
             } else {
                 Image(systemName: "xmark").font(.system(size: 10, weight: .bold)).frame(width: 26)
             }
@@ -809,7 +811,7 @@ struct LibraryTitleButton: View {
                     .opacity(iconIn ? 1 : 0)
                     .offset(x: iconIn ? 0 : -13)
                 Text("Your Library")
-                    .font(.system(size: 13, weight: .bold))
+                    .font(.mix(13, .bold))
                     .foregroundStyle(.primary)
             }
             .padding(.leading, 13)
@@ -1015,11 +1017,11 @@ struct LibraryRow: View {
                     Text(item.title).foregroundStyle(playing ? AnyShapeStyle(.tint) : AnyShapeStyle(.primary))
                     Text("• " + (item.subtitle.components(separatedBy: " • ").first ?? "")).foregroundStyle(.secondary)
                 }
-                .font(.system(size: 13))
+                .font(.mix(13))
                 .lineLimit(1)
             } else {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(item.title).font(.system(size: 13)).foregroundStyle(playing ? AnyShapeStyle(.tint) : AnyShapeStyle(.primary))
+                    Text(item.title).font(.mix(13)).foregroundStyle(playing ? AnyShapeStyle(.tint) : AnyShapeStyle(.primary))
                     HStack(spacing: 4) {
                         // A pinned item carries a small green pin, as in Spotify.
                         if Library.shared.isPinned(item.route) {
@@ -1027,7 +1029,7 @@ struct LibraryRow: View {
                         }
                         Text(item.subtitle)
                     }
-                    .font(.system(size: 11.5)).foregroundStyle(.secondary)
+                    .font(.mix(11.5)).foregroundStyle(.secondary)
                 }
                 .lineLimit(1)
             }
@@ -1080,8 +1082,8 @@ struct LibraryTile: View {
             ArtworkView(art: item.art, radius: 4)
                 .aspectRatio(1, contentMode: .fit)
                 .clipShape(item.kind == .artists ? AnyShape(Circle()) : AnyShape(RoundedRectangle(cornerRadius: 4, style: .continuous)))
-            Text(item.title).font(.system(size: 12, weight: .semibold)).lineLimit(1)
-            Text(item.subtitle).font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(1)
+            Text(item.title).font(.mix(12)).lineLimit(1)
+            Text(item.subtitle).font(.mix(11)).foregroundStyle(.secondary).lineLimit(1)
         }
         .padding(6)
         .background(RowHighlight(selected: selected, hovering: hovering))
@@ -1138,7 +1140,7 @@ struct NavRow: View {
             SpotifyIcon(name: selected ? icon + "_on" : icon)
                 .fill(style: FillStyle(eoFill: true))
                 .frame(width: 20, height: 20)
-            Text(title).font(.system(size: 13, weight: .bold))
+            Text(title).font(.mix(13, .bold))
             Spacer(minLength: 0)
         }
         .foregroundStyle(lit ? AnyShapeStyle(.primary) : AnyShapeStyle(PP.icon))

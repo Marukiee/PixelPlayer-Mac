@@ -10,7 +10,7 @@ import PixelPlayerKit
 /// - `PP_APPEARANCE=light|dark`, `PP_WINDOW=1180x760`, `PP_SLOW=6`, `PP_FREEZE=1`
 /// - `PP_SCRIPT=page:home,wait:1,shot:a-home,devices:1,wait:1.5,shot:a-devices,quit`
 ///   Steps: page (home, search, songs, liked, playlist:<id>, album:<id>, artist:<id>, shelf:<key>), filter, search:<text>, sort:<order>, queue (1|0), devices (1|0), full (1|0), indiv (1|0), play (1|0),
-///   minimize, resize:<w>x<h>, osfull (1|0), openapp (as Open PixelPlayer in the menu bar), resume, dump, render:<name>[:sheet] (without the screen),
+///   minimize, resize:<w>x<h>, osfull (1|0), fontimport:<path>, fontdefault, openapp (as Open PixelPlayer in the menu bar), resume, dump, render:<name>[:sheet] (without the screen),
 ///   appearance, wait, slow, shot:<name>, settings:<tab>, settingsshot:<name>, closesettings,
 ///   stage:<name> (menu bar panel), frames:<name>:<seconds>, quit.
 @MainActor
@@ -239,6 +239,14 @@ enum Debug {
         case "osfull":
             // `osfull:1|0`: the window's own full screen (the green button), not the app's full-screen player.
             if let window = mainWindow(), window.styleMask.contains(.fullScreen) != (value == "1") { window.toggleFullScreen(nil) }
+        case "fontimport":
+            // `fontimport:<path>`: what Import Font… does with a zip, a folder or a font file (set PP_FONTS_DIR to keep the
+            // copy out of Application Support).
+            FontStore.shared.importFonts(from: [URL(fileURLWithPath: value)])
+            while FontStore.shared.importing { try? await Task.sleep(for: .milliseconds(50)) }
+            FileHandle.standardError.write(Data("font: \(FontStore.shared.name ?? "default"), \(FontStore.shared.styleCount) styles, \(FontStore.shared.problem ?? "ok")\n".utf8))
+        case "fontdefault":
+            FontStore.shared.useDefault()
         case "openapp":
             // What Open PixelPlayer in the menu bar panel does.
             MainWindow.show(open: nil)
