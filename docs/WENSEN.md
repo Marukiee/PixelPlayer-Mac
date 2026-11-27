@@ -66,8 +66,8 @@ Alles wat Mark vroeg, met wat klaar is en wat nog moet. Bijgewerkt bij elke rond
 - Instelling Save mixes to Navidrome bij Navidrome in Settings › Sources; zonder account grijs en een klik zegt waarom. Uit: niets schrijven, wel de mix van vandaag van een andere app overnemen.
 - Welkom vraagt na het inloggen of je mixen naar Navidrome wilt (Yes of Not now), alleen met account; wie het welkom al zag krijgt alleen die vraag, een keer. Tot het antwoord schrijft de Mac niets.
 - Tab Developer in Settings: welkom opnieuw, Your Mix opnieuw maken (en schrijven als het aan staat), laatste synchronisatie met tijd en uitkomst, servercache wissen, Sonos-log openen, versie en build. Welcome Show Again staat daar nu in plaats van bij General.
-
 - Sonos: nummers boven 48 kHz (31 van de 970) komen als FLAC 48 kHz 24-bit van Navidrome (getTranscodeDecision), zonder instelling op de server; nooit MP3 320, de keuze is weg. Eerder kreeg de speaker ze onveranderd in 96 kHz en sloeg ze over.
+
 ## In 0.2.7 (uitgebracht)
 
 - Accent Spotify-groen in plaats van blauw: play-knoppen massief groen met zwart teken, schuifjes, vinkjes.
