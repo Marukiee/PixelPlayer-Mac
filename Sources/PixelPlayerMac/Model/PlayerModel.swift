@@ -332,6 +332,8 @@ final class PlayerModel {
             userQueue = saved.userQueue.compactMap(library.song(id:))
             upNext = saved.upNext.compactMap(library.song(id:))
             playingFrom = saved.playingFrom
+            // Saved again at once, now with the song itself, so the next start shows it straight away.
+            if saved.song == nil { saveNowPlaying() }
         } else if !Debug.active, let first = library.yourMix.first {
             // Scripted runs start empty, so their checks do not depend on what a mix picks.
             current = first
