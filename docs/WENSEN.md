@@ -70,6 +70,7 @@ Alles wat Mark vroeg, met wat klaar is en wat nog moet. Bijgewerkt bij elke rond
 - Knoppen zoals Spotify: hoofdknop groen met zwarte tekst, tweede knop wit in een grijze ring, in het welkom en in Instellingen (was wit op lichtgroen en groen op donkergroen).
 - Leeg Home-scherm met Spotify's huisje in plaats van het huisje met noot.
 - Paden zoals op Android: stappen vet en wit, grijze pijltjes met ruimte. Telefoonpad klopt nu: PixelPlayer › Settings › Remote player › Use this phone as remote player (was Play from).
+- Wachtrij slepen: het plaatje onder de muis toont de echte hoes als net vierkantje (was soms een noot die buiten het vakje viel).
 
 ## In 0.2.7 (uitgebracht)
 

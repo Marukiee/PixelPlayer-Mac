@@ -418,6 +418,16 @@ enum Debug {
             if let image = renderer.nsImage, let tiff = image.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff) {
                 try? rep.representation(using: .png, properties: [:])?.write(to: file("ref-\(value).png"))
             }
+        case "dragpreview":
+            // `dragpreview:<title>` draws what hangs under the pointer while that song is dragged in the queue, made in one
+            // go as macOS makes it (no waiting for a cover to load), to dragpreview-<title>.png at twice the size.
+            if let song = Library.shared.songs.first(where: { $0.title == value }) {
+                let renderer = ImageRenderer(content: QueueDragPreview(song: song).environment(model))
+                renderer.scale = 2
+                if let image = renderer.nsImage, let tiff = image.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff) {
+                    try? rep.representation(using: .png, properties: [:])?.write(to: file("dragpreview-\(value).png"))
+                }
+            }
         case "quit":
             try? await Task.sleep(for: .seconds(0.5))
             NSApp.terminate(nil)

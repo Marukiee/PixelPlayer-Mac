@@ -179,12 +179,17 @@ struct RemoteCover: View {
     @LocalState private var image: NSImage?
 
     var body: some View {
+        // A cover already in memory shows at once, also in a picture made in one go (the one under the pointer while a
+        // song is dragged), where the loading below never gets its turn.
+        let shown = CoverCache.shared.cached(for: album) ?? image
         ZStack {
             LinearGradient(colors: [Color(hex: album.tint), Color(hex: album.tint).opacity(0.6)], startPoint: .topLeading, endPoint: .bottomTrailing)
-            if let image {
-                Image(nsImage: image).resizable().scaledToFill()
+            if let shown {
+                Image(nsImage: shown).resizable().scaledToFill()
             } else {
-                Image(systemName: "music.note").font(.system(size: 28, weight: .semibold)).foregroundStyle(.white.opacity(0.6))
+                // Never bigger than the cover: 28 pt on a big one, smaller on a small one.
+                Image(systemName: "music.note").resizable().scaledToFit()
+                    .frame(maxWidth: 28, maxHeight: 28).padding(6).foregroundStyle(.white.opacity(0.6))
             }
         }
         .task(id: album.id) { image = await CoverCache.shared.image(for: album) }
@@ -194,7 +199,15 @@ struct RemoteCover: View {
 /// Covers in memory and in ~/Library/Caches/PixelPlayer/covers, keyed by the server's cover id or the file path.
 actor CoverCache {
     static let shared = CoverCache()
-    private var memory: [String: NSImage] = [:]
+    /// The covers in memory, also readable at once from a view (NSCache is safe from any thread).
+    private nonisolated(unsafe) let quick = NSCache<NSString, NSImage>()
+
+    nonisolated static func key(for album: Album) -> String { album.coverArtID ?? album.localCover?.path ?? album.id }
+
+    /// A cover that is already in memory, without waiting.
+    nonisolated func cached(for album: Album) -> NSImage? { quick.object(forKey: Self.key(for: album) as NSString) }
+
+    private func keep(_ image: NSImage, _ key: String) { quick.setObject(image, forKey: key as NSString) }
     private let folder: URL = {
         // A scripted run keeps its covers to itself, apart from the real app's.
         let url = ProcessInfo.processInfo.environment["PP_DEBUG_DIR"].map { URL(fileURLWithPath: $0).appendingPathComponent("covers", isDirectory: true) }
@@ -204,10 +217,10 @@ actor CoverCache {
     }()
 
     func image(for album: Album) async -> NSImage? {
-        let key = album.coverArtID ?? album.localCover?.path ?? album.id
-        if let image = memory[key] { return image }
+        let key = Self.key(for: album)
+        if let image = cached(for: album) { return image }
         let file = folder.appendingPathComponent(key.replacingOccurrences(of: "/", with: "_") + ".img")
-        if let image = NSImage(contentsOf: file) { memory[key] = image; return image }
+        if let image = NSImage(contentsOf: file) { keep(image, key); return image }
         // A local album uses the cover inside its music file, unless the server has one; without one inside,
         // a picture in the album's folder (cover.jpg, folder.jpg and the like).
         if album.coverArtID == nil, let local = album.localCover {
@@ -217,7 +230,7 @@ actor CoverCache {
             }
             if let data, let image = NSImage(data: data) {
                 try? data.write(to: file)
-                memory[key] = image
+                keep(image, key)
                 return image
             }
             return nil
@@ -225,7 +238,7 @@ actor CoverCache {
         guard let url = await MainActor.run(body: { Library.shared.coverURL(for: album) }),
               let (data, _) = try? await URLSession.shared.data(from: url), let image = NSImage(data: data) else { return nil }
         try? data.write(to: file)
-        memory[key] = image
+        keep(image, key)
         return image
     }
 }
