@@ -186,7 +186,10 @@ final class PlayerModel {
     }
     var showDevices = false
     var fullPlayer = false
-    var searchText = ""
+    /// The search the results page shows: set by Enter or a suggestion, as in Spotify, not by every key.
+    var searchText = "" { didSet { searchDraft = searchText } }
+    /// What is typed in the search field now; the panel under it follows every key.
+    var searchDraft = ""
     var selectedSong: Song.ID?
     var settingsTab: SettingsTab = .general
     /// Raised to open the Settings window from a script.

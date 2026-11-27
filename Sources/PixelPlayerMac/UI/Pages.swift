@@ -897,7 +897,7 @@ struct SearchPage: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 36) {
-                if term.isEmpty { browse } else { results }
+                if term.isEmpty { browse } else if songs.isEmpty && albums.isEmpty { NoResults(term: term) } else { results }
             }
             .padding(.horizontal, margin)
             .padding(.top, margin)
@@ -967,6 +967,30 @@ struct SearchPage: View {
                     .onTapGesture { PlayerModel.shared.go(.album(album.id)) }
                     // Whatever is opened or played from the results goes into Recent searches, as in Spotify.
                     .simultaneousGesture(TapGesture().onEnded { SearchHistory.shared.remember(SearchHistory.code(album: album)) })
+                } else if let song = songs.first {
+                    // Only songs found: the best one is the top result, as in Spotify (the column stood empty before).
+                    VStack(alignment: .leading, spacing: 0) {
+                        HStack(alignment: .center, spacing: 16) {
+                            CoverArt(album: song.album, radius: 6).frame(width: 96, height: 96)
+                                .shadow(color: .black.opacity(0.2), radius: 10, y: 5)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(song.title).titleFont(32).lineLimit(2)
+                                Text("Song · \(song.artist)").foregroundStyle(PP.subdued).lineLimit(1)
+                            }
+                        }
+                        Spacer(minLength: 0)
+                        HStack {
+                            Spacer()
+                            PlayCircle(title: song.title, songs: { [song] + songs.filter { $0.id != song.id } })
+                        }
+                    }
+                    .padding(20)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(height: 224)
+                    .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .onTapGesture { PlayerModel.shared.go(.album(song.album.id)) }
+                    .simultaneousGesture(TapGesture().onEnded { SearchHistory.shared.remember(SearchHistory.code(song: song)) })
                 }
             }
             .frame(width: 320)
@@ -989,6 +1013,26 @@ struct SearchPage: View {
                 }
             }
         }
+    }
+}
+
+/// Nothing found, as Spotify says it: the search in the title, a tip under it, in the middle of the page.
+private struct NoResults: View {
+    let term: String
+
+    var body: some View {
+        VStack(spacing: 12) {
+            Text("No results found for \u{201C}\(term)\u{201D}")
+                .titleFont(24)
+                .multilineTextAlignment(.center)
+            Text("Please make sure your words are spelled correctly, or use fewer or different keywords.")
+                .font(.mix(16))
+                .foregroundStyle(PP.subdued)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: 480)
+        .frame(maxWidth: .infinity)
+        .padding(.top, 120)
     }
 }
 

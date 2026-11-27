@@ -59,6 +59,8 @@ enum PP {
     static let menu = adaptive(0xFFFFFF, 0x1F1F1F)
     static let menuHover = adaptive(0xEDEDED, 0x2A2A2A)
     static let fieldHover = adaptive(0xF7F7F7, 0x2A2A2A)
+    /// The panel under the search field: Spotify's #2A2A2A, the same as the field while typing.
+    static let searchPanel = adaptive(0xFFFFFF, 0x2A2A2A)
     /// Under the pointer in Your Library: #1F1F1F on the #121212 panel (Spotify's --background-highlight).
     static let rowHover = adaptive(0xEDEDED, 0x1F1F1F)
     /// The thin line before the browse button in the search field (measured #7C7C7C).

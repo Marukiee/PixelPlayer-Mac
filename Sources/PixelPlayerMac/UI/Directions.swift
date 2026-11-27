@@ -46,7 +46,8 @@ struct RootView: View {
                     .transition(.opacity.combined(with: .scale(scale: 1.02)))
                     .zIndex(10)
             }
-            // Spotify's menus, over everything.
+            // The panel under the search field, then Spotify's menus, over everything.
+            SearchPanelLayer().zIndex(19)
             MenuLayer().zIndex(20)
         }
         .animation(Motion.panel, value: hideLibrary)
@@ -225,8 +226,6 @@ struct SearchField: View {
     var focused: FocusState<Bool>.Binding
     @Environment(PlayerModel.self) private var model
     @LocalState private var hovering = false
-    /// Only a focus after launch opens the search page; the window hands the field focus by itself when it opens.
-    @LocalState private var armed = false
 
     var body: some View {
         @Bindable var model = model
@@ -239,20 +238,27 @@ struct SearchField: View {
                 .frame(width: 24, height: 24)
                 .foregroundStyle(active || hovering ? AnyShapeStyle(.primary) : AnyShapeStyle(PP.icon))
                 .padding(.trailing, 12)
-            TextField("What do you want to play?", text: $model.searchText)
+            TextField("What do you want to play?", text: $model.searchDraft)
                 .textFieldStyle(.plain)
                 .font(.mix(16))
                 // Spotify's cursor is white, not the accent green.
                 .tint(Color.primary)
                 .focused(focused)
                 .onChange(of: focused.wrappedValue) { _, now in
+                    // The panel under the field opens with the typing cursor (Spotify's recent searches, then suggestions).
+                    SearchPanel.shared.focused = now
+                    if now { SearchPanel.shared.typingStarted() }
                     guard now else { return }
                     DispatchQueue.main.async { (NSApp.keyWindow?.firstResponder as? NSTextView)?.insertionPointColor = .labelColor }
                 }
-                .onExitCommand { model.searchText = ""; focused.wrappedValue = false }
-            if !model.searchText.isEmpty {
+                .onChange(of: model.searchDraft) { SearchPanel.shared.typingStarted() }
+                // Enter searches, or opens the row the arrow keys are on.
+                .onSubmit { SearchPanel.shared.submit() }
+                // Esc closes the panel and ends the typing; the text stays.
+                .onExitCommand { SearchPanel.shared.close(); focused.wrappedValue = false }
+            if !model.searchDraft.isEmpty {
                 // Clearing keeps you typing, as in Spotify.
-                Button { model.searchText = ""; focused.wrappedValue = true } label: {
+                Button { model.searchText = ""; model.searchDraft = ""; focused.wrappedValue = true } label: {
                     PlayerIconImage(symbol: "xmark", size: 14).foregroundStyle(PP.icon)
                         .frame(width: 29, height: 29).contentShape(Rectangle())
                 }
@@ -270,20 +276,12 @@ struct SearchField: View {
         .background(Capsule().fill(hovering || active ? PP.fieldHover : PP.field))
         .overlay(Capsule().strokeBorder(Color.primary.opacity(active ? 1 : hovering ? 0.1 : 0), lineWidth: active ? 2 : 1))
         .contentShape(Capsule())
-        .onTapGesture { focused.wrappedValue = true }
+        .onTapGesture { focused.wrappedValue = true; SearchPanel.shared.typingStarted() }
         .onHover { hovering = $0 }
+        .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(MenuPresenter.space)) } action: { SearchPanel.shared.fieldFrame = $0 }
         // Lighter under the pointer in 0.05 s (Spotify's hover); the white ring comes at once.
         .animation(.easeIn(duration: (hovering ? 0.05 : 0.22) * Motion.slow), value: hovering)
         .animation(nil, value: active)
-        // A click in the field opens the search page with the recent searches, as in Spotify.
-        .onChange(of: focused.wrappedValue) { _, now in
-            guard now, armed, model.searchText.isEmpty, model.route != .search else { return }
-            model.go(.search)
-        }
-        .task {
-            try? await Task.sleep(for: .seconds(1.5))
-            armed = true
-        }
     }
 }
 
@@ -1230,6 +1228,8 @@ enum ClickAwayFocus {
               let field = editor.delegate as? NSView else { return }
         let point = field.convert(event.locationInWindow, from: nil)
         if field.bounds.contains(point) { return }
+        // A click on the search panel picks a row; the panel stays until the button comes up.
+        if SearchPanel.shared.contains(event.locationInWindow, in: window) { SearchPanel.shared.holding = true; return }
         window.makeFirstResponder(nil)
     }
 }

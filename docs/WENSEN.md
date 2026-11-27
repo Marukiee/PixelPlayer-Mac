@@ -78,6 +78,8 @@ Alles wat Mark vroeg, met wat klaar is en wat nog moet. Bijgewerkt bij elke rond
 - Bij het openen staat het laatste nummer er meteen, geen Not playing meer tussendoor.
 - Hoes-plus-songtekstscherm opent soepel: vervaagde achtergrond is een kant-en-klaar plaatje.
 - Mediatoetsen werken vanaf het openen en ook als de Sonos of de telefoon speelt (gingen anders naar Spotify).
+- Zoekpaneel onder het zoekveld zoals Spotify (gemeten): leeg toont het Recent searches, typen geeft vier suggesties (getypte deel vet) en daaronder nummers, artiesten, albums en playlists; pijltjes, Enter en Esc werken. Enter opent de resultatenpagina.
+- Niets gevonden: "No results found for ..." met een tip, in plaats van een lege pagina; alleen nummers gevonden: het beste nummer als Top result.
 
 ## In 0.2.7 (uitgebracht)
 

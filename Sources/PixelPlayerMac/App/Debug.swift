@@ -238,6 +238,25 @@ enum Debug {
             let responder = window?.firstResponder
             let line = "key=\(window?.isKeyWindow ?? false) responder=\(responder.map { String(describing: type(of: $0)) } ?? "nil") fieldEditor=\((responder as? NSTextView)?.isFieldEditor ?? false) caret=\((responder as? NSTextView)?.insertionPointColor.usingColorSpace(.sRGB).map { String(format: "%.2f %.2f %.2f", $0.redComponent, $0.greenComponent, $0.blueComponent) } ?? "-")"
             try? line.write(to: file("\(value).txt"), atomically: true, encoding: .utf8)
+        case "searchpanel":
+            // `searchpanel:1` opens the panel under the search field as a click in it does (a scripted run's window is
+            // not the active one, so the field never gets the typing cursor itself), `searchpanel:0` closes it.
+            SearchPanel.shared.focused = value == "1"
+            if value == "1" { SearchPanel.shared.typingStarted() }
+            try? await Task.sleep(for: .seconds(0.3))
+        case "draft":
+            // `draft:<text>` types that in the search field (the panel follows), `draft:` empties it.
+            model.searchDraft = value
+            try? await Task.sleep(for: .seconds(0.3))
+        case "searchkey":
+            // `searchkey:down` or `searchkey:up` moves along the panel's rows, `searchkey:enter` presses Enter.
+            if value == "enter" { SearchPanel.shared.submit() } else if let window = mainWindow(),
+               let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                            windowNumber: window.windowNumber, context: nil, characters: "", charactersIgnoringModifiers: "",
+                                            isARepeat: false, keyCode: value == "up" ? 126 : 125) {
+                NSApp.postEvent(event, atStart: false)
+            }
+            try? await Task.sleep(for: .seconds(0.3))
         case "searchfocus":
             // Puts the typing cursor in the search field, as ⌘L does.
             model.searchRequest += 1
