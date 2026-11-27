@@ -161,6 +161,16 @@ private func sonosPureChecks() {
     check(SonosTracks.sameStream("http://h/rest/stream?u=a&id=s2", "http://h/rest/stream?u=a&amp;id=s2"), "sonos: amp;id counts")
     check(SonosTracks.sameStream("http://h/rest/stream?id=s2", "") && SonosTracks.sameStream("http://h/x", "http://h/rest/stream?id=s3"), "sonos: unknown counts as same")
     check(SonosTracks.subsonicID("http://h/rest/stream?u=a&id=s%201#f") == "s 1", "sonos: id is URL-decoded")
+    check(SonosTracks.subsonicID("http://h/rest/getTranscodeStream?u=a&mediaId=m1&mediaType=song&transcodeParams=x.y.z") == "m1",
+          "sonos: a converted stream is known by its mediaId")
+    // Songs above 48 kHz go converted to FLAC 48 kHz through Navidrome's getTranscodeDecision, never as MP3.
+    let profile = (try? JSONSerialization.jsonObject(with: SonosTracks.speakerProfile)) as? [String: Any]
+    let converts = (profile?["transcodingProfiles"] as? [[String: Any]])?.compactMap { $0["audioCodec"] as? String }
+    check(converts == ["flac"], "sonos: speaker profile is JSON and converts only to FLAC")
+    // A real ticket from Navidrome 0.64.2 (test server): exp 1795938614.
+    let ticket = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJiZCI6MjQsImNoIjoxLCJleHAiOjE3OTU5Mzg2MDEsImYiOiJmbGFjIiwiaXNzIjoiTkQiLCJtaWQiOiI1NjdlMkVUa3gyNnJKOWtKRHhldjRZIiwic3IiOjQ4MDAwLCJ1YSI6MTc5NTc2NTc1M30.eMGpGFO9UcwoQb2PC1sWgKNZRBcP0aT6wGrFn2B0bkg"
+    check(SubsonicTranscodeDecision.expiry(ofTicket: ticket) == Date(timeIntervalSince1970: 1_795_938_601), "sonos: ticket expiry read from the JWT")
+    check(SubsonicTranscodeDecision.expiry(ofTicket: "not-a-ticket") == nil, "sonos: unreadable ticket has no expiry")
 
     // Controller rules
     check(SonosController.playStateCommand(wantPlaying: true, transport: "TRANSITIONING") == nil, "sonos: TRANSITIONING counts as playing")

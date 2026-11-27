@@ -171,7 +171,29 @@ public enum SonosTracks {
     }
 
     /// The `id` query parameter (also as `amp;id`, from a URL that came back escaped once too often), URL-decoded.
-    public static func subsonicID(_ uri: String) -> String? { queryValue("id", in: uri, alsoEscaped: true) }
+    public static func subsonicID(_ uri: String) -> String? {
+        queryValue("id", in: uri, alsoEscaped: true) ?? queryValue("mediaId", in: uri, alsoEscaped: true)
+    }
+
+    /// What a Sonos speaker plays, for Navidrome's getTranscodeDecision: the usual formats as they are, FLAC and ALAC only
+    /// up to 48 kHz and 24-bit. Anything else comes converted as FLAC, so it stays lossless (48 kHz, 24-bit at most).
+    public static let speakerProfile = Data("""
+    {"name":"Sonos","platform":"Sonos",
+     "directPlayProfiles":[
+      {"containers":["flac"],"audioCodecs":["flac"],"protocols":["http"],"maxAudioChannels":2},
+      {"containers":["mp3"],"audioCodecs":["mp3"],"protocols":["http"],"maxAudioChannels":2},
+      {"containers":["mp4","m4a"],"audioCodecs":["aac","alac"],"protocols":["http"],"maxAudioChannels":2},
+      {"containers":["ogg"],"audioCodecs":["vorbis"],"protocols":["http"],"maxAudioChannels":2},
+      {"containers":["wav","aiff"],"audioCodecs":["pcm"],"protocols":["http"],"maxAudioChannels":2}],
+     "transcodingProfiles":[{"container":"flac","audioCodec":"flac","protocol":"http","maxAudioChannels":2}],
+     "codecProfiles":[
+      {"type":"AudioCodec","name":"flac","limitations":[
+       {"name":"audioSamplerate","comparison":"LessThanEqual","values":["48000"],"required":true},
+       {"name":"audioBitdepth","comparison":"LessThanEqual","values":["24"],"required":true}]},
+      {"type":"AudioCodec","name":"alac","limitations":[
+       {"name":"audioSamplerate","comparison":"LessThanEqual","values":["48000"],"required":true},
+       {"name":"audioBitdepth","comparison":"LessThanEqual","values":["24"],"required":true}]}]}
+    """.utf8)
 
     static func queryValue(_ name: String, in uri: String, alsoEscaped: Bool = false) -> String? {
         guard let q = uri.firstIndex(of: "?") else { return nil }

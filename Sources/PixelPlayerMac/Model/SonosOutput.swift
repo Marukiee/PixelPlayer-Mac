@@ -33,6 +33,11 @@ final class SonosOutput {
     @ObservationIgnored private var clock: Timer?
     @ObservationIgnored private var tracks: [String: SonosTrackInput] = [:]
     @ObservationIgnored private var tracksClient: SubsonicClient?
+    /// Tickets from Navidrome for songs a speaker can't play as they are (FLAC above 48 kHz and the like): with one the
+    /// speaker gets them converted to FLAC 48 kHz, so they stay lossless. Never MP3. A ticket runs out after two days.
+    @ObservationIgnored private var conversions: [String: (ticket: String, until: Date)] = [:]
+    /// Whether the server can convert like that (OpenSubsonic `transcoding`); nil until asked.
+    @ObservationIgnored private var serverConverts: Bool?
     @ObservationIgnored private var lastLoggedSession = ""
 
     private var model: PlayerModel { .shared }
@@ -139,7 +144,7 @@ final class SonosOutput {
         model.refreshFromLibrary()
         // The speaker fetches the music from Navidrome. Without the server's copy of the song that plays it would skip
         // song after song (as it did through 25 songs on 2026-11-26), so it does not take over: the Mac plays on.
-        if track(model.current).streamURL == nil {
+        if Library.shared.fresh(model.current).source.serverID == nil || Library.shared.client == nil {
             if case .loading = Library.shared.status {
                 waitForLibrary(groupID: groupID, controller: controller)
             } else {
@@ -160,8 +165,9 @@ final class SonosOutput {
         startClock()
         let withoutServer = ([model.current] + model.userQueue + model.upNext).prefix(50).filter { Library.shared.fresh($0).source.serverID == nil }.count
         let first = Library.shared.fresh(model.current)
-        SonosLog.write("connect \(groupID) current=\(model.current.title) server=\(first.source.serverID ?? "none") notOnServerInNext50=\(withoutServer) login=\(Library.shared.client != nil) library=\(Library.shared.status) at=\(Int(model.position))s playing=\(model.isPlaying) format=\(first.source.suffix ?? "?")/\(first.source.sampleRate ?? 0) converted=\(Self.needsConverting(first) ? (Self.losslessHiRes ? "flac" : "mp3") : "no")")
+        SonosLog.write("connect \(groupID) current=\(model.current.title) server=\(first.source.serverID ?? "none") notOnServerInNext50=\(withoutServer) login=\(Library.shared.client != nil) library=\(Library.shared.status) at=\(Int(model.position))s playing=\(model.isPlaying) format=\(first.source.suffix ?? "?")/\(first.source.sampleRate ?? 0) converts=\(Self.needsConverting(first))")
         Task {
+            await prepareConversions()
             await controller.setSettings(addressSettings)
             let ok = await controller.connect(groupID: groupID)
             SonosLog.write("connect result \(ok)")
@@ -305,7 +311,10 @@ final class SonosOutput {
         model.isPlaying = true
         setAnchor(0, running: true)
         guard let controller else { return }
-        Task { await controller.localItemChanged(automatic: false) }
+        Task {
+            await prepareConversions()
+            await controller.localItemChanged(automatic: false)
+        }
     }
 
     func setPlaying(_ playing: Bool) {
@@ -324,7 +333,10 @@ final class SonosOutput {
 
     func queueChanged() {
         guard controlsPlayback, !applying, let controller else { return }
-        Task { await controller.localQueueChanged() }
+        Task {
+            await prepareConversions()
+            await controller.localQueueChanged()
+        }
     }
 
     func setMacVolume(_ value: Double) {
@@ -373,32 +385,55 @@ final class SonosOutput {
         if let known = tracks[song.id], known.streamURL != nil { return known }
         // Built once per song: the stream URL has a fresh salt each time, and the speaker compares it.
         let client = Library.shared.client
+        let converts = Self.needsConverting(song)
+        let ticket = song.source.serverID.flatMap { conversions[$0]?.ticket }
+        let stream: URL? = song.source.serverID.flatMap { id in
+            if converts, let ticket { return client?.transcodeStreamURL(id: id, ticket: ticket) }
+            return client?.streamURL(id: id)
+        }
         let input = SonosTrackInput(id: song.id, title: song.title, artist: song.artist, album: song.album.title, durationMs: song.seconds * 1000,
-                                    streamURL: song.source.serverID.flatMap { id in Self.stream(id: id, song: song, client: client) },
-                                    coverURL: Library.shared.coverURL(for: song.album, size: 500),
-                                    mimeType: Self.needsConverting(song) && Self.losslessHiRes ? "audio/flac"
-                                        : song.source.suffix.map { SonosTracks.mimeType(suffix: $0) })
-        tracks[song.id] = input
+                                    streamURL: stream, coverURL: Library.shared.coverURL(for: song.album, size: 500),
+                                    mimeType: converts && ticket != nil ? "audio/flac" : song.source.suffix.map { SonosTracks.mimeType(suffix: $0) })
+        // Without its ticket a song is built again next time, once the ticket may be there.
+        if !converts || ticket != nil { tracks[song.id] = input }
         return input
+    }
+
+    /// Gets the tickets for the songs in the queue that a speaker can't play as they are, before the speaker sees them.
+    /// Only those songs (31 of 970 in a library with some 96 kHz albums), a few at a time; a ticket is kept until it nearly runs out.
+    private func prepareConversions() async {
+        guard let client = Library.shared.client else { return }
+        let soon = Date().addingTimeInterval(3600)
+        var seen = Set<String>()
+        let wanted = ([model.current] + model.userQueue + model.upNext).map(Library.shared.fresh).filter(Self.needsConverting)
+            .compactMap(\.source.serverID).filter { (conversions[$0]?.until ?? .distantPast) < soon && seen.insert($0).inserted }
+        guard !wanted.isEmpty else { return }
+        if serverConverts == nil {
+            serverConverts = (try? await client.openSubsonicExtensions())?.contains("transcoding")
+        }
+        guard serverConverts == true else {
+            SonosLog.write("server can't convert: \(wanted.count) songs above 48 kHz go as they are and may be skipped (Navidrome too old for transcoding)")
+            return
+        }
+        let profile = SonosTracks.speakerProfile
+        let found = await withTaskGroup(of: (String, String?).self) { group in
+            var results: [(String, String?)] = []
+            for (index, id) in wanted.enumerated() {
+                if index >= 4, let done = await group.next() { results.append(done) }
+                group.addTask { (id, try? await client.transcodeDecision(id: id, clientInfo: profile).transcodeParams) }
+            }
+            for await done in group { results.append(done) }
+            return results
+        }
+        for case let (id, ticket?) in found {
+            conversions[id] = (ticket, SubsonicTranscodeDecision.expiry(ofTicket: ticket) ?? Date().addingTimeInterval(86_400))
+        }
+        SonosLog.write("converted to FLAC 48 kHz: \(found.filter { $0.1 != nil }.count) of \(wanted.count) songs")
     }
 
     /// Whether a song needs converting before a speaker can play it: FLAC above 48 kHz, Opus, DSD and the like.
     private static func needsConverting(_ song: Song) -> Bool {
         SonosTracks.needsTranscode(suffix: song.source.suffix, sampleRate: song.source.sampleRate)
-    }
-
-    /// Lossless FLAC at 48 kHz (needs a transcoding called flac in Navidrome), or MP3 320, which works without one.
-    static var losslessHiRes: Bool { (UserDefaults.standard.string(forKey: "sonos.hires") ?? "flac") == "flac" }
-
-    /// The stream for the speaker. Sonos plays FLAC only up to 48 kHz: those songs come converted from Navidrome, as FLAC
-    /// 16-bit 48 kHz or as MP3 320, or the speaker skips them.
-    private static func stream(id: String, song: Song, client: SubsonicClient?) -> URL? {
-        guard let url = client?.streamURL(id: id) else { return nil }
-        guard needsConverting(song), var parts = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return url }
-        let extra = losslessHiRes ? [URLQueryItem(name: "format", value: "flac")]
-            : [URLQueryItem(name: "maxBitRate", value: "320"), URLQueryItem(name: "format", value: "mp3")]
-        parts.queryItems = (parts.queryItems ?? []) + extra
-        return parts.url ?? url
     }
 
     fileprivate func snapshot() -> SonosLocalSnapshot? {

@@ -181,6 +181,32 @@ public struct SubsonicLyrics: Codable, Sendable, Hashable {
 
 // MARK: Client
 
+/// The server's answer to getTranscodeDecision (OpenSubsonic `transcoding` extension).
+public struct SubsonicTranscodeDecision: Decodable, Sendable, Equatable {
+    public struct Stream: Decodable, Sendable, Equatable {
+        public var codec: String?
+        public var audioSamplerate: Int?
+        public var audioBitdepth: Int?
+    }
+    public var canDirectPlay: Bool?
+    public var canTranscode: Bool?
+    /// The ticket for getTranscodeStream. A signed token that runs out (two days on Navidrome 0.64).
+    public var transcodeParams: String?
+    public var transcodeStream: Stream?
+
+    /// When the ticket runs out, from its `exp` (it is a JWT). Nil when it can't be read.
+    public static func expiry(ofTicket ticket: String) -> Date? {
+        let parts = ticket.split(separator: ".")
+        guard parts.count >= 2 else { return nil }
+        var payload = parts[1].replacingOccurrences(of: "-", with: "+").replacingOccurrences(of: "_", with: "/")
+        payload += String(repeating: "=", count: (4 - payload.count % 4) % 4)
+        guard let data = Data(base64Encoded: payload),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let exp = object["exp"] as? Double else { return nil }
+        return Date(timeIntervalSince1970: exp)
+    }
+}
+
 public struct SubsonicClient: Sendable {
     public let config: SubsonicConfig
     private let session: URLSession
@@ -368,6 +394,30 @@ public struct SubsonicClient: Sendable {
     public func avatarURL() -> URL { url("getAvatar", [.init(name: "username", value: config.user)]) }
 
     public func streamURL(id: String) -> URL { url("stream", [.init(name: "id", value: id)]) }
+
+    /// The OpenSubsonic extensions the server has, by name (such as `transcoding`). Only reads.
+    public func openSubsonicExtensions() async throws -> [String] {
+        struct Extension: Decodable { var name: String }
+        return try await get("getOpenSubsonicExtensions", key: "openSubsonicExtensions", as: [Extension].self).map(\.name)
+    }
+
+    /// Asks the server how a player that can do what `clientInfo` says (OpenSubsonic ClientInfo, as JSON) should get a
+    /// song: as it is, or converted. Only reads; the answer holds a ticket for `transcodeStreamURL`.
+    public func transcodeDecision(id: String, clientInfo: Data) async throws -> SubsonicTranscodeDecision {
+        var request = URLRequest(url: url("getTranscodeDecision", [.init(name: "mediaId", value: id), .init(name: "mediaType", value: "song")]))
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = clientInfo
+        let (data, response) = try await session.data(for: request)
+        if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) { throw SubsonicError.http(http.statusCode) }
+        return try Self.decode(data, key: "transcodeDecision", as: SubsonicTranscodeDecision.self)
+    }
+
+    /// The converted stream that a `transcodeDecision` ticket stands for.
+    public func transcodeStreamURL(id: String, ticket: String) -> URL {
+        url("getTranscodeStream", [.init(name: "mediaId", value: id), .init(name: "mediaType", value: "song"),
+                                   .init(name: "transcodeParams", value: ticket)])
+    }
 
     public func coverArtURL(id: String, size: Int? = nil) -> URL {
         url("getCoverArt", [.init(name: "id", value: id)] + (size.map { [.init(name: "size", value: "\($0)")] } ?? []))
