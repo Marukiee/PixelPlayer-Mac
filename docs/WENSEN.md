@@ -77,6 +77,7 @@ Alles wat Mark vroeg, met wat klaar is en wat nog moet. Bijgewerkt bij elke rond
 - Speler altijd even breed; te lange titel of artiest loopt zoals bij Spotify.
 - Bij het openen staat het laatste nummer er meteen, geen Not playing meer tussendoor.
 - Hoes-plus-songtekstscherm opent soepel: vervaagde achtergrond is een kant-en-klaar plaatje.
+- Mediatoetsen werken vanaf het openen en ook als de Sonos of de telefoon speelt (gingen anders naar Spotify).
 
 ## In 0.2.7 (uitgebracht)
 

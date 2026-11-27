@@ -36,6 +36,13 @@ final class Playback {
             }
         }
         setUpRemoteCommands()
+        // macOS sends the media keys to the app that says it plays. That is said for every song and every play or pause,
+        // wherever the sound comes from: this Mac, the speakers or a phone (before, only this Mac's own sound counted, so
+        // with Sonos the keys went to Spotify; Mark, 2026-11-27). The song from last time counts from the start.
+        if !Debug.active {
+            updateNowPlaying()
+            watchNowPlaying()
+        }
         NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { _ in
             MainActor.assumeIsolated { PlayerModel.shared.saveNowPlaying() }
         }
@@ -108,6 +115,8 @@ final class Playback {
 
     func seek(to seconds: Double) {
         guard !Library.shared.isSample else { return }
+        // Control Center shows the new place too when the speakers or a phone play.
+        defer { updateNowPlaying() }
         if RemoteController.shared.controlsPlayback { RemoteController.shared.seek(to: seconds); return }
         if SonosOutput.shared.controlsPlayback { SonosOutput.shared.seek(toMs: Int(seconds * 1000)); return }
         // While the seek is on its way the clock still reports the old place; those reports are ignored, so the lyrics and
@@ -117,7 +126,6 @@ final class Playback {
         player.seek(to: CMTime(seconds: seconds, preferredTimescale: 600), toleranceBefore: tolerance, toleranceAfter: tolerance) { [weak self] _ in
             DispatchQueue.main.async { MainActor.assumeIsolated { self?.seeking -= 1; self?.lastTick = nil } }
         }
-        updateNowPlaying()
     }
 
     func setVolume(_ value: Double) {
@@ -244,8 +252,24 @@ final class Playback {
         }
     }
 
+    /// Says it again whenever the song or play and pause change, from wherever that change came.
+    private func watchNowPlaying() {
+        withObservationTracking {
+            _ = model.current.id
+            _ = model.isPlaying
+        } onChange: {
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated {
+                    Playback.shared.updateNowPlaying()
+                    Playback.shared.watchNowPlaying()
+                }
+            }
+        }
+    }
+
     private func updateNowPlaying() {
         let song = model.current
+        guard !song.id.isEmpty else { return }
         MPNowPlayingInfoCenter.default().nowPlayingInfo = [
             MPMediaItemPropertyTitle: song.title,
             MPMediaItemPropertyArtist: song.artist,

@@ -11,6 +11,8 @@ struct PixelPlayerApp: App {
         // thickening macOS adds (Mark, 2026-11-26: the letter looked a weight heavier). Set before anything is drawn,
         // for this app only.
         UserDefaults.standard.set(0, forKey: "AppleFontSmoothing")
+        // The media keys and Control Center from the start, not only after the first press on play.
+        _ = Playback.shared
     }
 
     var body: some Scene {
