@@ -2,7 +2,7 @@ import SwiftUI
 
 // MARK: Player bar
 
-/// The song that plays: cover, title and artist. A click on the cover opens the lyrics.
+/// The song that plays: cover, title and artist. A click on the cover opens the large cover with the lyrics beside it.
 struct NowPlayingInfo: View {
     var cover: CGFloat = 48
     var round = false
@@ -10,13 +10,13 @@ struct NowPlayingInfo: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Button { model.setFullPlayer(!model.fullPlayer) } label: {
+            Button { model.setFullScreen(!model.fullScreen, window: false) } label: {
                 CoverArt(album: model.current.album, radius: round ? cover / 2 : 6)
                     .frame(width: cover, height: cover)
             }
             .buttonStyle(.plain)
             .hoverLift(scale: 1.06)
-            .help(model.fullPlayer ? "Close lyrics" : "Lyrics")
+            .help("Cover and lyrics")
             VStack(alignment: .leading, spacing: 2) {
                 LinkText(model.current.title) { model.go(.album(model.current.album.id)) }.font(.mix(14))
                 LinkText(model.current.artist) { model.go(.artist(model.current.artist)) }.font(.mix(12)).foregroundStyle(PP.subdued)

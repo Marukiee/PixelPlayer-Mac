@@ -234,15 +234,25 @@ final class PlayerModel {
         withAnimation(Motion.fade) { fullPlayer = on }
     }
 
-    /// The full screen player, and the window in macOS full screen with it (not during scripted captures).
-    func setFullScreen(_ on: Bool) {
+    /// The full screen player (large cover, lyrics beside it). From the full screen button the window goes into macOS full
+    /// screen with it (not during scripted captures); from a click on the cover it opens in the window as it is. Closing
+    /// it only leaves macOS full screen when opening it went there.
+    func setFullScreen(_ on: Bool, window wholeScreen: Bool = true) {
         let window = NSApp.windows.first(where: { $0.isVisible && $0.frame.width > 800 })
         // A focused search field would draw its ring over the full screen player.
         window?.makeFirstResponder(nil)
         withAnimation(Motion.morph) { fullScreen = on }
         guard !Debug.active, let window else { return }
-        if window.styleMask.contains(.fullScreen) != on { window.toggleFullScreen(nil) }
+        if on {
+            tookWholeScreen = wholeScreen && !window.styleMask.contains(.fullScreen)
+            if tookWholeScreen { window.toggleFullScreen(nil) }
+        } else {
+            if tookWholeScreen, window.styleMask.contains(.fullScreen) { window.toggleFullScreen(nil) }
+            tookWholeScreen = false
+        }
     }
+    /// Whether the full screen player put the window in macOS full screen, so closing it takes it out again.
+    @ObservationIgnored private var tookWholeScreen = false
 
     /// Plays a song, with the list it was picked from as what follows it.
     /// The list the music plays from, for "Next from …" in the queue; empty when it is not one of the library's lists.

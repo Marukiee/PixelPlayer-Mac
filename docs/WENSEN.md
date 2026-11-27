@@ -71,6 +71,7 @@ Alles wat Mark vroeg, met wat klaar is en wat nog moet. Bijgewerkt bij elke rond
 - Leeg Home-scherm met Spotify's huisje in plaats van het huisje met noot.
 - Paden zoals op Android: stappen vet en wit, grijze pijltjes met ruimte. Telefoonpad klopt nu: PixelPlayer › Settings › Remote player › Use this phone as remote player (was Play from).
 - Wachtrij slepen: het plaatje onder de muis toont de echte hoes als net vierkantje (was soms een noot die buiten het vakje viel).
+- Klik op de hoes in de speler opent de grote hoes met songtekst ernaast, in het venster; de knop rechts zet hem op volledig scherm.
 
 ## In 0.2.7 (uitgebracht)
 
