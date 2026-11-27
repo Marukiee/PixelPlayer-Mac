@@ -56,9 +56,11 @@ final class Playback {
         start(song)
     }
 
-    private func start(_ song: Song, at seconds: Double = 0) {
+    /// `remember` puts the song that played into the history; going back does not, it goes to the front of the queue.
+    private func start(_ song: Song, at seconds: Double = 0, remember: Bool = true) {
         endListen()
-        if model.current.id != "" && model.current.id != song.id { history.append(model.current) }
+        if remember { model.songStep = 1 }
+        if remember, model.current.id != "" && model.current.id != song.id { history.append(model.current) }
         model.current = song
         model.position = seconds
         guard !Library.shared.isSample else { return }
@@ -186,11 +188,12 @@ final class Playback {
         if model.position > 3 || history.isEmpty {
             seek(to: 0)
         } else {
+            // One step back: the song before plays, the one that played goes to the front of the queue. (It took two off
+            // the history before, and crashed on an empty one after two quick presses, Mark 2026-11-27.)
             let last = history.removeLast()
             model.upNext.insert(model.current, at: 0)
-            model.current = last
-            start(last)
-            history.removeLast()
+            model.songStep = -1
+            start(last, remember: false)
         }
     }
 

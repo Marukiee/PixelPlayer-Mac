@@ -2,11 +2,11 @@ import SwiftUI
 import PixelPlayerKit
 
 /// The drawn covers of the made-up sample music.
-enum ArtStyle: Hashable {
+enum ArtStyle: Hashable, Codable {
     case sunset, blueDisc, bubbles, hills, orbit, prism, aurora, tide, copperMoon
 }
 
-struct Album: Identifiable, Hashable {
+struct Album: Identifiable, Hashable, Codable {
     let id: String
     let title: String
     let artist: String
@@ -22,7 +22,7 @@ struct Album: Identifiable, Hashable {
 
 /// Where a song can be played from. A song that is both on this Mac and on the server keeps both,
 /// and the local file always wins for playing on the Mac.
-struct SongSource: Hashable {
+struct SongSource: Hashable, Codable {
     var localURL: URL? = nil
     var serverID: String? = nil
     /// The path as the server knows it, for matching against local files.
@@ -33,7 +33,7 @@ struct SongSource: Hashable {
     var sampleRate: Int? = nil
 }
 
-struct Song: Identifiable, Hashable {
+struct Song: Identifiable, Hashable, Codable {
     let id: String
     let title: String
     let album: Album

@@ -72,6 +72,11 @@ Alles wat Mark vroeg, met wat klaar is en wat nog moet. Bijgewerkt bij elke rond
 - Paden zoals op Android: stappen vet en wit, grijze pijltjes met ruimte. Telefoonpad klopt nu: PixelPlayer › Settings › Remote player › Use this phone as remote player (was Play from).
 - Wachtrij slepen: het plaatje onder de muis toont de echte hoes als net vierkantje (was soms een noot die buiten het vakje viel).
 - Klik op de hoes in de speler opent de grote hoes met songtekst ernaast, in het venster; de knop rechts zet hem op volledig scherm.
+- Vorige nummer crasht niet meer bij twee keer snel terug (haalde er twee uit de geschiedenis).
+- Wissel van nummer in de speler komt van de goede kant (volgende rechts, vorige links), kort en binnen zijn eigen plek.
+- Speler altijd even breed; te lange titel of artiest loopt zoals bij Spotify.
+- Bij het openen staat het laatste nummer er meteen, geen Not playing meer tussendoor.
+- Hoes-plus-songtekstscherm opent soepel: vervaagde achtergrond is een kant-en-klaar plaatje.
 
 ## In 0.2.7 (uitgebracht)
 

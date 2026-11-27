@@ -283,20 +283,48 @@ final class PlayerModel {
         var userQueue: [String]
         var upNext: [String]
         var playingFrom: String
+        /// The song itself, so the player shows it the moment the app opens, before the library is read.
+        var song: Song?
+    }
+
+    /// Which way the last change of song went: 1 on to the next, -1 back. The song in the player comes in from that side.
+    @ObservationIgnored var songStep = 1
+    /// The song from last time is in the player already; its queue follows once the library is there.
+    @ObservationIgnored private var queueToRestore = false
+
+    private init() {
+        // The song from last time straight away, from what was saved with it, so the player never shows Not playing for
+        // a moment while the library loads (Mark, 2026-11-27). Scripted runs start empty.
+        guard !Debug.active, let data = Store.defaults.data(forKey: "player.last"),
+              let saved = try? JSONDecoder().decode(Saved.self, from: data), let song = saved.song else { return }
+        current = song
+        position = min(saved.position, Double(song.seconds))
+        playingFrom = saved.playingFrom
+        queueToRestore = true
     }
 
     /// Remembers the song, the place in it and the queue, so the player is never empty when the app opens again.
     func saveNowPlaying() {
         guard !Library.shared.isSample, !current.id.isEmpty else { return }
         let saved = Saved(id: current.id, position: position, userQueue: userQueue.map(\.id), upNext: upNext.prefix(300).map(\.id),
-                          playingFrom: playingFrom)
+                          playingFrom: playingFrom, song: current)
         if let data = try? JSONEncoder().encode(saved) { Store.defaults.set(data, forKey: "player.last") }
     }
 
     /// Once the library is there: the last song where it was, paused, with its queue; the first time, Your Mix.
     func restoreIfEmpty() {
-        guard current.id.isEmpty, !Library.shared.isSample, Library.shared.hasMusic else { return }
+        guard current.id.isEmpty || queueToRestore, !Library.shared.isSample, Library.shared.hasMusic else { return }
         let library = Library.shared
+        if queueToRestore {
+            // The song is there from the start; now its queue, and the library's own copy of it.
+            queueToRestore = false
+            guard let data = Store.defaults.data(forKey: "player.last"), let saved = try? JSONDecoder().decode(Saved.self, from: data),
+                  saved.id == current.id else { return }
+            if let song = library.song(id: saved.id) { current = song }
+            userQueue = saved.userQueue.compactMap(library.song(id:))
+            upNext = saved.upNext.compactMap(library.song(id:))
+            return
+        }
         if let data = Store.defaults.data(forKey: "player.last"), let saved = try? JSONDecoder().decode(Saved.self, from: data),
            let song = library.song(id: saved.id) {
             current = song

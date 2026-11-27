@@ -475,6 +475,55 @@ struct LinkText: View {
     }
 }
 
+/// One line of text that runs when it is too long for its place, as Spotify's title in the player: it waits, glides to
+/// its end, waits, glides back, and so on. It fades at the edge it runs under. Text that fits stands still, as wide as
+/// it is (so what follows sits right after it).
+struct Marquee<Content: View>: View {
+    @ViewBuilder var content: Content
+    @LocalState private var textWidth: CGFloat = 0
+    @LocalState private var boxWidth: CGFloat = 0
+    @LocalState private var offset: CGFloat = 0
+
+    private var overflow: CGFloat { max(0, textWidth - boxWidth) }
+
+    var body: some View {
+        content
+            .lineLimit(1)
+            .fixedSize()
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { textWidth = $0 }
+            .offset(x: offset)
+            .frame(minWidth: 0, idealWidth: textWidth, maxWidth: textWidth > 0 ? textWidth : nil, alignment: .leading)
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { boxWidth = $0 }
+            .clipped()
+            .mask {
+                HStack(spacing: 0) {
+                    LinearGradient(colors: [.clear, .black], startPoint: .leading, endPoint: .trailing)
+                        .frame(width: offset < 0 ? 12 : 0)
+                    Rectangle()
+                    LinearGradient(colors: [.black, .clear], startPoint: .leading, endPoint: .trailing)
+                        .frame(width: overflow > 0 && offset > -overflow ? 12 : 0)
+                }
+            }
+            .task(id: overflow) { await run() }
+    }
+
+    private func run() async {
+        offset = 0
+        guard overflow > 0, !Debug.active || Debug.marquee else { return }
+        // About as fast as Spotify's: a long title takes a few seconds to go by.
+        let duration = max(1.5, Double(overflow) / 30)
+        while !Task.isCancelled {
+            try? await Task.sleep(for: .seconds(2.5))
+            guard !Task.isCancelled else { return }
+            withAnimation(.linear(duration: duration)) { offset = -overflow }
+            try? await Task.sleep(for: .seconds(duration + 2))
+            guard !Task.isCancelled else { return }
+            withAnimation(.linear(duration: duration)) { offset = 0 }
+            try? await Task.sleep(for: .seconds(duration))
+        }
+    }
+}
+
 /// The green bars Spotify shows on a tile that plays: four thin bars that move while the music plays and rest when it
 /// pauses.
 struct PlayingBars: View {

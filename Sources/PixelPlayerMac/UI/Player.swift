@@ -1,4 +1,5 @@
 import SwiftUI
+import CoreImage
 
 // MARK: Player bar
 
@@ -9,6 +10,21 @@ struct NowPlayingInfo: View {
     @Environment(PlayerModel.self) private var model
 
     var body: some View {
+        // The old song and the new one lie on top of each other while they change (side by side they pushed the row
+        // about). The new one comes in a little from the side the change went, next from the right and back from the
+        // left, and stays inside its own place: nothing slides over the controls.
+        ZStack(alignment: .leading) {
+            song
+                .id(model.current.id)
+                .transition(.asymmetric(insertion: .offset(x: 14 * CGFloat(model.songStep)).combined(with: .opacity),
+                                        removal: .opacity))
+        }
+        .clipShape(Rectangle().inset(by: -4))
+        .animation(.easeOut(duration: 0.22), value: model.current.id)
+        .spotContextMenu { SongMenu.entries(for: PlayerModel.shared.current) }
+    }
+
+    private var song: some View {
         HStack(spacing: 12) {
             Button { model.setFullScreen(!model.fullScreen, window: false) } label: {
                 CoverArt(album: model.current.album, radius: round ? cover / 2 : 6)
@@ -17,17 +33,12 @@ struct NowPlayingInfo: View {
             .buttonStyle(.plain)
             .hoverLift(scale: 1.06)
             .help("Cover and lyrics")
+            // A title or artist too long for its place runs, as in Spotify, so all of it can be read.
             VStack(alignment: .leading, spacing: 2) {
-                LinkText(model.current.title) { model.go(.album(model.current.album.id)) }.font(.mix(14))
-                LinkText(model.current.artist) { model.go(.artist(model.current.artist)) }.font(.mix(12)).foregroundStyle(PP.subdued)
+                Marquee { LinkText(model.current.title) { model.go(.album(model.current.album.id)) }.font(.mix(14)) }
+                Marquee { LinkText(model.current.artist) { model.go(.artist(model.current.artist)) }.font(.mix(12)).foregroundStyle(PP.subdued) }
             }
-            .lineLimit(1)
         }
-        // Another song slides in from the side and the old one fades, instead of everything changing at once.
-        .id(model.current.id)
-        .transition(.asymmetric(insertion: .move(edge: .trailing).combined(with: .opacity), removal: .opacity))
-        .animation(Motion.panel, value: model.current.id)
-        .spotContextMenu { SongMenu.entries(for: PlayerModel.shared.current) }
     }
 }
 
@@ -182,7 +193,9 @@ struct FloatingPlayer: View {
                 }
                 LikeButton(size: 17)
             }
-            .frame(minWidth: withTitle ? 170 : 0, maxWidth: 240, alignment: .leading)
+            // Always as wide, whatever the song is called: the capsule never grows or shrinks with the title.
+            .frame(width: withTitle ? 240 : nil, alignment: .leading)
+            .frame(maxWidth: withTitle ? nil : 240, alignment: .leading)
             VStack(spacing: 2) {
                 TransportButtons(modes: !narrow, roundPlay: true)
                 InlinePosition()
@@ -197,8 +210,6 @@ struct FloatingPlayer: View {
         // Spotify's black bar.
         .glassEffect(.regular.tint(PP.adaptive(0xFFFFFF, 0x000000, opacityLight: 0.25, opacityDark: 0.45)), in: .capsule)
         .fixedSize(horizontal: true, vertical: false)
-        // A longer or shorter title makes the capsule grow or shrink smoothly, never in a jump.
-        .animation(Motion.panel, value: PlayerModel.shared.current.id)
     }
 }
 
@@ -256,19 +267,57 @@ struct NowPlayingView: View {
 /// The cover, blurred far, under a material: the colour of the song without the picture.
 struct CoverBackdrop: View {
     let album: Album
+    @LocalState private var blurred: NSImage?
 
     var body: some View {
         ZStack {
-            CoverArt(album: album, radius: 0)
-                .scaledToFill()
-                .blur(radius: 70)
-                .opacity(0.5)
-            Rectangle().fill(.regularMaterial)
+            if album.art != nil {
+                // The drawn covers of the sample music: blurred live, as before.
+                CoverArt(album: album, radius: 0).scaledToFill().blur(radius: 70).opacity(0.5)
+                Rectangle().fill(.regularMaterial)
+            } else {
+                // A blurred picture made once per cover (small, then stretched), over a solid ground: nothing is blurred
+                // while the view opens or the lyrics run. A live blur of the whole window and a glass layer over what lay
+                // behind it made opening stutter (Mark, 2026-11-27).
+                PP.page
+                if let blurred {
+                    Image(nsImage: blurred).resizable().interpolation(.high).scaledToFill()
+                        .opacity(0.55)
+                        .transition(.opacity)
+                }
+                Color.black.opacity(0.25)
+            }
+        }
+        .animation(Motion.fade, value: blurred == nil)
+        .task(id: album.id) {
+            guard album.art == nil, let cover = await CoverCache.shared.image(for: album) else { blurred = nil; return }
+            blurred = await BlurredCover.make(from: cover, key: CoverCache.key(for: album))
         }
         .clipped()
         // Up to the top and bottom of the window, behind the floating player too, but not under the sidebar: the sidebar
         // keeps its own colour.
         .ignoresSafeArea(.all, edges: [.top, .bottom])
+    }
+}
+
+/// A cover blurred into a soft wash for behind the full screen player: drawn small with Core Image, kept per cover.
+enum BlurredCover {
+    private nonisolated(unsafe) static let made = NSCache<NSString, NSImage>()
+
+    static func make(from cover: NSImage, key: String) async -> NSImage? {
+        if let done = made.object(forKey: key as NSString) { return done }
+        guard let cg = cover.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return nil }
+        let image = await Task.detached(priority: .userInitiated) { () -> CGImage? in
+            // 96 pixels across is plenty for something this soft, and quick to blur.
+            let side: CGFloat = 96
+            let small = CIImage(cgImage: cg).transformed(by: CGAffineTransform(scaleX: side / CGFloat(cg.width), y: side / CGFloat(cg.height)))
+            let soft = small.clampedToExtent().applyingGaussianBlur(sigma: 7).cropped(to: small.extent)
+            return CIContext(options: [.useSoftwareRenderer: false]).createCGImage(soft, from: small.extent)
+        }.value
+        guard let image else { return nil }
+        let result = NSImage(cgImage: image, size: NSSize(width: image.width, height: image.height))
+        made.setObject(result, forKey: key as NSString)
+        return result
     }
 }
 
