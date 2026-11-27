@@ -1008,7 +1008,7 @@ struct DevicesPopover: View {
                 Text("Phones")
             } footer: {
                 if remote.phones.isEmpty {
-                    Text("Pair a phone with this Mac and turn on \(Text("PixelPlayer › Settings › Play from › Use this phone as remote player").bold()) on it.")
+                    Text("Pair a phone with this Mac and turn on \(Text.path("PixelPlayer", "Settings", "Remote player", "Use this phone as remote player")) on it.")
                         .foregroundStyle(.secondary)
                 }
             }

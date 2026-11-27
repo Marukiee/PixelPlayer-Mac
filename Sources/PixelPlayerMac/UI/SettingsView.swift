@@ -118,7 +118,7 @@ private struct SourcesPane: View {
             } header: {
                 Text("Navidrome")
             } footer: {
-                Text("\(Text("Navidrome › Settings › Users").bold()). Only a login token is kept, not the password itself.")
+                Text("\(Text.path("Navidrome", "Settings", "Users")). Only a login token is kept, not the password itself.")
                     .foregroundStyle(.secondary)
             }
             Section {
@@ -127,7 +127,7 @@ private struct SourcesPane: View {
             } header: {
                 Text("Phones")
             } footer: {
-                Text("Pair the phone with this Mac, then on the phone: \(Text("PixelPlayer › Settings › Play from › Use this phone as remote player").bold()). It shows up in Connect.")
+                Text("Pair the phone with this Mac, then on the phone: \(Text.path("PixelPlayer", "Settings", "Remote player", "Use this phone as remote player")). It shows up in Connect.")
                     .foregroundStyle(.secondary)
             }
             Section {

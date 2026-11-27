@@ -1114,9 +1114,10 @@ struct ConnectPage: View {
     var body: some View {
         let library = Library.shared
         VStack(spacing: 20) {
-            Image(systemName: "music.note.house")
-                .font(.system(size: 44, weight: .semibold))
-                .foregroundStyle(.tint)
+            // Spotify's own house, the one of Home in the top bar.
+            SpotifyIcon(name: "home_on")
+                .fill(PP.primary, style: FillStyle(eoFill: true))
+                .frame(width: 44, height: 44)
                 .frame(width: 96, height: 96)
                 .background(Circle().fill(Color.primary.opacity(0.06)))
             VStack(spacing: 6) {
@@ -1142,11 +1143,10 @@ struct ConnectPage: View {
                     model.settingsTab = .sources
                     openSettings()
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(PillButtonStyle(kind: .primary))
                 Button("Choose Music Folder…") { _ = MusicFolder.choose() }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(PillButtonStyle(kind: .outline))
             }
-            .controlSize(.large)
         }
         .frame(maxWidth: 440)
         .frame(maxWidth: .infinity, maxHeight: .infinity)

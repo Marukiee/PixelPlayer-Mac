@@ -227,6 +227,44 @@ struct PressStyle: ButtonStyle {
     }
 }
 
+/// Spotify's buttons: the main one a green pill with black text, a second one a pill with a grey ring and white text,
+/// and in a dialog's footer plain white text. Bold and easy to read on the dark panels (the system's tinted buttons gave
+/// white on light green and green on dark green).
+struct PillButtonStyle: ButtonStyle {
+    enum Kind { case primary, outline, text }
+    var kind: Kind = .text
+    var height: CGFloat = 36
+
+    init(kind: Kind = .text, height: CGFloat = 36) { self.kind = kind; self.height = height }
+    init(prominent: Bool) { kind = prominent ? .primary : .text }
+
+    func makeBody(configuration: Configuration) -> some View {
+        PillBody(configuration: configuration, kind: kind, height: height)
+    }
+
+    private struct PillBody: View {
+        let configuration: Configuration
+        let kind: Kind
+        let height: CGFloat
+        @Environment(\.isEnabled) private var enabled
+
+        var body: some View {
+        configuration.label
+            .font(.mix(height >= 36 ? 15 : 13, .bold))
+            .foregroundStyle(kind == .primary ? PP.onPrimary : Color.primary)
+            .padding(.horizontal, kind == .text ? 14 : (height >= 36 ? 24 : 16))
+            .frame(height: height)
+            .background(Capsule().fill(kind == .primary ? PP.primary : Color.clear))
+            .overlay(Capsule().strokeBorder(kind == .outline ? Color.primary.opacity(0.45) : Color.clear, lineWidth: 1))
+            .contentShape(Capsule())
+            .hoverLift()
+            .opacity(!enabled ? 0.4 : configuration.isPressed ? 0.7 : 1)
+            .scaleEffect(configuration.isPressed ? pressedScale : 1)
+            .animation(Motion.bouncy, value: configuration.isPressed)
+        }
+    }
+}
+
 /// Hover without zooming, as in Spotify: what the pointer is on gets a little lighter.
 struct HoverLift: ViewModifier {
     var scale: CGFloat

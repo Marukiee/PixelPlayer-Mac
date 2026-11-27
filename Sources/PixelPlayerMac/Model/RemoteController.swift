@@ -201,7 +201,7 @@ final class RemoteController {
         guard active == phone else { newLink.close(); return }
         guard ok else {
             if first {
-                finish(note: "No answer. On the phone, turn on PixelPlayer › Settings › Play from › Use this phone as remote player.")
+                finish(note: "No answer. On the phone, turn on PixelPlayer › Settings › Remote player › Use this phone as remote player.")
                 if !Playback.shared.isPlayingHere { model.isPlaying = false }
             } else {
                 scheduleReconnect()

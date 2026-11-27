@@ -67,6 +67,9 @@ Alles wat Mark vroeg, met wat klaar is en wat nog moet. Bijgewerkt bij elke rond
 - Welkom vraagt na het inloggen of je mixen naar Navidrome wilt (Yes of Not now), alleen met account; wie het welkom al zag krijgt alleen die vraag, een keer. Tot het antwoord schrijft de Mac niets.
 - Tab Developer in Settings: welkom opnieuw, Your Mix opnieuw maken (en schrijven als het aan staat), laatste synchronisatie met tijd en uitkomst, servercache wissen, Sonos-log openen, versie en build. Welcome Show Again staat daar nu in plaats van bij General.
 - Sonos: nummers boven 48 kHz (31 van de 970) komen als FLAC 48 kHz 24-bit van Navidrome (getTranscodeDecision), zonder instelling op de server; nooit MP3 320, de keuze is weg. Eerder kreeg de speaker ze onveranderd in 96 kHz en sloeg ze over.
+- Knoppen zoals Spotify: hoofdknop groen met zwarte tekst, tweede knop wit in een grijze ring, in het welkom en in Instellingen (was wit op lichtgroen en groen op donkergroen).
+- Leeg Home-scherm met Spotify's huisje in plaats van het huisje met noot.
+- Paden zoals op Android: stappen vet en wit, grijze pijltjes met ruimte. Telefoonpad klopt nu: PixelPlayer › Settings › Remote player › Use this phone as remote player (was Play from).
 
 ## In 0.2.7 (uitgebracht)
 

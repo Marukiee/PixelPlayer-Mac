@@ -30,6 +30,8 @@ struct PixelPlayerApp: App {
             SettingsView()
                 .environment(model)
                 .tint(PP.primary)
+                // Readable buttons as in the main window: white text in a grey ring, not green on green.
+                .buttonStyle(PillButtonStyle(kind: .outline, height: 28))
         }
         // Not in the menu bar during scripted captures, so a run leaves nothing behind on the screen.
         MenuBarExtra("PixelPlayer", systemImage: "music.note", isInserted: MenuBarSetting.shared.binding) {

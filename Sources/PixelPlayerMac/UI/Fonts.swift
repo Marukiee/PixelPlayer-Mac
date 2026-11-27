@@ -158,6 +158,23 @@ extension Font {
     }
 }
 
+extension Text {
+    /// A place in an app, written as the Android app writes it: the steps bold and bright, quiet arrows with room around
+    /// them. With `size` in Spotify's letter (an imported face gets no bold from `.bold()`), without it in the letter around it.
+    @MainActor static func path(_ parts: String..., size: CGFloat? = nil) -> Text {
+        var text = Text("")
+        for (index, name) in parts.enumerated() {
+            // A step stays on one line: "Remote player" never breaks after Remote.
+            let part = name.replacingOccurrences(of: " ", with: "\u{00A0}")
+            let step = size.map { Text(part).font(.mix($0, .bold)) } ?? Text(part).bold()
+            let arrow = size.map { Text("  \u{203A}  ").font(.mix($0)) } ?? Text("  \u{203A}  ")
+            text = index == 0 ? Text("\(text)\(step.foregroundStyle(Color.primary))")
+                : Text("\(text)\(arrow.foregroundStyle(.secondary))\(step.foregroundStyle(Color.primary))")
+        }
+        return text
+    }
+}
+
 extension View {
     /// Spotify's title letter (SpotifyMixUITitle): section headings at 700, the big titles at 800. Without an imported font:
     /// the system's bold, and Figtree for the big titles.

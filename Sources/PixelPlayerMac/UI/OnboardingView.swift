@@ -76,6 +76,7 @@ struct OnboardingView: View {
                                 Task { await library.scanLocal() }
                             }
                         }
+                        .buttonStyle(PillButtonStyle(kind: .outline, height: 28))
                         .focusable(false)
                     }
                 }
@@ -100,12 +101,13 @@ struct OnboardingView: View {
                             Button(library.client == nil ? "Connect" : "Reconnect") {
                                 Task { await library.connect(ServerSettings(server: server, user: user), password: password) }
                             }
+                            .buttonStyle(PillButtonStyle(kind: .outline, height: 28))
                             .disabled(server.isEmpty || user.isEmpty || password.isEmpty || library.isSample)
                             .focusable(false)
                         }
                     }
                 } footer: {
-                    Text("\(Text("Navidrome › Settings › Users").bold()). Only a login token is kept, not the password itself.").foregroundStyle(.secondary)
+                    Text("\(Text.path("Navidrome", "Settings", "Users", size: 12)). Only a login token is kept, not the password itself.").font(.mix(12)).foregroundStyle(.secondary)
                 }
             }
             .formStyle(.grouped)
@@ -158,7 +160,7 @@ struct OnboardingView: View {
                     Label {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Your phone")
-                            Text("Pair it with this Mac, then on the phone: \(Text("PixelPlayer › Settings › Play from › Use this phone as remote player").bold()).")
+                            Text("Pair it with this Mac, then on the phone: \(Text.path("PixelPlayer", "Settings", "Remote player", "Use this phone as remote player", size: 12)).")
                                 .font(.mix(12)).foregroundStyle(.secondary)
                         }
                     } icon: { Image(systemName: "iphone") }
@@ -228,28 +230,26 @@ struct OnboardingView: View {
             Spacer()
             if model.onboardingStep > 0 {
                 Button("Back") { model.onboardingStep -= 1 }
-                    .controlSize(.large)
+                    .buttonStyle(PillButtonStyle())
                     .focusable(false)
             }
             if page == .mixes {
                 // The answer goes on at once: Not now or Yes, no Continue.
                 Button("Not now") { answer(false) }
-                    .controlSize(.large)
+                    .buttonStyle(PillButtonStyle())
                     .focusable(false)
                 Button("Yes") { answer(true) }
-                    .controlSize(.large)
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(PillButtonStyle(prominent: true))
                     .keyboardShortcut(.defaultAction)
                     .focusable(false)
             } else {
                 if page == .navidrome && library.client == nil || page == .sonos && !findSpeakers {
                     Button("Skip") { model.onboardingStep += 1 }
-                        .controlSize(.large)
+                        .buttonStyle(PillButtonStyle())
                         .focusable(false)
                 }
                 Button(primaryTitle) { next() }
-                    .controlSize(.large)
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(PillButtonStyle(prominent: true))
                     .keyboardShortcut(.defaultAction)
                     // No blue ring: Return presses it, the pointer clicks it.
                     .focusable(false)
