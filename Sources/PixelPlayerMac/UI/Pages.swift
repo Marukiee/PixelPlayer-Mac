@@ -886,25 +886,27 @@ struct TrackRow: View {
 
 struct SearchPage: View {
     let term: String
-
-    private var songs: [Song] {
-        Library.shared.songs.filter { [$0.title, $0.artist, $0.album.title].contains { $0.looselyContains(term) } }
-    }
-    private var albums: [Album] {
-        Library.shared.albums.filter { [$0.title, $0.artist].contains { $0.looselyContains(term) } }
-    }
+    /// The chip that is on: All, or one kind.
+    @LocalState private var filter: ResultFilter = .all
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 36) {
-                if term.isEmpty { browse } else if songs.isEmpty && albums.isEmpty { NoResults(term: term) } else { results }
-            }
-            .padding(.horizontal, margin)
-            .padding(.top, margin)
-            .padding(.bottom, 24)
-        }
+        ScrollView { content }
         // The same margin above as at the sides, whatever the title bar's safe area is at that moment.
         .ignoresSafeArea(.container, edges: .top)
+        .onChange(of: term) { filter = .all }
+    }
+
+    /// The page without its scrolling (a script draws it like this off screen).
+    var content: some View {
+        // Everything found, best first, as the panel under the field ranks it.
+        let found = term.isEmpty ? [] : SearchPanel.results(for: term, limit: 60)
+        return VStack(alignment: .leading, spacing: 36) {
+            if term.isEmpty { browse } else if found.isEmpty { NoResults(term: term) } else { results(found) }
+        }
+        .padding(.horizontal, margin)
+        // The chips 16 under the top, as Spotify's (the browse page keeps the page margin).
+        .padding(.top, term.isEmpty ? margin : 16)
+        .padding(.bottom, 24)
     }
 
     private var genres: [Album] {
@@ -937,83 +939,286 @@ struct SearchPage: View {
         }
     }
 
-    @ViewBuilder
-    private var results: some View {
-        HStack(alignment: .top, spacing: 24) {
-            VStack(alignment: .leading, spacing: 14) {
-                Text("Top result").titleFont(24)
-                if let album = albums.first {
-                    // Fits the four song rows beside it exactly: 20 + 96 + space + 56 + 20 within 224.
-                    VStack(alignment: .leading, spacing: 0) {
-                        HStack(alignment: .center, spacing: 16) {
-                            CoverArt(album: album, radius: 6).frame(width: 96, height: 96)
-                                .shadow(color: .black.opacity(0.2), radius: 10, y: 5)
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(album.title).titleFont(32).lineLimit(2)
-                                Text("Album · \(album.artist)").foregroundStyle(PP.subdued).lineLimit(1)
-                            }
-                        }
-                        Spacer(minLength: 0)
-                        HStack {
-                            Spacer()
-                            PlayCircle(title: album.title, songs: { Library.shared.songs(for: .album(album.id)) })
-                        }
-                    }
-                    .padding(20)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .frame(height: 224)
-                    .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    .onTapGesture { PlayerModel.shared.go(.album(album.id)) }
-                    // Whatever is opened or played from the results goes into Recent searches, as in Spotify.
-                    .simultaneousGesture(TapGesture().onEnded { SearchHistory.shared.remember(SearchHistory.code(album: album)) })
-                } else if let song = songs.first {
-                    // Only songs found: the best one is the top result, as in Spotify (the column stood empty before).
-                    VStack(alignment: .leading, spacing: 0) {
-                        HStack(alignment: .center, spacing: 16) {
-                            CoverArt(album: song.album, radius: 6).frame(width: 96, height: 96)
-                                .shadow(color: .black.opacity(0.2), radius: 10, y: 5)
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(song.title).titleFont(32).lineLimit(2)
-                                Text("Song · \(song.artist)").foregroundStyle(PP.subdued).lineLimit(1)
-                            }
-                        }
-                        Spacer(minLength: 0)
-                        HStack {
-                            Spacer()
-                            PlayCircle(title: song.title, songs: { [song] + songs.filter { $0.id != song.id } })
-                        }
-                    }
-                    .padding(20)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .frame(height: 224)
-                    .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    .onTapGesture { PlayerModel.shared.go(.album(song.album.id)) }
-                    .simultaneousGesture(TapGesture().onEnded { SearchHistory.shared.remember(SearchHistory.code(song: song)) })
-                }
+    /// Spotify's results page (measured on open.spotify.com, 2026-11-27): one column of at most 1152 in the middle; the
+    /// chips; the best match as a wide card (104 high, 10% white, corner 6); then every other match as a row of 80 with
+    /// its kind in a small grey tag.
+    private func results(_ found: [SearchPanelRow]) -> some View {
+        let shown = filter == .all ? found : found.filter(filter.matches)
+        let songs = found.compactMap { row -> Song? in if case .song(let song) = row { song } else { nil } }
+        return VStack(alignment: .leading, spacing: 16) {
+            ResultChips(filter: $filter, found: found)
+            if filter == .all, let top = shown.first {
+                TopResultCard(row: top)
             }
-            .frame(width: 320)
-            VStack(alignment: .leading, spacing: 14) {
-                Text("Songs").titleFont(24)
-                VStack(spacing: 0) {
-                    ForEach(Array(songs.prefix(4).enumerated()), id: \.element.id) { index, song in
-                        TrackRow(index: index + 1, song: song, context: songs, showAlbum: false, showAdded: false)
-                            .simultaneousGesture(TapGesture().onEnded { SearchHistory.shared.remember(SearchHistory.code(song: song)) })
-                    }
+            VStack(spacing: 0) {
+                ForEach(filter == .all ? Array(shown.dropFirst()) : shown) { row in
+                    SearchResultRow(row: row, songs: songs)
                 }
-                .frame(height: 224, alignment: .top)
             }
         }
-        if !albums.isEmpty {
-            Shelf(title: "Albums", showAll: .shelf("albums:\(term)")) {
-                FittingRow(items: albums, minWidth: 160) { album in
-                    ShelfCell(item: .album(album))
-                        .simultaneousGesture(TapGesture().onEnded { SearchHistory.shared.remember(SearchHistory.code(album: album)) })
+        .frame(maxWidth: 1152, alignment: .leading)
+        .frame(maxWidth: .infinity)
+    }
+}
+
+/// The kinds the chips filter on.
+enum ResultFilter: CaseIterable {
+    case all, songs, albums, artists, playlists
+
+    var title: String {
+        switch self {
+        case .all: "All"
+        case .songs: "Songs"
+        case .albums: "Albums"
+        case .artists: "Artists"
+        case .playlists: "Playlists"
+        }
+    }
+
+    func matches(_ row: SearchPanelRow) -> Bool {
+        switch (self, row) {
+        case (.all, _), (.songs, .song), (.albums, .album), (.artists, .artist), (.playlists, .playlist): true
+        default: false
+        }
+    }
+}
+
+/// Spotify's chips over the results: 32 high, 8 apart, 14; the one that is on white with black, the others 10% white.
+/// A kind with nothing found has no chip.
+private struct ResultChips: View {
+    @Binding var filter: ResultFilter
+    let found: [SearchPanelRow]
+
+    var body: some View {
+        HStack(spacing: 8) {
+            ForEach(ResultFilter.allCases.filter { kind in kind == .all || found.contains(where: kind.matches) }, id: \.self) { kind in
+                Button { filter = kind } label: {
+                    Text(kind.title)
+                        .font(.mix(14))
+                        .foregroundStyle(filter == kind ? Color.black : Color.primary)
+                        .padding(.horizontal, 12)
+                        .frame(height: 32)
+                        .background(Capsule().fill(filter == kind ? Color.white : Color.primary.opacity(0.1)))
+                        .contentShape(Capsule())
                 }
+                .buttonStyle(PressStyle())
             }
         }
     }
+}
+
+/// The best match, as Spotify's wide card: cover 72, title 24 bold, the kind and the artist in 14 under it, and on the
+/// right the menu, the save check and a green play of 48.
+private struct TopResultCard: View {
+    let row: SearchPanelRow
+    @Environment(PlayerModel.self) private var model
+    @LocalState private var hovering = false
+
+    var body: some View {
+        HStack(spacing: 24) {
+            ResultPicture(row: row, size: 72)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(row.title).font(.mix(24, .bold)).lineLimit(1)
+                Text(row.kindAndArtist).font(.mix(14)).foregroundStyle(PP.subdued).lineLimit(1)
+            }
+            Spacer(minLength: 16)
+            HStack(spacing: 24) {
+                if case .song(let song) = row {
+                    QueueMore(song: song, owner: "top:" + song.id).opacity(hovering ? 1 : 0)
+                    ResultSave(song: song, hovering: hovering)
+                }
+                GreenPlayButton(size: 48, label: "Play \(row.title)") { play() }
+            }
+        }
+        .padding(16)
+        .frame(height: 104)
+        .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Color.primary.opacity(hovering ? 0.14 : 0.1)))
+        .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .onTapGesture { open() }
+        .onHover { hovering = $0 && !Debug.active }
+        .animation(Motion.fade, value: hovering)
+    }
+
+    /// A song plays; anything else opens, as from the panel.
+    private func open() {
+        if case .song = row { play() } else { SearchPanel.shared.open(row) }
+    }
+
+    private func play() {
+        switch row {
+        case .song: SearchPanel.shared.open(row)
+        case .album(let album):
+            SearchHistory.shared.remember(SearchHistory.code(album: album))
+            model.play(Library.shared.songs(for: .album(album.id)))
+        case .artist(let name, _):
+            SearchHistory.shared.remember(SearchHistory.code(artist: name))
+            model.play(Library.shared.songs(for: .artist(name)))
+        case .playlist(let playlist):
+            model.play(playlist.songs)
+        case .suggestion:
+            break
+        }
+    }
+}
+
+/// One match below the card: 80 high, cover 64 (round for an artist), title 16 and artist 14, the kind in a tag in the
+/// last 282 of the row, and for a song the menu and the save check at the end. Lighter under the pointer, a play on the
+/// cover; a double click plays a song, a click opens anything else.
+private struct SearchResultRow: View {
+    let row: SearchPanelRow
+    let songs: [Song]
+    @Environment(PlayerModel.self) private var model
+    @LocalState private var hovering = false
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Button { play() } label: {
+                ResultPicture(row: row, size: 64)
+                    .overlay {
+                        if hovering {
+                            ZStack {
+                                Color.black.opacity(0.5)
+                                PlayGlyph().fill(Color.white).frame(width: 17, height: 20).offset(x: 1)
+                            }
+                            .clipShape(row.isArtist ? AnyShape(Circle()) : AnyShape(RoundedRectangle(cornerRadius: 4, style: .continuous)))
+                        }
+                    }
+            }
+            .buttonStyle(PressStyle())
+            .help("Play \(row.title)")
+            VStack(alignment: .leading, spacing: 2) {
+                Text(row.title).font(.mix(16)).lineLimit(1)
+                if let artist = row.artistLine {
+                    Text(artist).font(.mix(14)).foregroundStyle(PP.subdued).lineLimit(1)
+                }
+            }
+            Spacer(minLength: 12)
+            HStack(spacing: 24) {
+                Text(row.kind)
+                    .font(.mix(12, .bold))
+                    .foregroundStyle(PP.subdued)
+                    .padding(.horizontal, 4)
+                    .frame(height: 16)
+                    .background(RoundedRectangle(cornerRadius: 4, style: .continuous).fill(Color.primary.opacity(0.1)))
+                Spacer(minLength: 0)
+                if case .song(let song) = row {
+                    QueueMore(song: song, owner: "result:" + song.id).opacity(hovering ? 1 : 0)
+                    ResultSave(song: song, hovering: hovering)
+                }
+            }
+            .frame(width: 282)
+        }
+        .padding(.horizontal, 12)
+        .frame(height: 80)
+        .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Color.primary.opacity(hovering ? 0.1 : 0)))
+        .contentShape(Rectangle())
+        .onTapGesture(count: 2) { if case .song = row { play() } }
+        .onTapGesture { if case .song = row {} else { SearchPanel.shared.open(row) } }
+        .onHover { hovering = $0 && !Debug.active }
+        .animation(nil, value: hovering)
+        .spotContextMenu(owner: "resultrow:" + row.id) {
+            if case .song(let song) = row { SongMenu.entries(for: song) } else { [] }
+        }
+    }
+
+    private func play() {
+        switch row {
+        case .song(let song):
+            SearchHistory.shared.remember(SearchHistory.code(song: song))
+            model.play(song, in: songs)
+        case .album(let album):
+            SearchHistory.shared.remember(SearchHistory.code(album: album))
+            model.play(Library.shared.songs(for: .album(album.id)))
+        case .artist(let name, _):
+            SearchHistory.shared.remember(SearchHistory.code(artist: name))
+            model.play(Library.shared.songs(for: .artist(name)))
+        case .playlist(let playlist):
+            model.play(playlist.songs)
+        case .suggestion:
+            break
+        }
+    }
+}
+
+/// The cover of a match: round for an artist, a corner of 4 for the rest.
+private struct ResultPicture: View {
+    let row: SearchPanelRow
+    let size: CGFloat
+
+    var body: some View {
+        switch row {
+        case .song(let song): CoverArt(album: song.album, radius: 4).frame(width: size, height: size)
+        case .album(let album): CoverArt(album: album, radius: 4).frame(width: size, height: size)
+        case .artist(_, let album): CoverArt(album: album, radius: 0).frame(width: size, height: size).clipShape(Circle())
+        case .playlist(let playlist):
+            if let album = playlist.songs.first?.album {
+                CoverArt(album: album, radius: 4).frame(width: size, height: size)
+            } else {
+                RoundedRectangle(cornerRadius: 4).fill(Color.primary.opacity(0.1)).frame(width: size, height: size)
+            }
+        case .suggestion: Color.clear.frame(width: size, height: size)
+        }
+    }
+}
+
+/// Spotify's save mark at the end of a song: the green check when it is saved, a plus under the pointer when not.
+private struct ResultSave: View {
+    let song: Song
+    let hovering: Bool
+    @Environment(PlayerModel.self) private var model
+
+    var body: some View {
+        let saved = model.likedIDs.contains(song.id) || Library.shared.inPlaylist(song)
+        Button { model.setLiked(song, !saved) } label: {
+            PlayerIconImage(symbol: saved ? "checkmark.circle.fill" : "plus.circle", size: 16)
+                .foregroundStyle(saved ? AnyShapeStyle(PP.primary) : AnyShapeStyle(PP.subdued))
+                .frame(width: 16, height: 32)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(PressStyle())
+        .opacity(saved || hovering ? 1 : 0)
+        .help(saved ? "Remove from Liked Songs" : "Save to Liked Songs")
+    }
+}
+
+extension SearchPanelRow {
+    var title: String {
+        switch self {
+        case .suggestion(let text): text
+        case .song(let song): song.title
+        case .album(let album): album.title
+        case .artist(let name, _): name
+        case .playlist(let playlist): playlist.title
+        }
+    }
+
+    /// The tag: Song, Album, Artist or Playlist.
+    var kind: String {
+        switch self {
+        case .suggestion: ""
+        case .song: "Song"
+        case .album: "Album"
+        case .artist: "Artist"
+        case .playlist: "Playlist"
+        }
+    }
+
+    /// The grey line under a row's title; an artist has none.
+    var artistLine: String? {
+        switch self {
+        case .song(let song): song.artist
+        case .album(let album): album.artist
+        case .playlist(let playlist): "\(playlist.songs.count) songs"
+        case .artist, .suggestion: nil
+        }
+    }
+
+    /// Under the card's title: the kind and the artist, as "Song • Thomas Stenström".
+    var kindAndArtist: String {
+        if let artist = artistLine { "\(kind) • \(artist)" } else { kind }
+    }
+
+    var isArtist: Bool { if case .artist = self { true } else { false } }
 }
 
 /// Nothing found, as Spotify says it: the search in the title, a tip under it, in the middle of the page.

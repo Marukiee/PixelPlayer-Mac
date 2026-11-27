@@ -18,6 +18,8 @@ enum Debug {
     private static let env = ProcessInfo.processInfo.environment
     static let directory: URL? = env["PP_DEBUG_DIR"].map { URL(fileURLWithPath: $0, isDirectory: true) }
     static var active: Bool { directory != nil }
+    /// True while a script draws a view off screen (rendersearch).
+    static var offscreen = false
     /// `PP_MARQUEE=1` lets long titles run in a scripted run too (they stand still otherwise, for steady screenshots).
     static var marquee: Bool { env["PP_MARQUEE"] != nil }
     /// `PP_HOVER=Night Drive,Jazz` draws those rows, tiles and cards as if the pointer were on them, for screenshots of hover.
@@ -438,6 +440,18 @@ enum Debug {
             renderer.scale = 1
             if let image = renderer.nsImage, let tiff = image.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff) {
                 try? rep.representation(using: .png, properties: [:])?.write(to: file("ref-\(value).png"))
+            }
+        case "rendersearch":
+            // `rendersearch:<term>` draws the results page for that search off screen, 1200 by 760 at twice the size, to
+            // rendersearch-<term>.png: for when the screen sleeps and no window can be captured.
+            offscreen = true
+            defer { offscreen = false }
+            let page = SearchPage(term: value).content.environment(model).frame(width: 1200, height: 760, alignment: .top)
+                .background(PP.page).environment(\.colorScheme, .dark)
+            let renderer = ImageRenderer(content: page)
+            renderer.scale = 2
+            if let image = renderer.nsImage, let tiff = image.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff) {
+                try? rep.representation(using: .png, properties: [:])?.write(to: file("rendersearch-\(value).png"))
             }
         case "dragpreview":
             // `dragpreview:<title>` draws what hangs under the pointer while that song is dragged in the queue, made in one

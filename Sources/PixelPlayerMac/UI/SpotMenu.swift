@@ -536,7 +536,8 @@ struct RightClickArea: NSViewRepresentable {
 extension View {
     /// Spotify's menu on a right click. `owner` names the row, which stays lit while its menu is open.
     func spotContextMenu(owner: String? = nil, _ entries: @escaping () -> [MenuEntry]) -> some View {
-        overlay(RightClickArea { event in MenuPresenter.shared.show(entries(), owner: owner, at: MenuPresenter.point(of: event), in: event.window) })
+        // Left out in a picture drawn off screen, which cannot draw the AppKit view that catches the right click.
+        overlay(Debug.offscreen ? nil : RightClickArea { event in MenuPresenter.shared.show(entries(), owner: owner, at: MenuPresenter.point(of: event), in: event.window) })
     }
 }
 

@@ -80,6 +80,7 @@ Alles wat Mark vroeg, met wat klaar is en wat nog moet. Bijgewerkt bij elke rond
 - Mediatoetsen werken vanaf het openen en ook als de Sonos of de telefoon speelt (gingen anders naar Spotify).
 - Zoekpaneel onder het zoekveld zoals Spotify (gemeten): leeg toont het Recent searches, typen geeft vier suggesties (getypte deel vet) en daaronder nummers, artiesten, albums en playlists; pijltjes, Enter en Esc werken. Enter opent de resultatenpagina.
 - Niets gevonden: "No results found for ..." met een tip, in plaats van een lege pagina; alleen nummers gevonden: het beste nummer als Top result.
+- Resultatenpagina zoals Spotify nu (gemeten op open.spotify.com): filterknoppen, beste resultaat als brede kaart, daaronder alles in rijen van 80 met een label Song, Artist of Album; nummers van een artiest komen mee.
 
 ## In 0.2.7 (uitgebracht)
 

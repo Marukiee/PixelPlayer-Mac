@@ -156,7 +156,7 @@ final class SearchPanel {
 
     /// Songs, artists, albums and playlists to open straight away: names that start with the text first, then a word that
     /// starts with it, then the rest that holds it; artists before songs before albums, the most played first.
-    static func results(for text: String) -> [SearchPanelRow] {
+    static func results(for text: String, limit: Int = 8) -> [SearchPanelRow] {
         let library = Library.shared
         func rank(_ name: String) -> Int? {
             if name.range(of: text, options: [.caseInsensitive, .diacriticInsensitive, .anchored]) != nil { return 0 }
@@ -170,7 +170,15 @@ final class SearchPanel {
             if let r = rank(album.artist) { found.append((r, 0, 0, .artist(album.artist, album))) }
         }
         for song in library.songs {
-            if let r = rank(song.title) { found.append((r, 1, song.playCount, .song(song))) }
+            // By its title first; else by its artist or album, after every title match (so "thomas stenström" lists
+            // his songs under the artist, as Spotify does).
+            if let r = rank(song.title) {
+                found.append((r, 1, song.playCount, .song(song)))
+            } else if rank(song.artist) != nil {
+                found.append((3, 1, song.playCount, .song(song)))
+            } else if rank(song.album.title) != nil {
+                found.append((4, 1, song.playCount, .song(song)))
+            }
         }
         for album in library.albums {
             if let r = rank(album.title) { found.append((r, 2, 0, .album(album))) }
@@ -179,7 +187,7 @@ final class SearchPanel {
             if let r = rank(playlist.title) { found.append((r, 3, 0, .playlist(playlist))) }
         }
         found.sort { ($0.rank, $0.kind, -$0.plays) < ($1.rank, $1.kind, -$1.plays) }
-        return found.prefix(8).map(\.row)
+        return found.prefix(limit).map(\.row)
     }
 }
 
